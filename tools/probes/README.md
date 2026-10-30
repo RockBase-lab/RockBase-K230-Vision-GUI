@@ -98,6 +98,7 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_recognize_model.py` | Verification chain: memory, shape, timing, same-subject scores |
 | `_probe_recognize_app.py` | Recognize app end to end: enroll, reload, match, delete, fps |
 | `_cap_face_recognize.py` | Screen capture of the Recognize app with a match |
+| `_cap_recognize_empty.py` | Screen capture of the empty-database panel |
 | `_cap_run.py` | Run a display probe as a subprocess, capture raw output |
 | `_start_launcher.py` | Start the on-board GUI with a single exec |
 
