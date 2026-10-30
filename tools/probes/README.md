@@ -79,7 +79,7 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_beep_race.py` | Click-sound off-time under a blocking C call |
 | `_probe_tz_hash.py` | Sha256 of the timezone wheel bitmaps |
 | `_cap_run.py` | Run a display probe as a subprocess, capture raw output |
-| `_start_gui.py` | Start the on-board GUI with a single exec |
+| `_start_launcher.py` | Start the on-board GUI with a single exec |
 
 Snapshot probes print a run-length encoded frame plus base64 blocks. Pipe that
 output through a file, then decode it with

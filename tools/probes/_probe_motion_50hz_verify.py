@@ -13,13 +13,13 @@ for _name in ("apps.app_motion", "apps", "app_error", "gui"):
 
 import lvgl as lv
 
-src_file = open("/sdcard/factory/gui/gui.py")
+src_file = open("/sdcard/factory/gui/launcher.py")
 gui_src = src_file.read()
 src_file.close()
 del src_file
 
 G = {"__name__": "gui_probe"}
-exec(compile(gui_src, "gui.py", "exec"), G)
+exec(compile(gui_src, "launcher.py", "exec"), G)
 
 launcher = G["Launcher"]()
 meta = None

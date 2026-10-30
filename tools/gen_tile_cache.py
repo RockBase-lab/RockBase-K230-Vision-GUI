@@ -1,13 +1,13 @@
 # Offline-bake the tile cache: on the PC, Pillow composites each app's tile bitmap
-# and emits tile_<id>.bin (XRGB8888, cf=17) that matches gui.py's on-board
+# and emits tile_<id>.bin (XRGB8888, cf=17) that matches launcher.py's on-board
 # _cache_load exactly.
 #
 # Purpose: skip the first-boot on-device snapshot bake (~1.3 s per tile) so the UI is
 # instant at power-on.
-# New app flow: edit the APPS table in gui.py -> run this tool -> push
+# New app flow: edit the APPS table in launcher.py -> run this tool -> push
 # factory/gui/assets/cache/.
 #
-# It parses BAKE_VER / TILE_SIZE / ACCENTS / APPS out of gui.py so the baked
+# It parses BAKE_VER / TILE_SIZE / ACCENTS / APPS out of launcher.py so the baked
 # parameters always match the board; apps without an icon (placeholders) get an
 # accent circular badge plus the first letter (the LVGL symbol font cannot be
 # reproduced on the PC).
@@ -25,9 +25,9 @@ FONT_PATH = os.path.join(ASSETS, "Nunito-Bold-700.ttf")
 
 CF_XRGB8888 = 17   # same as the on-board snapshot
 
-BADGE_SIZE = 96   # badge size when there is no icon (matches _bake_tile in gui.py)
+BADGE_SIZE = 96   # badge size when there is no icon (matches _bake_tile in launcher.py)
 
-# Colours, radius, and margins all come from gui.py so neither side drifts by
+# Colours, radius, and margins all come from launcher.py so neither side drifts by
 # hard-coding them.
 CFG = {}
 
@@ -37,7 +37,7 @@ def _hex(txt, name):
 
 
 def parse_gui():
-    txt = open(os.path.join(GUI, "gui.py"), encoding="utf-8").read()
+    txt = open(os.path.join(GUI, "launcher.py"), encoding="utf-8").read()
     ver = int(re.search(r"BAKE_VER\s*=\s*(\d+)", txt).group(1))
     CFG["tile"] = int(re.search(r"\bTILE_SIZE\s*=\s*(\d+)", txt).group(1))
     CFG["icon"] = int(re.search(r"\bICON_SIZE\s*=\s*(\d+)", txt).group(1))

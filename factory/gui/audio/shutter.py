@@ -54,7 +54,7 @@ import os
 import sys
 import time
 
-import audio_io
+from audio import device
 
 # ---- resource location ----
 SFX_DIR = "/data/audio"
@@ -75,8 +75,8 @@ SFX_FADE_MS = 6               # tail fade-out so the cut-off does not click
 
 # ---- playback parameters ----
 SFX_BLOCK = 320               # must == frames_per_buffer (20ms)
-SFX_VOLUME = audio_io.PLAY_VOLUME   # 95, matches playback calibration, do not tune separately
-PA_SETTLE_MS = 50             # amplifier power-up wait, avoids a start-up pop (same as audio_io)
+SFX_VOLUME = device.PLAY_VOLUME   # 95, matches playback calibration, do not tune separately
+PA_SETTLE_MS = 50             # amplifier power-up wait, avoids a start-up pop (same as stream)
 
 # AO open retry. Measured: after running Vision (sensor+KPU+Ai2d) first and then
 # entering the camera, pa.open occasionally reports
@@ -265,7 +265,7 @@ class ShutterSfx:
 
         path = wav_path()
         try:
-            audio_io.ensure_dir(SFX_DIR)
+            device.ensure_dir(SFX_DIR)
         except BaseException:
             pass
 
@@ -329,10 +329,10 @@ class ShutterSfx:
         pin = None
         stream = None
         try:
-            pin = audio_io._pa_enable()
+            pin = device._pa_enable()
             if pin is not None:
                 time.sleep_ms(PA_SETTLE_MS)
-            pa = audio_io._get_pa()     # shared instance, never terminate (root cause of AO leaks)
+            pa = device._get_pa()     # shared instance, never terminate (root cause of AO leaks)
             stream = pa.open(format=paInt16, channels=2, rate=SFX_RATE,
                              output=True, frames_per_buffer=SFX_BLOCK)
             try:
@@ -346,7 +346,7 @@ class ShutterSfx:
                     stream.close()
                 except BaseException:
                     pass
-            audio_io._pa_disable(pin)
+            device._pa_disable(pin)
             return False
         self._pa_pin = pin
         self._stream = stream
@@ -390,4 +390,4 @@ class ShutterSfx:
                 print("[Sfx] close error: {}".format(error))
         pin = self._pa_pin
         self._pa_pin = None
-        audio_io._pa_disable(pin)
+        device._pa_disable(pin)

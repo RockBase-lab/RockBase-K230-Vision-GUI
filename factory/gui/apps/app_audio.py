@@ -6,7 +6,7 @@
 #     READY     [PLAY]  -> play back; the small "record again" text below re-records
 #     PLAYING   [STOP]  -> stop playback
 #   Page 2 sweep signal (quantitative amplifier analysis): frequency/amplitude sliders
-#     plus START/STOP; the generator lives in tone_gen.py.
+#     plus START/STOP; the generator lives in audio/tone.py.
 #
 # Paging: dragging right-to-left goes to the next page (paging.SnapPager, same 120 px
 # threshold as the desktop). Two dots at the top indicate the current page.
@@ -30,10 +30,10 @@ import time
 
 import lvgl as lv
 
-import audio_io
+from audio import device
 import beep
 import paging
-import tone_gen
+from audio import tone
 
 
 # ---------------- State (page 1) ----------------
@@ -131,10 +131,18 @@ _BTN_IMGS = {}
 # Assets
 # =========================================================================
 def _assets_dir():
-    """Asset directory. Prefers audio_io.__file__ (it sits next to gui.py)."""
-    path = getattr(audio_io, "__file__", None)
+    """Asset directory, derived from this module's __file__ (apps/'s parent is gui/).
+
+    Deriving it from here rather than from an audio module keeps it correct when
+    those modules move between packages.
+    """
+    path = globals().get("__file__")
     if path:
-        return path.rsplit("/", 1)[0] + "/assets"
+        try:
+            base = path.rsplit("/", 1)[0]        # .../gui/apps
+            return base.rsplit("/", 1)[0] + "/assets"
+        except BaseException:
+            pass
     return "/sdcard/factory/gui/assets"
 
 
@@ -204,8 +212,8 @@ class AudioApp:
     def __init__(self, content, ctx):
         self.ctx = ctx
         self.state = STATE_IDLE
-        self.rec = audio_io.DmicRecorder()
-        self.player = audio_io.WavPlayer()
+        self.rec = device.DmicRecorder()
+        self.player = device.WavPlayer()
         self.finalizer = None
 
         self.duration = 0.0        # recorded length (seconds)
@@ -218,7 +226,7 @@ class AudioApp:
         self.pager = None          # paging.DragPager (built in _build)
 
         # ---- Page 2 sweep state ----
-        self.tone = tone_gen.ToneOut()
+        self.tone = tone.ToneOut()
         self.tone_running = False
         self._freq_val = 1000          # raw frequency slider value (logarithmic mapping)
         self._amp_val = 300            # raw amplitude slider value (mV)
@@ -385,7 +393,7 @@ class AudioApp:
         self.amp_sld = lv.slider(page)
         self.amp_sld.set_size(T_SLD_W, T_SLD_H)
         self.amp_sld.align(lv.ALIGN.TOP_MID, 0, T_AMP_SLD)
-        self.amp_sld.set_range(0, int(tone_gen.AMP_MAX_MV))
+        self.amp_sld.set_range(0, int(tone.AMP_MAX_MV))
         self.amp_sld.set_value(self._amp_val, lv.ANIM.OFF)
         self._style_slider(self.amp_sld)
         self._guard_scroll(self.amp_sld)
@@ -531,7 +539,7 @@ class AudioApp:
         if state == STATE_IDLE:
             self._set_btn("btn_rec")
             self._set_hint("tap to record, up to {}".format(
-                audio_io.fmt_time(MAX_RECORD_S)))
+                device.fmt_time(MAX_RECORD_S)))
             self.sub.set_text("no recording yet")
             self.again.add_flag(lv.obj.FLAG.HIDDEN)
             self._set_timer(0)
@@ -555,7 +563,7 @@ class AudioApp:
         elif state == STATE_READY:
             self._set_btn("btn_play")
             self._set_hint("")
-            self.sub.set_text("recorded {}".format(audio_io.fmt_time(self.duration)))
+            self.sub.set_text("recorded {}".format(device.fmt_time(self.duration)))
             self.again.clear_flag(lv.obj.FLAG.HIDDEN)
             self._set_timer(self.duration)
             self.bar.add_flag(lv.obj.FLAG.HIDDEN)
@@ -656,7 +664,7 @@ class AudioApp:
             return
 
         try:
-            self.finalizer = audio_io.WavFinalizer(info["peak"]).start()
+            self.finalizer = device.WavFinalizer(info["peak"]).start()
         except BaseException as error:
             print("[audio] finalize start failed: {}".format(error))
             self.finalizer = None
@@ -673,7 +681,7 @@ class AudioApp:
     def _start_play(self):
         self._error = ""
         try:
-            self.player.start(gain=audio_io.PLAY_GAIN)
+            self.player.start(gain=device.PLAY_GAIN)
         except BaseException as error:
             print("[audio] play start failed: {}".format(error))
             self._error = "playback unavailable: {}".format(error)
@@ -742,8 +750,8 @@ class AudioApp:
 
     def _freq_from_slider(self, v):
         # Logarithmic: FREQ_MIN * (FREQ_MAX/FREQ_MIN)^(v/STEPS)
-        return tone_gen.FREQ_MIN * (
-            (tone_gen.FREQ_MAX / tone_gen.FREQ_MIN) ** (v / float(FREQ_STEPS)))
+        return tone.FREQ_MIN * (
+            (tone.FREQ_MAX / tone.FREQ_MIN) ** (v / float(FREQ_STEPS)))
 
     def _fmt_freq(self, f):
         if f >= 1000:
@@ -753,12 +761,12 @@ class AudioApp:
     def _update_tone_readout(self):
         f = self._freq_from_slider(self._freq_val)
         mv = float(self._amp_val)
-        dig, clamped = tone_gen.amp_digital(mv)
+        dig, clamped = tone.amp_digital(mv)
         pct = dig / 32767.0 * 100.0
         self.t_freq_lbl.set_text("Frequency: {}".format(self._fmt_freq(f)))
         self.t_amp_lbl.set_text("Amplitude: {:.0f} mV  ({:.1f}% FS)".format(mv, pct))
         txt = "digital peak = {}   est Vdiff = {:.3f} V   vol = {}".format(
-            dig, mv / 1000.0, tone_gen.TONE_VOLUME)
+            dig, mv / 1000.0, tone.TONE_VOLUME)
         if clamped:
             txt += "   [CLAMPED: >FS, raise FS_MV]"
         if txt != self._last_readout:

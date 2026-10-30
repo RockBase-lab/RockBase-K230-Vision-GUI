@@ -1884,7 +1884,7 @@ class ImuApp(object):
 
         Font sizes (the user reported the built-in 14/16px was unreadable): title and
         buttons use the 28px Nunito Bold bin font (the same face as the Cancel button of
-        the gui.py panel and the on-screen keyboard), body uses 22px -- any larger and
+        the launcher.py panel and the on-screen keyboard), body uses 22px -- any larger and
         four lines no longer fit. Both are bitmap fonts, so a redraw is only a blit and
         the dialog does not slow redraws down.
         """

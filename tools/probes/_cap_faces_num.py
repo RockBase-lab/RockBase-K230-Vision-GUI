@@ -13,13 +13,13 @@ for _name in ("apps.app_face_det", "apps", "app_error", "beep", "gui"):
 
 import lvgl as lv
 
-_f = open("/sdcard/factory/gui/gui.py")
+_f = open("/sdcard/factory/gui/launcher.py")
 gui_src = _f.read()
 _f.close()
 del _f
 
 G = {"__name__": "gui_probe"}
-exec(compile(gui_src, "gui.py", "exec"), G)
+exec(compile(gui_src, "launcher.py", "exec"), G)
 G["_ensure_cache_dir"]()
 print("L1 gui loaded")
 

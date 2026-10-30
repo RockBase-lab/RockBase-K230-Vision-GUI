@@ -134,7 +134,7 @@ This repository will collect the board-specific material needed to build K230 Vi
 ├── README_zh.md           # Simplified Chinese product overview
 ├── LICENSE                # Apache License 2.0
 ├── AGENTS.md              # Working agreement for contributors and agents
-├── factory/gui/           # Board-side MicroPython GUI launcher and apps
+├── factory/gui/           # GUI: launcher, apps, audio, net, assets
 ├── stubs/                 # Type stubs for the on-board API
 ├── tools/                 # Asset baking and deployment scripts
 │   └── probes/            # One-shot measurement scripts run on the board

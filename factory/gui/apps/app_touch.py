@@ -20,7 +20,7 @@
 #    stroke, the result is a string of isolated dots/short lines - the "fragmented dots"
 #    seen on screen. Mitigation: do not settle immediately on Up; a new touch with the
 #    same track_id within BRIDGE_MS continues the same stroke (same idea as
-#    RELEASE_HOLDOFF_MS in gui.py; measured fake Up interval p50=20-26 ms, max=40 ms).
+#    RELEASE_HOLDOFF_MS in launcher.py; measured fake Up interval p50=20-26 ms, max=40 ms).
 #
 # 4) Each stroke is a sliding window of MAX_PTS points: once full, every new point drops
 #    the oldest one, so the line start keeps disappearing and only the newest 200 points
@@ -226,7 +226,7 @@ class TouchApp:
     def _compute_offset(self):
         """Compute the canvas's absolute offset on screen (scr) deterministically, without
         relying on the runtime object tree.
-        Layout (see _build_shell in gui.py):
+        Layout (see _build_shell in launcher.py):
           scr(screen_w x screen_h)
             content(ctx.width x ctx.height)  TOP_MID aligned -> abs=(content_x, content_y)
               canvas(ctx.width x ctx.height-TOP_BAR_H)  TOP_MID aligned -> (0, TOP_BAR_H)

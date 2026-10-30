@@ -101,8 +101,8 @@ print("SIM_IS_UNAVAILABLE", isinstance(err2, AppUnavailable))
 if err2 is not None:
     print("SIM_MSG", getattr(err2, "message", str(err2)))
 
-g = {"__name__": "guimod", "__file__": "/sdcard/factory/gui/gui.py"}
-src = open("/sdcard/factory/gui/gui.py").read()
+g = {"__name__": "guimod", "__file__": "/sdcard/factory/gui/launcher.py"}
+src = open("/sdcard/factory/gui/launcher.py").read()
 exec(src, g)
 launcher = g["Launcher"]()
 if err2 is None:

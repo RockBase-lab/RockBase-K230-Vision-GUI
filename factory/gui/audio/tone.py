@@ -10,7 +10,7 @@
 # [Amplitude -> voltage calibration] see FS_MV/AMP_MAX_MV below: oscilloscope
 #   measurements taken 2026-10-27, where the panel mV reading is the real
 #   differential voltage at the amplifier input. The full-chain calibration is in
-#   the header block of the audio_io module.
+#   the header block of the stream module.
 #
 # Real time: same as WavPlayer, step() calls pump() every frame to adaptively
 # write until playback progress catches up with the wall clock, otherwise AO
@@ -20,7 +20,7 @@
 import math
 import time
 
-import audio_io
+from audio import device
 
 
 TONE_RATE = 44100
@@ -74,12 +74,12 @@ class ToneOut:
         self.stop()
         self.fail = None
         from media.pyaudio import paInt16
-        pin = audio_io._pa_enable()
+        pin = device._pa_enable()
         if pin is not None:
             time.sleep_ms(50)     # wait for amplifier power-up, avoids a start-up "pop"
         stream = None
         try:
-            pa = audio_io._get_pa()   # shared PyAudio instance, never terminated per op (root cause of AO leaks)
+            pa = device._get_pa()   # shared PyAudio instance, never terminated per op (root cause of AO leaks)
             stream = pa.open(format=paInt16, channels=2, rate=TONE_RATE,
                              output=True, frames_per_buffer=TONE_BLOCK)
             try:
@@ -96,7 +96,7 @@ class ToneOut:
                     stream.close()
                 except BaseException:
                     pass
-            audio_io._pa_disable(pin)
+            device._pa_disable(pin)
             raise
         self._pa = pa
         self._stream = stream
@@ -128,7 +128,7 @@ class ToneOut:
             except BaseException:
                 pass
         self._pa = None          # shared PyAudio: dropping the reference is enough, never terminate
-        audio_io._pa_disable(self._pin)
+        device._pa_disable(self._pin)
         self._pin = None
 
     def _gen_block(self):
@@ -194,7 +194,7 @@ class ToneOut:
                     except BaseException:
                         pass
                 self._pa = None
-                audio_io._pa_disable(self._pin)
+                device._pa_disable(self._pin)
                 self._pin = None
                 return
             self.frames_written += TONE_BLOCK

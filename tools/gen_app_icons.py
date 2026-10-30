@@ -23,7 +23,7 @@
 #   python tools/gen_app_icons.py gallery    # build only the named ones
 #
 # After adding an icon, remember to re-run python tools/gen_tile_cache.py to
-# re-bake the tile cache (and bump BAKE_VER in gui.py, otherwise the board keeps
+# re-bake the tile cache (and bump BAKE_VER in launcher.py, otherwise the board keeps
 # loading the stale cache).
 
 import os
@@ -38,11 +38,11 @@ from svglib.svglib import svg2rlg
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 ASSETS = os.path.join(ROOT, "factory", "gui", "assets")
-GUI_PY = os.path.join(ROOT, "factory", "gui", "gui.py")
+GUI_PY = os.path.join(ROOT, "factory", "gui", "launcher.py")
 
 
 def _parse_gui():
-    """Parse colour constants out of gui.py so the generator and the display side
+    """Parse colour constants out of launcher.py so the generator and the display side
     cannot drift apart."""
     txt = open(GUI_PY, encoding="utf-8").read()
     bg = int(re.search(r"\bTILE_BG\s*=\s*0x([0-9A-Fa-f]{6})", txt).group(1), 16)
@@ -55,7 +55,7 @@ def _parse_gui():
 
 BG_HEX, APP_ACCENTS = _parse_gui()
 
-SIZE = 112                    # target edge length, matches ICON_SIZE in gui.py
+SIZE = 112                    # target edge length, matches ICON_SIZE in launcher.py
 PAD = 5                       # padding from ink to the border (usable area = SIZE - 2*PAD)
 BG = ((BG_HEX >> 16) & 255, (BG_HEX >> 8) & 255, BG_HEX & 255)  # TILE_BG
 STROKE_WIDTH = 1.6            # thinner than Lucide's default 2, crisper at 112px

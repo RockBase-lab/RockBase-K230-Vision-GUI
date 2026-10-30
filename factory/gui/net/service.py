@@ -1,6 +1,6 @@
 # Network service singleton: WiFi connect/persist, timezone, NTP sync.
 #
-# Responsibility boundary: this module belongs to no app. gui.py calls start() at
+# Responsibility boundary: this module belongs to no app. launcher.py calls start() at
 # boot and poll() once per frame in the main loop. app_network is only its
 # configuration entry point; leaving the app does not affect the link (WLAN is a
 # firmware-global interface: once up it stays active until someone calls
@@ -55,17 +55,17 @@
 # connected again. Both holes are closed in load/save.
 #
 # On-disk format v2 (2026-10-30): the password is no longer stored in plain text;
-# net_crypt wraps it into "pwd":{"r","c"} (fresh random every write). ssid/tz/
-# ntp_idx stay plain -- scanning and the UI need them, and encrypting them would
-# only cost debugging time without adding protection. A v1 file (top-level
+# seal() wraps it into "pwd":{"r","c"} with a fresh nonce on every write.
+# ssid/tz/ntp_idx stay plain -- scanning and the UI need them, and encrypting them
+# would only cost debugging time without adding protection. A v1 file (top-level
 # "password") is used as-is in memory and immediately rewritten as v2, invisible
 # to the user. Undecryptable ciphertext means "unconfigured" (no connect, the
 # user just types the password again).
 
+import hashlib
 import json
 import time
 
-import net_crypt
 
 CFG_PATH = "/sdcard/factory/net.json"
 CFG_VER = 2                    # on-disk format version (v1 = plain-text password)
@@ -164,7 +164,7 @@ def load():
         # v2: rebuild the password from pwd.r / pwd.c. Undecryptable means the
         # file was damaged or the algorithm changed; treat it as unconfigured
         # (no connect, the user retypes the password in the app).
-        pwd = net_crypt.unseal(loaded.pop("pwd", None))
+        pwd = unseal(loaded.pop("pwd", None))
         # Ciphertext alone is not enough: a file with an empty ssid can only be a
         # settings file left by a timezone change or a sync, holding no WiFi
         # credentials, so it must not count as configured.
@@ -242,7 +242,7 @@ def save(create=True):
         pwd = ""
         if not create and not _cfg_exists():
             return False
-    sealed = net_crypt.seal(pwd)
+    sealed = seal(pwd)
     if sealed is None:
         # Sealing failed, so skip the write: losing this change beats falling
         # back to plain text.
@@ -490,7 +490,7 @@ def wifi_icon_key():
 # ---------------- Lifecycle: start / poll ----------------
 
 def start():
-    """Called once when gui.py boots: load the config, apply the timezone, and
+    """Called once when launcher.py boots: load the config, apply the timezone, and
     auto-reconnect only when stored credentials exist.
 
     With no net.json (never configured) it returns immediately without touching
@@ -885,3 +885,141 @@ def busy():
     long beep, so staying silent is better. See beep.set_busy_check.
     """
     return _worker_busy
+
+# ---------------- password at rest ----------------
+# Scope: this is obfuscation, not cryptographic protection. The key material has
+# to travel with the card (a replaced card must still join the network), so it
+# lives in the same file. The goal is only that the password is not readable when
+# the card is pulled and mounted on a PC, when a backup is stolen, or during a
+# full-text search -- not that it resists someone reading the sources under
+# /sdcard/factory/gui/.
+#
+# Algorithm: SHA256 counter-mode keystream XOR.
+#   keystream_i = SHA256(_TAG + nonce + byte(i)),  c = plaintext ^ keystream
+# The 16-byte nonce is regenerated on every seal() and stored with the file, so
+# the same password yields different ciphertext on two cards.
+#
+# Why SHA256 rather than ucryptolib: hashlib already has proven on-board use in
+# this project, while ucryptolib has no on-board evidence. A password is at most
+# 63 bytes, so performance is no reason to adopt an unverified dependency.
+#
+# Envelope (verified after decryption, so corruption takes the "not configured"
+# path instead of feeding garbage to connect()):
+#   b"RB\x02" + length (2 bytes little endian) + password text
+#
+# Changing _TAG or the algorithm invalidates every password stored on every
+# deployed device; users would have to re-enter it once.
+
+_TAG = b"RockBase/net/v2"
+_HDR = b"RB\x02"
+R_LEN = 16                     # nonce length, regenerated on every seal
+
+
+def _rand(n):
+    """Get n random bytes. Three sources degrade in turn; the last fallback only
+    guarantees "different every time"."""
+    try:
+        import os
+        b = os.urandom(n)
+        if b and len(b) == n:
+            return bytes(b)
+    except Exception:
+        pass
+    try:
+        import urandom
+        return bytes([urandom.getrandbits(8) for _ in range(n)])
+    except Exception:
+        pass
+    try:
+        import time as _t
+        seed = "{}-{}-{}".format(_t.ticks_us(), _t.ticks_ms(), id(_TAG))
+    except Exception:
+        seed = str(id(_TAG))
+    return hashlib.sha256(seed.encode()).digest()[:n]
+
+
+def _hex(b):
+    try:
+        return b.hex()
+    except AttributeError:
+        return "".join("{:02x}".format(x) for x in b)
+
+
+def _unhex(s):
+    n = len(s) // 2
+    out = bytearray(n)
+    for i in range(n):
+        out[i] = int(s[i * 2:i * 2 + 2], 16)
+    return bytes(out)
+
+
+def _keystream(nonce, need):
+    """Generate need bytes of keystream: SHA256(_TAG + nonce + counter) per block."""
+    out = b""
+    i = 0
+    while len(out) < need:
+        h = hashlib.sha256()
+        h.update(_TAG)
+        h.update(nonce)
+        h.update(bytes([i & 0xFF]))
+        out += h.digest()
+        i += 1
+    return out
+
+
+def _xor(nonce, data):
+    n = len(data)
+    ks = _keystream(nonce, n)
+    out = bytearray(n)
+    for i in range(n):
+        out[i] = data[i] ^ ks[i]
+    return bytes(out)
+
+
+def seal(pwd):
+    """Wrap the plaintext password into {"r": nonce hex, "c": ciphertext hex} and
+    return None on failure.
+
+    On failure the caller must abandon the write: losing this change beats
+    falling back to plaintext.
+    """
+    try:
+        if isinstance(pwd, bytes):
+            raw = pwd
+        else:
+            raw = (pwd or "").encode()
+        n = len(raw)
+        body = _HDR + bytes([n & 0xFF, (n >> 8) & 0xFF]) + raw
+        nonce = _rand(R_LEN)
+        return {"r": _hex(nonce), "c": _hex(_xor(nonce, body))}
+    except Exception as e:
+        print("[net] seal failed:", e)
+        return None
+
+
+def unseal(d):
+    """Restore the plaintext password from {"r","c"}; returns None when the format
+    is wrong or the data was corrupted, which callers treat as not configured."""
+    try:
+        if not isinstance(d, dict):
+            return None
+        nonce = _unhex(d.get("r") or "")
+        c = _unhex(d.get("c") or "")
+    except Exception:
+        return None
+    if len(nonce) != R_LEN or not c:
+        return None
+    try:
+        body = _xor(nonce, c)
+    except Exception:
+        return None
+    if len(body) < 5 or body[0:3] != _HDR:
+        return None
+    n = body[3] | (body[4] << 8)
+    raw = body[5:]
+    if len(raw) != n:
+        return None
+    try:
+        return raw.decode()
+    except Exception:
+        return None

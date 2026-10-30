@@ -12,11 +12,11 @@ for _k in ("apps.app_imu", "app_imu", "apps"):
     if _k in sys.modules:
         del sys.modules[_k]
 
-src = open("/sdcard/factory/gui/gui.py").read()
+src = open("/sdcard/factory/gui/launcher.py").read()
 
 glb = {"__name__": "gui_mod"}
 try:
-    exec(compile(src, "/sdcard/factory/gui/gui.py", "exec"), glb)
+    exec(compile(src, "/sdcard/factory/gui/launcher.py", "exec"), glb)
 except SystemExit:
     pass
 print("[I] gui module loaded")

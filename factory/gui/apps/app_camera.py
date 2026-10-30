@@ -13,7 +13,7 @@
 # Keys: CANCEL (GPIO0) exits, handled by the launcher. OK (GPIO53) captures,
 # consumed here through ctx.take_ok().
 #
-# Shutter feedback: pressing OK plays a synthesized "ka-cha" (see camera_sfx.py)
+# Shutter feedback: pressing OK plays a synthesized "ka-cha" (see audio/shutter.py)
 # and shows a full-screen 20% white overlay for FLASH_FRAMES rendered frames
 # (~60ms at LVGL's 30ms refresh period). Both are driven from the frame loop,
 # not from inside the capture call, because _capture() blocks ~0.5s and nothing
@@ -30,7 +30,7 @@ import time
 import lvgl as lv
 from media.sensor import Sensor, CAM_CHN_ID_0, CAM_CHN_ID_2
 
-import camera_sfx
+from audio import shutter
 from app_error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                        close_sensor)
 
@@ -197,8 +197,8 @@ class CameraApp:
         # (~10 KB) stays resident in memory.
         # The output stream is opened here and reused for the whole session - opening and
         # closing it per shot would add the fixed 1.1 s of stop_stream (measured; see the
-        # header of camera_sfx.py).
-        self.sfx = camera_sfx.ShutterSfx()
+        # header of shutter.py).
+        self.sfx = shutter.ShutterSfx()
         self.sfx.open()
 
         print("[Camera] ready: preview {}x{} | capture {}x{} | dir={} next={}".format(

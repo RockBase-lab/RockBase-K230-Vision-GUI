@@ -18,7 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 ASSETS = os.path.join(ROOT, "factory", "gui", "assets")
 FONT_PATH = os.path.join(ASSETS, "Nunito-Bold-700.ttf")
-GUI_PY = os.path.join(ROOT, "factory", "gui", "gui.py")
+GUI_PY = os.path.join(ROOT, "factory", "gui", "launcher.py")
 
 
 def _hex(name, txt):
@@ -35,7 +35,7 @@ SUPERSAMPLE = 4
 
 
 def parse_sizes():
-    """Parse the clock cell sizes from gui.py so generator and display agree exactly."""
+    """Parse the clock cell sizes from launcher.py so generator and display agree exactly."""
     import re
     txt = open(GUI_PY, encoding="utf-8").read()
     cell = int(re.search(r"CLOCK_CELL_W\s*=\s*(\d+)", txt).group(1))
@@ -86,7 +86,7 @@ def main():
     if cell < need_digit + 2 or colon_w < need_colon + 2:
         raise SystemExit(
             "CELL TOO NARROW: need digit>={} colon>={} but got {} / {} "
-            "(update CLOCK_CELL_W / CLOCK_COLON_W in gui.py)".format(
+            "(update CLOCK_CELL_W / CLOCK_COLON_W in launcher.py)".format(
                 need_digit + 2, need_colon + 2, cell, colon_w))
 
     for ch in "0123456789":

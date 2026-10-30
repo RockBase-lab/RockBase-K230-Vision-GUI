@@ -194,7 +194,7 @@ gyro LSB is 15.6 mdps with 0.2-0.5 dps noise, so one decimal suffices.
 - Constraint: single-ended output must stay at or below 350 mV or the speaker
   saturates. Hence `TARGET_PEAK_PCT = 48` (350 / 720 ≈ 48.6 %, rounded down for
   margin, about 346 mV single-ended).
-- `tone_gen` is calibrated with `FS_MV = 1440` (differential full scale) and
+- `audio.tone` is calibrated with `FS_MV = 1440` (differential full scale) and
   `AMP_MAX_MV = 700` (= 350 × 2, the red line), so the sweep page mV reading is
   the true differential amplifier input.
 - Board regression: output peak 48.0 % FS, clipped 0, RMS +19.7 dB over raw,

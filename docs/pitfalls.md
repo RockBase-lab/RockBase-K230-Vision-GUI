@@ -106,7 +106,7 @@ nothing points at the cause.
 |---|---|---|
 | The board still shows old bitmaps | Colour or size constants changed without re-baking | Re-run the matching generator and increment `BAKE_VER` |
 | A re-baked asset is skipped as "already identical" | Incremental deploy compares size only above 256 KB | Deploy that file with `--force` |
-| The board boots an old UI while probes see new code | `gui.py` was copied wholesale to `/sdcard/main.py` | Autostart must be the 112-byte three-line launcher stub |
+| The board boots an old UI while probes see new code | `launcher.py` was copied wholesale to `/sdcard/main.py` | Autostart must be the 112-byte three-line launcher stub |
 | Code changes have no effect | No soft reset after deploying a `.py` | Ctrl-D |
 | `SyntaxError` on line 1 of an uploaded file | The file carries a UTF-8 BOM | Strip it before upload |
 | Every later probe fails with an empty `UnicodeError` on line 2 | A crashed probe left the transfer temp file locked | Use unique temp names; only a power cycle clears an already-locked file |

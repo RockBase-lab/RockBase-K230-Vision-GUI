@@ -1,6 +1,6 @@
 # Placeholder app: lights up the paging indicator during bring-up. The second
 # page only appears once the icon grid exceeds eight entries.
-# Once a real app is ready, drop its entry from the APPS table in gui.py.
+# Once a real app is ready, drop its entry from the APPS table in launcher.py.
 
 import lvgl as lv
 

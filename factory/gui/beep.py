@@ -154,7 +154,7 @@ def set_busy_check(fn):
 
     Why: while a worker (net_mgr connecting/scanning) holds the lock inside a
     wlan C call, the main thread cannot even enter sleep_ms, so any tone would
-    necessarily become a long beep - better not to sound at all. gui.py wires
+    necessarily become a long beep - better not to sound at all. launcher.py wires
     net_mgr.busy in at boot.
     """
     global _busy_check

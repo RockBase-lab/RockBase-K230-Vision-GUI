@@ -133,7 +133,7 @@ sudo dd if=sysimage-sdcard.img of=/dev/sdx bs=1M oflag=sync
 ├── README_zh.md           # 简体中文版产品说明
 ├── LICENSE                # Apache License 2.0
 ├── AGENTS.md              # 贡献者与 AI 代理的协作约定
-├── factory/gui/           # 板端 MicroPython GUI 启动器与应用
+├── factory/gui/           # GUI：launcher、apps、audio、net、assets
 ├── stubs/                 # 板端 API 类型存根
 ├── tools/                 # 资源烘焙与部署脚本
 │   └── probes/            # 在板上跑的一次性测量脚本

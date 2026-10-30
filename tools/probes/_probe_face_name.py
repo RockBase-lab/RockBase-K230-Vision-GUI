@@ -1,6 +1,6 @@
-# Asserts the on-board gui.py text for the Face group entry name.
+# Asserts the on-board launcher.py text for the Face group entry name.
 
-p = "/sdcard/factory/gui/gui.py"
+p = "/sdcard/factory/gui/launcher.py"
 f = open(p, "r")
 src = f.read()
 f.close()

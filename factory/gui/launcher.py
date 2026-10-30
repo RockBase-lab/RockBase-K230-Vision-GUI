@@ -21,7 +21,7 @@
 #   Status-bar icons and clock digits are bitmaps for the same reason: the clock ticks
 #   every second, and live text would stall the UI once per second.
 #
-# Run: exec(open('/sdcard/factory/gui/gui.py').read())
+# Run: exec(open('/sdcard/factory/gui/launcher.py').read())
 #
 # App contract (apps/app_xxx.py):
 #   create_app(content, ctx) -> app
@@ -391,11 +391,11 @@ if _gui_dir not in sys.path:
 
 # Shared paging module (home screen, gallery and any other horizontally paged app use
 # the same thresholds and styles).
-# It must be imported after _gui_dir is on sys.path, and it must never import gui.py
+# It must be imported after _gui_dir is on sys.path, and it must never import launcher.py
 # back: this file runs via exec(open().read()), so a reverse import would execute it a
 # second time and build a second Launcher.
 import paging
-import net_mgr
+from net import service as net_mgr
 # Signal that an app cannot run (camera missing, ...): the app raises AppUnavailable
 # and this file shows the notice panel.
 from app_error import AppUnavailable

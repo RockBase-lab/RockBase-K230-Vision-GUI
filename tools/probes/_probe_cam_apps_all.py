@@ -25,8 +25,8 @@ if GUI not in sys.path:
 for m in ("app_error", "apps.app_camera", "apps.app_scan", "apps.app_vision"):
     sys.modules.pop(m, None)
 
-g = {"__name__": "guimod", "__file__": GUI + "/gui.py"}
-exec(open(GUI + "/gui.py").read(), g)
+g = {"__name__": "guimod", "__file__": GUI + "/launcher.py"}
+exec(open(GUI + "/launcher.py").read(), g)
 AppUnavailable = g["AppUnavailable"]
 from app_error import NoSignalCounter
 

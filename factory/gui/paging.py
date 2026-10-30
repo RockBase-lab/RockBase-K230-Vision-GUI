@@ -1,17 +1,17 @@
 # Shared paging/scroll module: reused by the desktop launcher and every app that
 # pages horizontally.
 #
-# Why a separate module: the desktop (gui.py) and the gallery used to carry their
+# Why a separate module: the desktop (launcher.py) and the gallery used to carry their
 # own copies of the scroll-container setup and snap logic, with thresholds and
 # styles kept in sync by comments, which drifted easily. They are collapsed into
 # one copy here.
 #
-# This module **depends on lvgl only** and never imports gui.py (gui.py runs via
+# This module **depends on lvgl only** and never imports launcher.py (launcher.py runs via
 # exec(open().read()), so a reverse import would execute it again and create a
 # second Launcher).
 #
 # Deployment note: MicroPython caches imported modules. After editing paging.py,
-# re-exec'ing gui.py on the board may still use the old module -- a soft reset or a
+# re-exec'ing launcher.py on the board may still use the old module -- a soft reset or a
 # power cycle is needed.
 #
 # Measured parameters reusable on board (2026-10, RockBase/K230):
