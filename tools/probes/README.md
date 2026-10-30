@@ -57,6 +57,7 @@ See `docs/pitfalls.md` for the full trap index.
 | `_gen_qr_matrix.py` | Host-side QR matrix generation for the scan probe |
 | `_cap_faces_num.py` | Face app detection count and layout |
 | `_probe_face_name.py` | Face group display name in the on-board source |
+| `_probe_face_dots.py` | Face app landmark slices stay in sync with their boxes |
 | `_probe_imu_tear.py` | Read tearing signature at exactly 256 LSB |
 | `_probe_imu_lock.py` | Locking sequence effect on peak-to-peak and outliers |
 | `_probe_imu_accuracy.py` | Noise, offset and magnitude for a static board |

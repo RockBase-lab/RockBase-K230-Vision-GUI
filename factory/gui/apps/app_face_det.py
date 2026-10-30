@@ -495,6 +495,13 @@ class FaceDetApp:
         for i in range(MAX_FACES):
             box = self.box_objs[i]
             lab = self.box_labels[i]
+            base = i * POINTS_PER_FACE
+            # Clear this face's dot slice up front. Hiding by a trailing
+            # visible-count prefix instead leaves the dots of a skipped face on
+            # screen and cuts the dots of a face that is drawn.
+            for k in range(POINTS_PER_FACE):
+                self.dot_objs[base + k].add_flag(lv.obj.FLAG.HIDDEN)
+
             if i >= n:
                 box.add_flag(lv.obj.FLAG.HIDDEN)
                 lab.add_flag(lv.obj.FLAG.HIDDEN)
@@ -525,30 +532,18 @@ class FaceDetApp:
             lab.clear_flag(lv.obj.FLAG.HIDDEN)
             lab.align_to(box, lv.ALIGN.TOP_LEFT, 0, label_dy(y))
 
-            # 5 landmarks: each face owns a fixed POINTS_PER_FACE slice of the pool
-            base = i * POINTS_PER_FACE
+            # 5 landmarks, written into the slice cleared above
             if points and i < len(points):
                 pts = points[i]
                 cnt = len(pts) // 2
                 if cnt > POINTS_PER_FACE:
                     cnt = POINTS_PER_FACE
-                for k in range(POINTS_PER_FACE):
+                for k in range(cnt):
                     dot = self.dot_objs[base + k]
-                    if k >= cnt:
-                        dot.add_flag(lv.obj.FLAG.HIDDEN)
-                        continue
-                    px = int(pts[k * 2])
-                    py = int(pts[k * 2 + 1]) - self.y_off
-                    dot.set_pos(px - DOT_SIZE // 2, py - DOT_SIZE // 2)
+                    dot.set_pos(int(pts[k * 2]) - DOT_SIZE // 2,
+                                int(pts[k * 2 + 1]) - self.y_off - DOT_SIZE // 2)
                     dot.clear_flag(lv.obj.FLAG.HIDDEN)
-            else:
-                for k in range(POINTS_PER_FACE):
-                    self.dot_objs[base + k].add_flag(lv.obj.FLAG.HIDDEN)
 
-        # hide the dots of faces beyond the current count (when n shrinks)
-        keep = drawn * POINTS_PER_FACE
-        for k in range(keep, len(self.dot_objs)):
-            self.dot_objs[k].add_flag(lv.obj.FLAG.HIDDEN)
         return drawn, len(boxes) > MAX_FACES if boxes else False
 
     def _print_faces(self, res):

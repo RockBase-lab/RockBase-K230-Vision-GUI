@@ -74,6 +74,7 @@ nothing points at the cause.
 | A widget jumped somewhere unexpected and no error was raised | Passed `TEXT_ALIGN.*` to `set_align()`, whose values collide with `ALIGN.*` | Use `set_style_text_align()` for text alignment |
 | Tapping an icon body does nothing, its blank edge works | An `lv.obj` child is CLICKABLE by default and swallows the hit without bubbling | `clear_flag(lv.obj.FLAG.CLICKABLE)` on decorative children |
 | A single-page scroll container loses clicks | Touch jitter is read as a scroll, which cancels `CLICKED` | `clear_flag(SCROLLABLE)` when there is only one page |
+| Landmark dots linger on screen while the next face loses its own | A shared widget pool was hidden by a trailing "visible count" prefix, so one skipped slot shifted every later slice | Clear each slot's own slice when you visit it and index by the item, never by a visible counter |
 | Each page is offset by 11 px more than the last | flex `pad_column` defaults to 11 px and `pad_all(0)` does not clear it | `set_style_pad_column(0)` |
 | A snappy animation becomes a mid-animation position | A release does not guarantee `SCROLL_END` once momentum is off | Poll the pressed state instead of waiting for the event |
 | Text position is off by 4 px between two labels | Mixed proportional and monospace fonts share no baseline | Use the same font family for the whole row |
