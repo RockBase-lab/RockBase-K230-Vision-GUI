@@ -200,6 +200,15 @@ scale = pad_top / scale + screen_y`, so `y_off = pad_top / scale`, which is
 Pad colour is `[104, 117, 123]` (the training mean) with pad parameters
 `[0, 0, 0, 0, top, top, 0, 0]`.
 
+**The AI channel sees only part of the sensor.** Both Face apps configure
+chn1/chn2 with `set_framesize(800, 480, crop=True)`, and the firmware keeps a
+centred 1600x960 window of the 1920x1080 frame (offset 160,60): 83.3% of the
+width and 88.9% of the height, downscaled 2:1. A face outside that window is
+never seen, and one half inside it is truncated at the border, so the app
+cannot detect or track a face that has left the retained field of view even
+though it is still in front of the lens. See `board-hardware.md` and
+`tools/probes/_probe_sensor_crop.py`.
+
 Measured cost (800x480 preview, 320 model): ai2d 1.5 ms + kpu 4.0 ms + post
 3.0 ms = 8.5 ms; 26 fps inside the app including LVGL repaint. At conf 0.5 a
 centred face is detected in 90/90 frames. A four-face scene (three small, one
