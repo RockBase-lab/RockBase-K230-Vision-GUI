@@ -61,6 +61,8 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_face_conf_sweep.py` | Box count against confidence threshold on one captured frame |
 | `_probe_face_points_cost.py` | `lv.line` mesh cost and landmark model chain timings |
 | `_probe_face_points_app.py` | Points app through the real launcher: frame rate, views, points |
+| `_probe_face_mesh.py` | Triangulated mesh draw cost on real face geometry |
+| `_cap_face_points.py` | Points app screen capture for host-side viewing |
 | `_probe_landmark_assets.py` | Landmark model files and the aidemo symbols that exist |
 | `_probe_imu_tear.py` | Read tearing signature at exactly 256 LSB |
 | `_probe_imu_lock.py` | Locking sequence effect on peak-to-peak and outliers |
@@ -83,6 +85,7 @@ See `docs/pitfalls.md` for the full trap index.
 | `_cap_kbtxt.py` | Keyboard snapshot on the text page |
 | `_probe_beep_race.py` | Click-sound off-time under a blocking C call |
 | `_probe_tz_hash.py` | Sha256 of the timezone wheel bitmaps |
+| `_probe_sensor_crop.py` | Crop rectangle the firmware keeps for an 800x480 preview |
 | `_cap_run.py` | Run a display probe as a subprocess, capture raw output |
 | `_start_launcher.py` | Start the on-board GUI with a single exec |
 

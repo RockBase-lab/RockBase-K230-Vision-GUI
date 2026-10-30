@@ -35,6 +35,11 @@ plus the widgets that actually changed.
 | `lv.line` x8 | 20.1 ms |
 | `lv.line` x10 | 25.2 ms |
 | `set_points` for 100 points, no repaint | 1.83 ms |
+| mesh: 23 edges | 11.9 ms |
+| mesh: 46 edges | 19.3 ms |
+| mesh: 92 edges | 30.6 ms |
+| mesh: 92 edges + 42 vertex dots | 32.2 ms |
+| 42 vertex dots alone | 5.0 ms |
 
 Screen `lv.line` objects scale at roughly 1.2-1.6 ms each after the first, and
 the first one is expensive because it covers the most pixels. The point count
@@ -42,6 +47,11 @@ barely matters: pushing 100 points into ten lines costs 1.83 ms while drawing
 them costs about 20 ms, so a mesh must be batched into polylines instead of one
 object per point. Under FULL render every visible line is redrawn whether or not
 its geometry changed, so hiding a group is the only way to save its cost.
+
+Edge width is not the lever: a 92-edge mesh costs 30.6 ms at 1 px and 31.2 ms at
+2 px. Shaded length decides, so reduce the number of edges, not their thickness.
+Vertex dots are nearly free once the edges are drawn (1.2 ms for 42 of them),
+which makes a node-and-link mesh look worth its cost.
 
 Two consequences that have already shaped this codebase:
 

@@ -249,6 +249,12 @@ run 1.32 ms. `affine + build` dominates, so the app rebuilds it every other fram
 and reuses the previous points in between. Model load: detector 206 ms, landmark
 106 ms; both models resident leaves 3.65 MB free.
 
+The triangulated mask is nine anatomical polylines plus 32 cross edges and 42
+vertex dots. On a 220x270 face the edges cost 30.6 ms and the dots add 1.2 ms;
+with detection and the preview composite the app settles at about 57 ms/frame
+(17.5 fps). The repaint of the preview alone is about 26 ms, so even an empty
+overlay caps near 25 fps: reduce edge count, not line width.
+
 Opening an audio output stream after this chain still works, so the RetinaFace
 single-model path does not reproduce the audio contamination seen with the
 full Vision chain. See `reset-matrix.md`.

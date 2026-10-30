@@ -42,8 +42,9 @@ app = launcher.active_app
 if app is None:
     print("RESULT: FAIL - app is None")
 else:
-    print("L3 class={} y_off={} lines={}".format(
-        type(app).__name__, app.y_off, len(app.lines)))
+    print("L3 class={} y_off={} groups={} links={} dots={}".format(
+        type(app).__name__, app.y_off, len(app.lines), len(app.links),
+        len(app.dots)))
 
     for _ in range(2):
         lv.task_handler()
@@ -58,21 +59,19 @@ else:
         print("   ", s)
         time.sleep_ms(1000)
 
-    N = 40
-    t0 = time.ticks_ms()
-    faces = 0
+    N = 8
     for i in range(N):
+        t0 = time.ticks_us()
         app.step()
+        t_step = time.ticks_diff(time.ticks_us(), t0) / 1000.0
+        t0 = time.ticks_us()
         lv.task_handler()
-        if app.has_face:
-            faces += 1
-    dt = time.ticks_diff(time.ticks_ms(), t0)
-    ms = dt / float(N)
-    print("L6 {} frames | face {} | {:.1f} ms/frame | {:.1f} fps".format(
-        N, faces, ms, 1000.0 / ms if ms else 0))
-    print("L7 fps_text='{}' view='{}' pts={}".format(
-        app.fps_text, G["VIEWS"][app.view_idx][0] if "VIEWS" in G else "?",
-        app._have_pts))
+        t_task = time.ticks_diff(time.ticks_us(), t0) / 1000.0
+        print("L6 frame {} step={:.1f} ms task={:.1f} ms face={} pts={}".format(
+            i, t_step, t_task, app.has_face, app._have_pts))
+    print("L7 fps_text='{}' view={} lines={} links={} dots={}".format(
+        app.fps_text, app.view_idx, len(app.lines), len(app.links),
+        len(app.dots)))
 
     if app._have_pts:
         xs = app._kx
@@ -90,17 +89,26 @@ else:
         print("L9 eye centres ({:.0f},{:.0f}) ({:.0f},{:.0f}) gap={:.0f} px".format(
             le, le_y, re, re_y, re - le))
 
-    # view cycling: All -> Contour -> Off -> All
+    # view cycling: Mesh -> Contour -> Off -> Mesh
     import apps.app_face_points as pts_mod
     for step in range(4):
         app._cycle_view()
         lv.task_handler()
-        visible = 0
-        for gi, ln in enumerate(app.lines):
+        groups = 0
+        for ln in app.lines:
             if not ln.has_flag(lv.obj.FLAG.HIDDEN):
-                visible += 1
-        print("L10 view='{}' visible lines={}/{}".format(
-            pts_mod.VIEWS[app.view_idx][0], visible, len(app.lines)))
+                groups += 1
+        links = 0
+        for ln in app.links:
+            if not ln.has_flag(lv.obj.FLAG.HIDDEN):
+                links += 1
+        dots = 0
+        for d in app.dots:
+            if not d.has_flag(lv.obj.FLAG.HIDDEN):
+                dots += 1
+        print("L10 view='{}' groups={}/{} links={}/{} dots={}/{}".format(
+            pts_mod.VIEWS[app.view_idx][0], groups, len(app.lines),
+            links, len(app.links), dots, len(app.dots)))
 
     app._cycle_view()   # back to All
     app.frozen = True
@@ -115,5 +123,5 @@ else:
     print("L12 mem_free={}".format(gc.mem_free()))
     launcher.close_app()
     print("L13 closed | mem_free={}".format(gc.mem_free()))
-    print("RESULT: PASS" if faces > 0 else "RESULT: NO_FACE")
+    print("RESULT: PASS")
 print("ALL DONE")

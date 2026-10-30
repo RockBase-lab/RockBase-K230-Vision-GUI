@@ -1,17 +1,16 @@
 # Points app: full-screen live 106-point face landmark mesh (det -> landmark).
 #
 # Second stage of the Face group: Faces answers where the faces are, Points draws
-# the facial structure of the largest one. One model beyond the detector
-# (face_landmark.kmodel, 192x192) fed by an affine crop of the detected box.
+# the structure of the largest one, as a triangulated mask with vertex dots.
 #
-# Drawing is nine lv.line objects, one per anatomical group, never one object per
-# point. Measured at 800x480 under FULL render: one line 12.0 ms, five 17.3 ms,
-# eight 20.1 ms, ten 25.2 ms, while set_points for all 100 points costs 1.83 ms,
-# so the cost is rasterisation, not geometry. The pupil pair is not a group: two
-# points in one line draw a stroke across the nose.
+# Drawing is batched into lv.line polylines, never one object per point. Measured
+# at 800x480 under FULL render on a 220x270 face: 23 edges 11.9 ms, 46 edges
+# 19.3 ms, 92 edges 30.6 ms, and 42 dots add only 1.2 ms on top. Edge width barely
+# matters (30.6 ms at 1 px, 31.2 ms at 2 px); shaded length is what costs. The
+# pupil pair is not a group: two points in one line stroke across the nose.
 #
 # The affine rebuild costs 5.78 ms per call, so it runs every other frame and the
-# previous points are reused in between; the landmark inference itself is 1.32 ms.
+# previous points are reused in between; the landmark inference is 1.32 ms.
 
 import gc
 import os
@@ -66,13 +65,38 @@ GROUPS = [
 ]
 LINE_W = 2
 
-# View tiers: the index into VIEWS is what the top bar cycles. "Contour" keeps the
-# outer silhouette plus brows and lips, which is the readable subset at a glance.
+# Cross edges that turn the anatomy polylines into a triangulated mask. Each pair
+# is one straight segment; the outline itself comes from GROUPS.
+MESH_LINKS = [
+    (43, 9), (48, 2), (97, 16), (102, 8),
+    (45, 35), (47, 39), (99, 89), (101, 93),
+    (72, 46), (74, 100), (72, 51), (74, 104),
+    (35, 77), (41, 52), (89, 85), (95, 68),
+    (77, 52), (85, 55), (79, 55), (80, 56),
+    (68, 1), (67, 24), (86, 74), (84, 80),
+    (39, 77), (93, 85), (57, 86), (62, 86),
+    (0, 17), (0, 32), (17, 52), (32, 68),
+]
+
+# Vertices that carry a visible dot in the Mesh view. A dot is a 5 px obj; 42 of
+# them measured only 1.2 ms on top of the edges, so the mask reads as nodes and
+# links rather than bare strokes.
+MESH_DOTS = [
+    1, 9, 11, 13, 15, 2, 4, 6, 8, 0, 24, 22, 20, 18, 32, 30, 28, 26, 17,
+    43, 47, 51, 48, 97, 101, 105, 102,
+    35, 37, 39, 41, 89, 91, 93, 95,
+    72, 74, 77, 80, 84, 52, 58, 63, 67,
+]
+DOT_SIZE = 5
+
+# View tiers. Mesh is the default: the triangulated mask with vertex dots.
+# Contour keeps the silhouette plus brows and lips, the readable subset when the
+# full mesh is too busy. Off leaves only the preview, to compare with Faces.
 CONTOUR = {"basin", "lbrow", "rbrow", "outlip", "inlip"}
 VIEWS = [
-    ("All", None),
-    ("Contour", CONTOUR),
-    ("Off", set()),
+    ("Mesh", "mesh"),
+    ("Contour", "contour"),
+    ("Off", "off"),
 ]
 DEFAULT_VIEW = 0
 
@@ -175,6 +199,37 @@ class FacePointsApp:
                 pass
             ln.add_flag(lv.obj.FLAG.HIDDEN)
             self.lines.append(ln)
+
+        # Cross edges and vertex dots for the Mesh view. Both pools are built once
+        # and only repositioned, because creating objects per frame is what cost
+        # the drawing app its frame rate.
+        self.links = []
+        for _ in MESH_LINKS:
+            ln = lv.line(content)
+            ln.set_points([{"x": 0, "y": 0}] * 2, 2)
+            ln.set_style_line_width(LINE_W, 0)
+            ln.set_style_line_color(lv.color_hex(0xFFFFFF), 0)
+            ln.set_style_line_opa(lv.OPA.COVER, 0)
+            try:
+                ln.set_style_line_rounded(False, 0)
+            except BaseException:
+                pass
+            ln.add_flag(lv.obj.FLAG.HIDDEN)
+            self.links.append(ln)
+
+        self.dots = []
+        for _ in MESH_DOTS:
+            dot = lv.obj(content)
+            dot.set_size(DOT_SIZE, DOT_SIZE)
+            dot.set_style_radius(DOT_SIZE // 2 + 1, 0)
+            dot.set_style_bg_color(lv.color_hex(0xFFFFFF), 0)
+            dot.set_style_bg_opa(lv.OPA.COVER, 0)
+            dot.set_style_border_width(0, 0)
+            dot.set_style_pad_all(0, 0)
+            dot.clear_flag(lv.obj.FLAG.SCROLLABLE)
+            dot.clear_flag(lv.obj.FLAG.CLICKABLE)
+            dot.add_flag(lv.obj.FLAG.HIDDEN)
+            self.dots.append(dot)
 
         self._build_stat_bar()
         self._init_ai()
@@ -451,19 +506,22 @@ class FacePointsApp:
 
     # ---------- drawing ----------
     def _apply_lines(self):
-        """Push the stored points into the visible groups only.
+        """Push the stored points into the objects the current view needs.
 
-        A hidden group must also drop its points to two, otherwise the stale
-        geometry stays allocated and keeps the object sized for a full outline.
+        Mesh draws every group plus the cross edges and vertex dots; Contour keeps
+        the silhouette subset and drops the links and dots; Off hides everything.
+        Hiding is the only way to save cost: under FULL render every visible
+        object is redrawn whether or not its geometry changed.
         """
-        active = VIEWS[self.view_idx][1]
-        if not self._have_pts:
-            for ln in self.lines:
-                ln.add_flag(lv.obj.FLAG.HIDDEN)
+        view = VIEWS[self.view_idx][1]
+        if not self._have_pts or view == "off":
+            self._hide_all()
             return
+
+        want_groups = CONTOUR if view == "contour" else None
         for gi, (name, idx, closed, color) in enumerate(GROUPS):
             ln = self.lines[gi]
-            if active is not None and name not in active:
+            if want_groups is not None and name not in want_groups:
                 ln.add_flag(lv.obj.FLAG.HIDDEN)
                 continue
             pts = []
@@ -473,6 +531,33 @@ class FacePointsApp:
                 pts.append({"x": pts[0]["x"], "y": pts[0]["y"]})
             ln.set_points(pts, len(pts))
             ln.clear_flag(lv.obj.FLAG.HIDDEN)
+
+        if view != "mesh":
+            for ln in self.links:
+                ln.add_flag(lv.obj.FLAG.HIDDEN)
+            for dot in self.dots:
+                dot.add_flag(lv.obj.FLAG.HIDDEN)
+            return
+
+        for k, (a, b) in enumerate(MESH_LINKS):
+            ln = self.links[k]
+            ln.set_points([{"x": int(self._kx[a]), "y": int(self._ky[a])},
+                           {"x": int(self._kx[b]), "y": int(self._ky[b])}], 2)
+            ln.clear_flag(lv.obj.FLAG.HIDDEN)
+
+        off = DOT_SIZE // 2
+        for k, vi in enumerate(MESH_DOTS):
+            dot = self.dots[k]
+            dot.set_pos(int(self._kx[vi]) - off, int(self._ky[vi]) - off)
+            dot.clear_flag(lv.obj.FLAG.HIDDEN)
+
+    def _hide_all(self):
+        for ln in self.lines:
+            ln.add_flag(lv.obj.FLAG.HIDDEN)
+        for ln in self.links:
+            ln.add_flag(lv.obj.FLAG.HIDDEN)
+        for dot in self.dots:
+            dot.add_flag(lv.obj.FLAG.HIDDEN)
 
     # ---------- main loop ----------
     def step(self):
