@@ -1,0 +1,8 @@
+# Board-side tool dependencies (tools/push_factory.py, _push_file.py, _run_remote.py)
+pyserial
+adafruit-ampy
+
+# Icon / cache generation (tools/gen_app_icons.py, gen_status_icons.py, gen_tile_cache.py)
+Pillow
+svglib
+reportlab

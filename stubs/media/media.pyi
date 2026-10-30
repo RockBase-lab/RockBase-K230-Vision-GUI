@@ -1,0 +1,26 @@
+"""K230 CanMV media.media module stubs."""
+from typing import Any
+
+
+VB_REMAP_MODE_NOCACHE: int
+VB_REMAP_MODE_CACHED: int
+
+
+class MediaManager:
+    @staticmethod
+    def init(*args: Any, **kwargs: Any) -> int: ...
+    @staticmethod
+    def deinit(*args: Any, **kwargs: Any) -> int: ...
+    @staticmethod
+    def link(*args: Any, **kwargs: Any) -> int: ...
+    @staticmethod
+    def unlink(*args: Any, **kwargs: Any) -> int: ...
+    @staticmethod
+    def buffer_init(*args: Any, **kwargs: Any) -> int: ...
+    @staticmethod
+    def buffer_deinit(*args: Any, **kwargs: Any) -> int: ...
+    @staticmethod
+    def buffer_config(*args: Any, **kwargs: Any) -> int: ...
+
+
+def __getattr__(name: str) -> Any: ...

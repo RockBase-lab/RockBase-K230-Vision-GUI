@@ -1,0 +1,24 @@
+{
+    "include": [
+        "factory",
+        "tools",
+        "stubs"
+    ],
+    "stubPath": "./stubs",
+    "extraPaths": [
+        "./stubs"
+    ],
+    "pythonVersion": "3.13",
+    "typeCheckingMode": "basic",
+
+    "reportMissingModuleSource": "none",
+    "reportMissingImports": "warning",
+    "reportMissingTypeStubs": "none",
+    "reportGeneralTypeIssues": "none",
+    "reportOptionalMemberAccess": "none",
+    "reportOptionalSubscript": "none",
+    "reportAttributeAccessIssue": "none",
+    "reportPossiblyUnboundVariable": "none",
+    "reportUndefinedVariable": "warning",
+    "reportInvalidTypeForm": "none"
+}

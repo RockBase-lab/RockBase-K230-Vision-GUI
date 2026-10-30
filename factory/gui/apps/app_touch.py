@@ -1,0 +1,444 @@
+# Touch app: multi-touch line drawing test. Each finger gets its own stroke, and each
+# stroke its own colour.
+#
+# Key design points (all measured on board, do not change them back):
+#
+# 1) Do not rely on LVGL's PRESSED/PRESSING events (indev only samples every ~30 ms, so a
+#    fast swipe loses points). Instead consume the high-rate raw point stream from
+#    TouchScreen.read_raw() directly in step() (main loop ~5 ms).
+#    A raw point is a (x, y, event, track_id) tuple; track_id is the only way to tell
+#    fingers apart, and one stroke = one track_id, so several fingers can each draw their
+#    own line without crossing over.
+#
+# 2) One stroke = one lv.line object, not one lv.obj per sample point.
+#    The old approach used a rounded obj per point and, at the cap, had to delete+create
+#    every frame; measured fps collapsed from 47 to 9. A single lv.line set_points call
+#    draws the whole polyline, and more points only cost two memcpy calls.
+#
+# 3) Stroke bridging: while dragging fast the FT5316 reports many Down/Up pairs and almost
+#    no Move (measured within one second: ev=[1:43 2:43 3:2]). If every Down started a new
+#    stroke, the result is a string of isolated dots/short lines - the "fragmented dots"
+#    seen on screen. Mitigation: do not settle immediately on Up; a new touch with the
+#    same track_id within BRIDGE_MS continues the same stroke (same idea as
+#    RELEASE_HOLDOFF_MS in gui.py; measured fake Up interval p50=20-26 ms, max=40 ms).
+#
+# 4) Each stroke is a sliding window of MAX_PTS points: once full, every new point drops
+#    the oldest one, so the line start keeps disappearing and only the newest 200 points
+#    remain; memory also stays constant at 200 points.
+
+import lvgl as lv
+import time
+
+
+def _load_png(path):
+    """Read a PNG into an lv.img_dsc_t. The returned dsc must stay referenced (its data
+    lives inside it)."""
+    try:
+        f = open(path, "rb")
+        data = f.read()
+        f.close()
+        return lv.img_dsc_t({"data_size": len(data), "data": data})
+    except BaseException as error:
+        print("[Touch] load {} failed: {}".format(path, error))
+        return None
+
+
+def _assets_dir():
+    """Asset directory, derived from this module's __file__ (apps/'s parent is gui/)."""
+    path = globals().get("__file__")
+    if path:
+        try:
+            base = path.rsplit("/", 1)[0]        # .../gui/apps
+            return base.rsplit("/", 1)[0] + "/assets"
+        except BaseException:
+            pass
+    return "/sdcard/factory/gui/assets"
+
+
+# ---- Top coordinate readout ----
+# Use built-in font labels (no pre-baked bitmaps): the text changes on every touch batch,
+# but the built-in font rasterises quickly, and the coordinate bar only takes 34 px, which
+# leaves the most drawing space for the canvas.
+# x/y and n are separate labels - recolouring part of a single label needs text recolor
+# (LV_USE_LABEL_TEXT_RECOLOR), which this firmware does not enable; splitting them is the
+# only way to colour n separately.
+COORD_COLOR = 0x60A5FA    # x/y: light blue
+COORD_N_COLOR = 0x34D399  # n (concurrent touches): bright green, easy to tell apart
+COORD_FONT = "font_montserrat_16"
+COORD_TOP = 8             # vertical offset inside the coordinate bar
+COORD_LEFT_FMT = "x={:>3d} y={:>3d} |"   # padded to 3 digits so the text width is constant
+
+# Temporary diagnostics (event distribution / stroke count / set_points count). Set to
+# True while tuning; building the string every frame costs time, so it stays off normally.
+TOUCH_DIAG = False
+
+# Height of the top coordinate bar. The canvas starts just below it and runs to the bottom
+# edge of content (no bottom margin).
+TOP_BAR_H = 34
+
+LINE_WIDTH = 6         # stroke width (px, rounded caps)
+# New stroke colours rotate by creation order: fingers drawing at the same time are
+# guaranteed different colours.
+LINE_COLORS = (0xF59E0B, 0x3B82F6, 0x10B981, 0xEC4899,
+               0xA855F7, 0xEF4444, 0x14B8A6, 0xEAB308)
+BRIDGE_MS = 100        # Up->Down bridge window: a new touch with the same track_id continues the stroke
+MAX_STROKES = 10       # max strokes kept on the canvas; the oldest is deleted beyond that
+MAX_PTS = 200          # per-stroke sliding window: the oldest point is dropped past this (always 200 points)
+
+# Hint in the middle of the canvas when the app opens: tells the user how many touches the
+# panel supports.
+# It hides itself after the first stroke, otherwise it would stay under the lines forever
+# (set HINT_HIDE_ON_TOUCH=False to keep it).
+#
+# Why a pre-baked PNG instead of lv.label + font:
+#   1) the firmware only bundles montserrat_14/16, with no larger size;
+#   2) tiny_ttf at 80 px does display, but LVGL runs RENDER_MODE.FULL, redrawing the whole
+#      buffer every frame -> tiny_ttf re-rasterises every frame; measured 229.6 ms per
+#      frame on board (completely unusable);
+#   3) pre-baking assets/hint_multitouch.png costs one blit, negligible.
+# The bitmap is generated by tools/gen_touch_hint.py (Nunito Bold 40 px, text
+# "5-point multi-touch" measured 372 px wide; the background is filled with the canvas
+# colour so it does not depend on the PNG alpha channel).
+HINT_TEXT = "5-point multi-touch"   # only used for logging / verification, the bitmap is what shows
+HINT_IMG = "hint_multitouch.png"
+HINT_HIDE_ON_TOUCH = True
+
+
+class TouchApp:
+    def __init__(self, content, ctx):
+        self.ctx = ctx
+        self.content = content
+        self.touch = getattr(ctx, "touch", None)
+        self._sample_count = 0
+        self._stroke_count = 0
+        # One state entry per stroke: track_id -> {"line", "pts", "dirty", "last_up_ms"}.
+        # pts is a list of dicts fed straight to lv.line.set_points; its length is capped by
+        # MAX_PTS.
+        self._strokes = {}
+        self._live = []      # lv.line objects kept on the canvas, in creation order (oldest goes past MAX_STROKES)
+        self._seq = 0        # stroke serial, used to rotate colours
+        self._off_x = None   # canvas absolute screen offset, computed on the first step
+        self._off_y = None
+        # Diagnostic counters: event distribution / one-second rhythm
+        self._diag_ev = {}
+        self._diag_batches = 0
+        self._diag_setpts = 0
+        self._diag_gap_max = 0
+        self._diag_t0 = time.ticks_ms()
+        print("[Touch] created: canvas {}x{} | raw sampling via ctx.touch={}".format(
+            ctx.width, ctx.height - TOP_BAR_H, self.touch is not None))
+
+        # Top coordinate bar: assembled from bitmaps (it builds its own objects), occupying
+        # the top TOP_BAR_H pixels of content
+        self._build_coord()
+
+        # Canvas area (a display container only; coordinates come from the raw point stream
+        # consumed in step())
+        # It starts at the bottom edge of the info bar and ends flush with the bottom of
+        # content (no margin, filling as much as possible).
+        self._canvas_w = ctx.width
+        self._canvas_h = ctx.height - TOP_BAR_H
+        self.canvas = lv.obj(content)
+        self.canvas.set_size(self._canvas_w, self._canvas_h)
+        self.canvas.align(lv.ALIGN.TOP_MID, 0, TOP_BAR_H)
+        self.canvas.set_style_bg_color(lv.color_hex(0x182029), 0)
+        self.canvas.set_style_bg_opa(lv.OPA.COVER, 0)
+        self.canvas.set_style_pad_all(0, 0)
+        self.canvas.set_style_border_width(0, 0)
+        self.canvas.clear_flag(lv.obj.FLAG.SCROLLABLE)
+
+        # Hint in the middle of the canvas. Aligned as a child of canvas so it shares the
+        # same coordinate system as the strokes, centred on the canvas (not on the whole
+        # screen) - the coordinate bar still occupies the top.
+        self.hint = lv.img(self.canvas)
+        # The dsc's data must stay referenced, otherwise the bitmap turns into garbage after
+        # GC; keep it on the instance
+        self._hint_dsc = _load_png(_assets_dir() + "/" + HINT_IMG)
+        if self._hint_dsc is not None:
+            self.hint.set_src(self._hint_dsc)
+            self.hint.align(lv.ALIGN.CENTER, 0, 0)
+        else:
+            print("[Touch] hint image missing, fallback to label")
+            self.hint.delete()
+            self.hint = lv.label(self.canvas)
+            self.hint.set_text(HINT_TEXT)
+            self.hint.set_style_text_color(lv.color_hex(0x454E5D), 0)
+            self.hint.align(lv.ALIGN.CENTER, 0, 0)
+            for name in ("font_montserrat_16", "font_montserrat_14"):
+                font = getattr(lv, name, None)
+                if font is None:
+                    continue
+                try:
+                    self.hint.set_style_text_font(font, 0)
+                    break
+                except BaseException:
+                    continue
+
+    def _coord_label(self, parent, text, color):
+        """Build a coordinate bar label with the shared font and colour."""
+        lb = lv.label(parent)
+        lb.set_text(text)
+        lb.set_style_text_color(lv.color_hex(color), 0)
+        font = getattr(lv, COORD_FONT, None)
+        if font is not None:
+            try:
+                lb.set_style_text_font(font, 0)
+            except BaseException:
+                pass
+        return lb
+
+    def _build_coord(self):
+        """Top coordinate readout: x / y on the left (light blue), n on the right (bright
+        green), the whole thing horizontally centred.
+
+        Use a flex row container instead of measuring widths by hand: labels are not laid
+        out yet when the app is created, get_self_width() returns 0, and a hand-computed x
+        stacks both labels at the origin (measured on board). Let LVGL do it: container
+        width SIZE_CONTENT + ROW flow + overall TOP_MID centring, so nothing jumps as the
+        text grows or shrinks.
+        """
+        row = lv.obj(self.content)
+        row.set_style_bg_opa(lv.OPA.TRANSP, 0)
+        row.set_style_border_width(0, 0)
+        row.set_style_pad_all(0, 0)
+        row.clear_flag(lv.obj.FLAG.SCROLLABLE)
+        row.set_flex_flow(lv.FLEX_FLOW.ROW)
+        row.set_flex_align(lv.FLEX_ALIGN.CENTER, lv.FLEX_ALIGN.CENTER,
+                           lv.FLEX_ALIGN.CENTER)
+        row.set_width(lv.SIZE_CONTENT)
+        row.set_height(lv.SIZE_CONTENT)
+        row.align(lv.ALIGN.TOP_MID, 0, COORD_TOP)
+        self._coord_row = row
+
+        self.coord = self._coord_label(row, COORD_LEFT_FMT.format(0, 0), COORD_COLOR)
+        self.coord_n = self._coord_label(row, "n=0", COORD_N_COLOR)
+
+    def _set_coord(self, x, y, n):
+        """Refresh the coordinate readout. n = number of concurrent touches reported in this
+        batch (verifies multi-touch)."""
+        if x > 999:
+            x = 999
+        if y > 999:
+            y = 999
+        self.coord.set_text(COORD_LEFT_FMT.format(x, y))
+        self.coord_n.set_text("n={}".format(n))
+
+    def _compute_offset(self):
+        """Compute the canvas's absolute offset on screen (scr) deterministically, without
+        relying on the runtime object tree.
+        Layout (see _build_shell in gui.py):
+          scr(screen_w x screen_h)
+            content(ctx.width x ctx.height)  TOP_MID aligned -> abs=(content_x, content_y)
+              canvas(ctx.width x ctx.height-TOP_BAR_H)  TOP_MID aligned -> (0, TOP_BAR_H)
+        The newer layout prefers the content_x/content_y supplied directly by ctx (the
+        content area is top-aligned instead of centred).
+        """
+        content_x = getattr(self.ctx, "content_x", None)
+        content_y = getattr(self.ctx, "content_y", None)
+        if content_x is None or content_y is None:
+            sw = getattr(self.ctx, "screen_w", 800)
+            sh = getattr(self.ctx, "screen_h", 480)
+            cw = self.ctx.width
+            ch = self.ctx.height
+            content_x = (sw - cw) // 2
+            content_y = (sh - ch) // 2
+        canvas_x_in_content = 0                        # canvas width = content width -> 0
+        canvas_y_in_content = TOP_BAR_H                # flush with the bottom edge of the top info bar
+        self._off_x = content_x + canvas_x_in_content
+        self._off_y = content_y + canvas_y_in_content
+        print("[Touch] canvas abs offset = ({},{})".format(self._off_x, self._off_y))
+
+    def _clip(self, sx, sy):
+        """Screen coordinates -> canvas coordinates, clipped to the canvas (out-of-range
+        coordinates blow up the line's bounding box)."""
+        cx = sx - self._off_x
+        cy = sy - self._off_y
+        if cx < 0:
+            cx = 0
+        elif cx >= self._canvas_w:
+            cx = self._canvas_w - 1
+        if cy < 0:
+            cy = 0
+        elif cy >= self._canvas_h:
+            cy = self._canvas_h - 1
+        return cx, cy
+
+    def _new_stroke(self, tid, cx, cy):
+        """Open a new stroke for track_id: one lv.line object plus this stroke's own point
+        list."""
+        # Past the cap, recycle the oldest stroke (delete the whole object, not point by
+        # point)
+        if len(self._live) >= MAX_STROKES:
+            old = self._live.pop(0)
+            for key in list(self._strokes.keys()):
+                if self._strokes[key]["line"] is old:
+                    del self._strokes[key]
+                    break
+            try:
+                old.delete()
+            except BaseException:
+                pass
+            self._stroke_count -= 1
+        line = lv.line(self.canvas)
+        # set_points coordinates are relative to the line itself, so fill the canvas and
+        # align its origin to the top-left corner
+        line.set_pos(0, 0)
+        line.set_size(self._canvas_w, self._canvas_h)
+        line.set_style_line_width(LINE_WIDTH, 0)
+        line.set_style_line_color(lv.color_hex(LINE_COLORS[self._seq % len(LINE_COLORS)]), 0)
+        self._seq += 1
+        try:
+            line.set_style_line_rounded(True, 0)
+        except BaseException:
+            pass
+        line.set_style_bg_opa(lv.OPA.TRANSP, 0)
+        line.set_style_border_width(0, 0)
+        line.clear_flag(lv.obj.FLAG.CLICKABLE)
+        line.clear_flag(lv.obj.FLAG.SCROLLABLE)
+        self._live.append(line)
+        self._strokes[tid] = {"line": line,
+                              "pts": [{"x": cx, "y": cy}],
+                              "dirty": True,
+                              "last_up_ms": 0}
+        self._stroke_count += 1
+        # Hide the hint on the first stroke, so it does not sit on top of the lines forever
+        if HINT_HIDE_ON_TOUCH and self.hint is not None:
+            hint = self.hint
+            self.hint = None
+            try:
+                hint.add_flag(lv.obj.FLAG.HIDDEN)
+            except BaseException:
+                try:
+                    hint.set_text("")
+                except BaseException:
+                    pass
+
+    def _extend(self, st, cx, cy):
+        """Append one point to the given stroke; once MAX_PTS is reached the oldest point is
+        dropped first, keeping the window at exactly 200 points."""
+        pts = st["pts"]
+        last = pts[-1]
+        if cx == last["x"] and cy == last["y"]:
+            return
+        if TOUCH_DIAG:
+            dx = cx - last["x"]
+            dy = cy - last["y"]
+            dist = int((dx * dx + dy * dy) ** 0.5)
+            if dist > self._diag_gap_max:
+                self._diag_gap_max = dist
+        if len(pts) >= MAX_PTS:
+            pts.pop(0)      # sliding window: drop the oldest point, the line start moves forward
+        pts.append({"x": cx, "y": cy})
+        st["dirty"] = True
+
+    def _commit(self, st):
+        """Push a stroke's point list into its own lv.line. Called once per batch, not once
+        per point."""
+        line = st["line"]
+        pts = st["pts"]
+        n = len(pts)
+        if n == 1:
+            # Single point (a quick tap): lv.line cannot draw one point, so add a point
+            # 1 px away; with rounded caps that reads as a dot. Temporary list, so it does
+            # not pollute st["pts"].
+            p = pts[0]
+            pts = [p, {"x": p["x"] + 1, "y": p["y"]}]
+            n = 2
+        try:
+            line.set_points(pts, n)
+            if TOUCH_DIAG:
+                self._diag_setpts += 1
+        except BaseException as error:
+            print("[Touch] set_points failed: {}".format(error))
+        st["dirty"] = False
+
+    def step(self):
+        if self.touch is None:
+            return
+        raw = self.touch.read_raw()
+        if not raw:
+            return
+        if self._off_x is None:
+            self._compute_offset()
+        if TOUCH_DIAG:
+            self._diag_batches += 1
+        now = time.ticks_ms()
+        seen = {}                      # track_ids seen in this batch -> for the concurrent-touch count
+        for (sx, sy, ev, tid) in raw:
+            self._sample_count += 1
+            seen[tid] = True
+            if TOUCH_DIAG:
+                self._diag_ev[ev] = self._diag_ev.get(ev, 0) + 1
+            st = self._strokes.get(tid)
+            if ev == 2:                # Down
+                bridge = st is not None and st["last_up_ms"] and \
+                    time.ticks_diff(now, st["last_up_ms"]) <= BRIDGE_MS
+                cx, cy = self._clip(sx, sy)
+                if bridge:
+                    # Fake-Up bridging: continue the same stroke instead of opening a new one
+                    # (otherwise the result is "fragmented dots")
+                    self._extend(st, cx, cy)
+                else:
+                    self._new_stroke(tid, cx, cy)
+            elif ev == 3:              # Move
+                cx, cy = self._clip(sx, sy)
+                if st is None:
+                    # Entered the app mid-gesture and missed the Down frame: backfill a
+                    # stroke
+                    self._new_stroke(tid, cx, cy)
+                else:
+                    self._extend(st, cx, cy)
+            else:                      # Up: do not settle, just record the moment; the stroke ends on its own
+                                       # once no new point arrives within BRIDGE_MS
+                if st is not None:
+                    st["last_up_ms"] = now
+        # Top readout: last touch coordinates + number of touches in this batch (verifies
+        # that multi-touch is really reported)
+        self._set_coord(raw[-1][0], raw[-1][1], len(seen))
+        # Commit each stroke once per batch -> whether the batch has 1 point or 5, each
+        # stroke costs a single set_points call
+        for st in self._strokes.values():
+            if st["dirty"]:
+                self._commit(st)
+        if TOUCH_DIAG:
+            self._diag_report()
+
+    def _diag_report(self):
+        now = time.ticks_ms()
+        el = time.ticks_diff(now, self._diag_t0)
+        if el < 1000:
+            return
+        evs = " ".join("{}:{}".format(k, v) for k, v in sorted(self._diag_ev.items()))
+        max_pts = 0
+        for st in self._strokes.values():
+            if len(st["pts"]) > max_pts:
+                max_pts = len(st["pts"])
+        print("[TouchDiag] {:.1f}s batches={} samples/s={} ev=[{}] gap_max={}px "
+              "live={} tracks={} max_pts={} set_points={}".format(
+                  el / 1000.0, self._diag_batches, self._sample_count * 1000 // el,
+                  evs, self._diag_gap_max, len(self._live), len(self._strokes),
+                  max_pts, self._diag_setpts))
+        self._diag_t0 = now
+        self._diag_batches = 0
+        self._sample_count = 0
+        self._diag_ev = {}
+        self._diag_gap_max = 0
+        self._diag_setpts = 0
+
+    def destroy(self):
+        font = getattr(self, "_hint_font", None)
+        self._hint_font = None
+        if font is not None:
+            destroy = getattr(lv, "tiny_ttf_destroy", None)
+            if destroy is not None:
+                try:
+                    destroy(font)
+                except BaseException:
+                    pass
+        self._hint_dsc = None
+        print("[Touch] destroy: samples={} strokes={}".format(
+            self._sample_count, self._stroke_count))
+
+
+def create_app(content, ctx):
+    return TouchApp(content, ctx)

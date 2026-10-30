@@ -1,0 +1,78 @@
+本目录图标来源与授权
+====================
+
+icon_touch.png  <- Lucide "hand"
+icon_camera.png <- Lucide "camera"
+icon_audio.png  <- Lucide "mic"
+icon_gallery.png <- Lucide "image"
+icon_vision.png   <- Lucide "brain-circuit"
+icon_system.png   <- Lucide "cpu"
+icon_battery.png  <- Lucide "battery-medium"
+icon_imu.png   <- Lucide "rotate-3d"
+icon_network.png  <- Lucide "wifi"
+icon_settings.png <- Lucide "settings"
+icon_video.png    <- Lucide "video"
+icon_voice.png    <- Lucide "mic-vocal"
+icon_talk.png     <- Lucide "audio-lines"
+icon_scan.png     <- Lucide "qr-code"
+
+全部由 tools/gen_app_icons.py 生成（新增图标只需在该脚本的 ICONS 表加一行）。
+
+来源: https://github.com/lucide-icons/lucide (lucide-static v1.61.0)
+授权: ISC License
+
+ISC License Copyright (c) for portions of Lucide are held by:
+  - Chris Bell (https://chris.bell.design/)
+  - the Lucide contributors (https://github.com/lucide-icons/lucide/graphs/contributors)
+and portions of code are licensed under the MIT License by the original
+Iconify / Feather Icons authors.
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+处理过程: 原始 SVG (src_*.svg) 描边改为 #FFFFFF、描边宽 1.6，
+渲染为 112x112 PNG，背景 #23262A（与桌面图标瓦片底色一致）。
+src_*.svg 为官方原始文件（含 ISC 头注释），保留在此作为出处凭证。
+
+----
+
+Nunito-Bold-700.ttf  <- Nunito Bold 静态 TTF（tiny_ttf 运行时渲染）
+
+字体: Nunito (https://fonts.google.com/specimen/Nunito)
+作者: Sophia Vasilopoulou (Cyreal)
+授权: SIL Open Font License 1.1 (OFL) — 可自由商用、嵌入产品。
+
+来源: Google Fonts v1 API 直接下载的官方预编译静态 Bold TTF
+（usWeightClass=700，无 fvar）。源文件备份在 tools/fontsrc/Nunito-Bold.ttf。
+注意: 不要用 fontTools instantiateVariableFont 自行实例化可变字体——
+产物会让板上 tiny_ttf(stb_truetype) 渲染时死循环（板上实测卡死）。
+OFL 全文见 https://openfontlicense.org
+
+----
+
+fonts/kb_nunito_bold_28.bin  <- 由 tools/gen_font.py 用 lv_font_conv(GitHub master)
+                                 预烘的运行时位图字体，字形来自下面两个源字体。
+
+fa-solid-900.woff  <- Font Awesome Free 5 Solid（键盘符号页字形）
+
+字体: Font Awesome Free (https://fontawesome.com)
+授权: 字体文件 SIL Open Font License 1.1 (OFL)；图标 CC BY 4.0。
+      保留署名要求，故记录于此。
+来源: cdnjs font-awesome 5 的 fa-solid-900.woff，备份在 tools/fontsrc/。
+用途: 只取 LVGL 键盘默认 map 用到的私有区符号码位（OK/CLOSE/LEFT/RIGHT/
+      KEYBOARD/BACKSPACE），这些码位就是 Font Awesome 的码位，恒等映射；
+      NEW_LINE(0xF8A2) 在 v5 已移除，用 v5 的 corner-down-left(0xF3BE) 重映射补上。
+
+----
+
+DejaVuSansMono.ttf  <- DejaVu Sans Mono（等宽）；源文件备份在 tools/fontsrc/
+fonts/mono_dejavu_16.bin  <- 由 tools/gen_font.py 预烘的 16px 等宽位图字体，
+                             只取数值字符（空格 + + - . 0-9）。
+
+字体: DejaVu Fonts (https://dejavu-fonts.github.io)
+授权: Bitstream Vera Fonts Copyright + DejaVu 变更部分为 Public Domain。
+      允许免费使用、修改、嵌入与再分发（含商业用途），保留署名即可。
+来源: matplotlib 发行包自带的 mpl-data/fonts/ttf/DejaVuSansMono.ttf。
+用途: IMU app 的 acc/gyro/temp 读数。等宽设计让每个数字/符号占同一
+      字宽，配合固定符号位（{:+.4f}）后数值不会随位数变化横向抽动。
