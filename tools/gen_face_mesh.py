@@ -1,25 +1,30 @@
 # Generate the face-mesh tables used by apps/app_face_points.py.
 #
-# Why a generated mesh and not a triangulation of the landmarks: the 106-point
-# model puts points on the silhouette and on the features and none inside the
-# cheeks, so a Delaunay on them leaves the cheeks empty and packs triangles onto
-# the eyes and mouth. Instead an even lattice is laid inside the face outline,
-# triangulated once, and every vertex is bound to three landmarks by barycentric
-# weights. The topology then never changes while the vertices follow any face.
+# Why a hand-placed mesh: the 106-point landmark model puts points on the
+# silhouette and on the features and none inside the cheeks, so triangulating
+# them directly leaves the cheeks empty. An automatic lattice also degrades
+# below about 30 nodes, because the landmark outline is unevenly spaced and the
+# lower face has no landmarks at all, so the triangles become long and skewed
+# and the eyes vanish into them.
+#
+# Instead 26 nodes are placed at even fractions of the face box. Feature nodes
+# reuse real landmark indices so the mesh tracks expressions; forehead, cheek,
+# jaw and chin nodes are synthetic and are bound to landmarks by inverse
+# distance weighting. Barycentric binding cannot be used for those: they sit
+# outside every landmark triangle, where the weights extrapolate wildly.
 #
 # Run: python tools/gen_face_mesh.py
-# Prints the MESH_BARY / MESH_EDGES tables to paste into the app. Needs numpy
+# Prints MESH_ORDER / MESH_BIND / MESH_EDGES to paste into the app. Needs numpy
 # and scipy on the host; the board does not run this.
 #
-# Measured on board: the emitted mesh is 36 vertices and 94 edges, and the app
-# runs at about 50-57 ms/frame (18-20 fps). Trimming the mesh from 104 to 94
-# edges did not change the frame rate measurably: repainting the preview and
-# running the detector already cost 36-40 ms.
+# Measured on board: 26 nodes and 64 edges, the app settles around 45 ms/frame
+# (about 22 fps). Trimming edges further barely moves the frame time, because
+# the detector and the preview repaint already cost 36-40 ms.
 
 import math
 
-# One real detection, kept as the template face. The mesh only depends on the
-# relative layout, so the absolute coordinates do not matter.
+# One real detection, kept as the template face. Only the relative layout
+# matters, so the absolute coordinates do not.
 TEMPLATE = [
     (504.39, 286.71), (454.45, 201.29), (466.72, 259.82), (470.25, 265.42),
     (474.49, 270.59), (479.10, 275.27), (484.35, 279.74), (490.08, 283.41),
@@ -50,135 +55,132 @@ TEMPLATE = [
     (528.26, 188.46), (537.63, 188.96),
 ]
 
-BASIN = [1, 9, 10, 11, 12, 13, 14, 15, 16, 2, 3, 4, 5, 6, 7, 8, 0, 24,
-         23, 22, 21, 20, 19, 18, 32, 31, 30, 29, 28, 27, 26, 25, 17]
-
-# Feature points that must land on a mesh node, so eyes and nose stay readable
-# after the deformation. Brows 2, eyes 4, nose bridge 1, nose wings 2. The lips
-# are left to the lattice: adding lip anchors cost 6 nodes for little visible
-# gain at this scale, and the lattice already puts nodes along the mouth.
-FEATURES = [
-    43, 48,
-    97, 102,
-    35, 33, 39, 41,
-    89, 87, 93, 95,
-    74,
-    77, 84,
+# (name, landmark index or None, nx, ny). nx/ny are fractions of the face
+# bounding box and are only used when the landmark index is None.
+#
+# ny is negative for the forehead on purpose: the highest landmarks are the brows
+# and the bbox top IS the brow line, so a fraction of 0 would put the forehead
+# nodes on the eyebrows and the mesh would stop at the brow instead of reaching
+# the hairline.
+NODES = [
+    ("forehead_top", None, 0.50, -0.34),
+    ("forehead_l", None, 0.24, -0.22),
+    ("forehead_r", None, 0.76, -0.22),
+    ("temple_l", None, 0.02, 0.02),
+    ("temple_r", None, 0.98, 0.02),
+    ("brow_l_out", 43, None, None),
+    ("brow_l_in", 48, None, None),
+    ("brow_r_in", 102, None, None),
+    ("brow_r_out", 97, None, None),
+    ("eye_l_out", 33, None, None),
+    ("eye_l_in", 41, None, None),
+    ("eye_r_in", 95, None, None),
+    ("eye_r_out", 87, None, None),
+    ("bridge", 74, None, None),
+    ("cheek_l", None, 0.12, 0.62),
+    ("cheek_r", None, 0.88, 0.62),
+    ("nose_tip", None, 0.50, 0.62),
+    ("nose_l", 77, None, None),
+    ("nose_r", 84, None, None),
+    ("mouth_l", 52, None, None),
+    ("mouth_r", 67, None, None),
+    ("jaw_l", None, 0.26, 0.90),
+    ("jaw_r", None, 0.74, 0.90),
+    ("chin", None, 0.50, 0.99),
+    ("cheek_low_l", None, 0.16, 0.80),
+    ("cheek_low_r", None, 0.84, 0.80),
 ]
 
-# Every Nth outline point becomes a mesh node. Without outline anchors the
-# triangulation spans the forehead and the silhouette stops looking like a face;
-# stride 5 was the sparsest that still followed the jaw.
-OUTLINE_STRIDE = 5
-
-# The template face is only 97x98 px, so the lattice step decides how many
-# interior nodes fit. 22 px gives 36 nodes in total with the forehead covered;
-# 34 px fits only five interior nodes and leaves the forehead empty.
-LATTICE_STEP = 22.0
+BIND_K = 3
 
 
-def point_in_poly(p, poly):
-    """Even-odd containment test, enough for a star-shaped face outline."""
-    x, y = p
-    inside = False
-    n = len(poly)
-    j = n - 1
-    for i in range(n):
-        xi, yi = poly[i]
-        xj, yj = poly[j]
-        if ((yi > y) != (yj > y)) and \
-                (x < (xj - xi) * (y - yi) / (yj - yi + 1e-12) + xi):
-            inside = not inside
-        j = i
-    return inside
+def bbox(pts):
+    xs = [v[0] for v in pts]
+    ys = [v[1] for v in pts]
+    return min(xs), min(ys), max(xs), max(ys)
 
 
-def build_lattice(poly, step):
-    """Hexagonal lattice inside the outline: even spacing, equilateral cells."""
-    xs = [p[0] for p in poly]
-    ys = [p[1] for p in poly]
-    x0, x1 = min(xs), max(xs)
-    y0, y1 = min(ys), max(ys)
+def place(pts):
+    x0, y0, x1, y1 = bbox(pts)
+    w, h = x1 - x0, y1 - y0
     out = []
-    row = 0
-    y = y0
-    dy = step * math.sqrt(3.0) / 2.0
-    while y <= y1:
-        x = x0 + (step * 0.5 if row % 2 else 0.0)
-        while x <= x1:
-            if point_in_poly((x, y), poly):
-                out.append((x, y))
-            x += step
-        y += dy
-        row += 1
+    for name, lm, nx, ny in NODES:
+        if lm is not None:
+            out.append((name, pts[lm][0], pts[lm][1]))
+        else:
+            out.append((name, x0 + nx * w, y0 + ny * h))
     return out
+
+
+def idw(pts, p, k=BIND_K):
+    """k nearest landmarks by inverse squared distance, weights normalized."""
+    dl = sorted(((pts[i][0] - p[0]) ** 2 + (pts[i][1] - p[1]) ** 2, i)
+                for i in range(len(pts)))
+    sel = dl[:k]
+    ws = [(i, 1.0 / (d2 + 1e-6)) for d2, i in sel]
+    s = sum(w for _, w in ws)
+    return [(i, w / s) for i, w in ws]
 
 
 def main():
     import numpy as np
     from scipy.spatial import Delaunay
 
-    poly = [TEMPLATE[i] for i in BASIN]
-    outline = BASIN[::OUTLINE_STRIDE]
-    verts = list(build_lattice(poly, LATTICE_STEP))
-    lattice_n = len(verts)
-    for i in outline:
-        verts.append(TEMPLATE[i])
-    for i in FEATURES:
-        verts.append(TEMPLATE[i])
-    # Anchors: outline and feature nodes must survive, otherwise a landmark a few
-    # px outside the basin ends up as a dot with no edges.
-    anchor_from = lattice_n
-    print("lattice %d + outline %d + features %d = %d vertices"
-          % (lattice_n, len(outline), len(FEATURES), len(verts)))
-
-    xy = np.array(verts)
+    nodes = place(TEMPLATE)
+    xy = np.array([[n[1], n[2]] for n in nodes])
     tri = Delaunay(xy)
-    tris = []
-    for s in tri.simplices:
-        if any(int(i) >= anchor_from for i in s):
-            tris.append(tuple(sorted(s)))
-        elif point_in_poly((xy[s, 0].mean(), xy[s, 1].mean()), poly):
-            tris.append(tuple(sorted(s)))
+    tris = [tuple(sorted(int(i) for i in s)) for s in tri.simplices]
+
     edges = set()
     for t in tris:
         for a in range(3):
             for b in range(a + 1, 3):
-                edges.add((t[a], t[b]))
+                edges.add((min(t[a], t[b]), max(t[a], t[b])))
     edges = sorted(edges)
-    print("%d triangles, %d edges" % (len(tris), len(edges)))
+
+    used = {i for e in edges for i in e}
+    orphan = [nodes[i][0] for i in range(len(nodes)) if i not in used]
+    print("nodes=%d triangles=%d edges=%d orphan=%s"
+          % (len(nodes), len(tris), len(edges), orphan or "none"))
     print("estimated draw: %.1f ms at 800x480"
           % (12.0 + max(0, len(edges) - 23) * (19.3 - 11.9) / 23.0))
 
-    lm = np.array(TEMPLATE)
-    lm_tri = Delaunay(lm)
-    bary = []
-    for v in verts:
-        p = np.array(v)
-        s = lm_tri.find_simplex(p)
-        if s < 0:
-            raise SystemExit("vertex %r outside every landmark triangle" % (v,))
-        T = lm_tri.simplices[s]
-        A = lm_tri.transform[s]
-        b = A[:2].dot(p - A[2])
-        w0, w1 = float(b[0]), float(b[1])
-        bary.append((int(T[0]), int(T[1]), int(T[2]), w0, w1, 1.0 - w0 - w1))
-
-    def emit(name, items, fmt):
+    def emit_block(name, lines):
         print(name + " = [")
-        line = "    "
-        for it in items:
-            piece = (fmt % it) + ", "
-            if len(line) + len(piece) > 76:
-                print(line.rstrip())
-                line = "    "
-            line += piece
-        print(line.rstrip())
+        for ln in lines:
+            print("    " + ln)
         print("]")
 
-    emit("MESH_BARY", bary, "(%.0f, %.0f, %.0f, %.4f, %.4f, %.4f)")
+    order = []
+    line = ""
+    for name, _, _ in nodes:
+        piece = "%r, " % name
+        if len(line) + len(piece) > 72:
+            order.append(line.rstrip())
+            line = ""
+        line += piece
+    order.append(line.rstrip())
+
+    bind = []
+    for i, n in enumerate(nodes):
+        ws = idw(TEMPLATE, (n[1], n[2]))
+        bind.append("(%s)," % ", ".join("(%d, %.4f)" % (k, w) for k, w in ws))
+
+    elines = []
+    line = ""
+    for a, b in edges:
+        piece = "(%d, %d), " % (a, b)
+        if len(line) + len(piece) > 72:
+            elines.append(line.rstrip())
+            line = ""
+        line += piece
+    elines.append(line.rstrip())
+
+    emit_block("MESH_ORDER", order)
     print()
-    emit("MESH_EDGES", edges, "(%d, %d)")
+    emit_block("MESH_BIND", bind)
+    print()
+    emit_block("MESH_EDGES", elines)
 
 
 if __name__ == "__main__":

@@ -249,29 +249,35 @@ run 1.32 ms. `affine + build` dominates, so the app rebuilds it every other fram
 and reuses the previous points in between. Model load: detector 206 ms, landmark
 106 ms; both models resident leaves 3.65 MB free.
 
-The mask is an **even triangle mesh, not a triangulation of the landmarks**. The
-106-point model puts points on the silhouette and on the features and none
-inside the cheeks, so a Delaunay on those points leaves the cheeks empty and
-packs triangles onto the eyes and mouth; that is what makes a naive mesh look
-like a web of stray lines. Instead `tools/gen_face_mesh.py` lays a hexagonal
-lattice inside the outline, triangulates lattice plus feature points once, and
-binds every vertex to three landmarks by barycentric weights. At runtime
-`x = w0*lm[i0] + w1*lm[i1] + w2*lm[i2]`, so the topology is constant while the
-vertices follow any face. The emitted mesh is 36 vertices and 94 edges: 14
-lattice nodes, 7 outline anchors (every 5th basin point) and 15 feature nodes
-(brows 2, eyes 4, nose bridge 1, nose wings 2). Outline anchors are required;
-without them the triangulation spans the forehead and the silhouette stops
-looking like a face. The template face is only 97x98 px, so the lattice step
-sets the interior density: 22 px gives 14 interior nodes with the forehead
-covered, while 34 px fits five and leaves the forehead empty.
+The mask is **not a triangulation of the landmarks**. The 106-point model puts
+points on the silhouette and on the features and none inside the cheeks, so a
+Delaunay on those points leaves the cheeks empty and packs triangles onto the
+eyes and mouth. An automatic lattice degrades below about 30 nodes for the same
+reason: the landmark outline is unevenly spaced and the lower face has no
+landmarks, so the triangles become long and skewed and the eyes vanish into
+them.
 
-Ink is teal (`0x00B894` edges, `0x5CE8C0` dots) rather than white, because white
+`tools/gen_face_mesh.py` therefore places **26 nodes by hand** at even fractions
+of the face box (forehead 3, temples 2, brows 4, eyes 4, nose 4, mouth 2,
+cheeks 4, jaw 2, chin 1), triangulates them once, and binds each node to its
+three nearest landmarks by inverse-distance weights:
+`x = sum(w_i * lm[i_i])`. The topology is constant; only positions move.
+
+Two details that are easy to get wrong:
+
+- **Barycentric binding cannot be used.** Forehead, cheek, jaw and chin nodes sit
+  outside every landmark triangle, where `find_simplex` fails and the weights
+  extrapolate wildly. Inverse-distance weighting is stable everywhere.
+- **The forehead offset must be negative.** The highest landmarks are the brows,
+  so the bbox top IS the brow line; a node fraction of 0 lands on the eyebrows
+  and the mesh stops there instead of reaching the hairline.
+
+Ink is teal (`0x00B894` edges, `0x5CE8C0` nodes) rather than white, because white
 washed out against bright scenes; both match the app accent.
 
-Cost: the app runs at about 50-57 ms/frame, 18-20 fps at 800x480 under FULL
-render. Trimming the mesh from 104 to 94 edges did not change the frame rate
-measurably, because repainting the preview and running the detector already cost
-36-40 ms; the mesh is the remaining half. Vertex dots add roughly 1.2 ms.
+Cost: 26 nodes and 63 edges put the app at about 45 ms/frame, 22 fps at 800x480
+under FULL render. The detector plus the preview repaint already cost 36-40 ms,
+so the overlay is only part of the frame and trimming more edges buys little.
 
 Opening an audio output stream after this chain still works, so the RetinaFace
 single-model path does not reproduce the audio contamination seen with the
