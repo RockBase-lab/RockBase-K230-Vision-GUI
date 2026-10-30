@@ -300,6 +300,57 @@ Opening an audio output stream after this chain still works, so the RetinaFace
 single-model path does not reproduce the audio contamination seen with the
 full Vision chain. See `reset-matrix.md`.
 
+## Face recognition (enrolled identities)
+
+Model: `face_recognition_mobile.kmodel` (2780824 B, 112x112 input). The large
+`face_recognition.kmodel` is 46333280 B, which cannot coexist with the GUI heap,
+so only the mobile variant is usable.
+
+Chain per face:
+
+1. Detect and take the largest box (screen coordinates, so subtract `y_off`).
+2. Build a **similarity** transform (not a plain affine) that maps the five
+   landmarks onto the canonical 112x112 face:
+   `[38.2946, 51.6963, 73.5318, 51.5014, 56.0252, 71.7366, 41.5493, 92.3655,
+   70.7299, 92.2041]`. Use the closed-form 2x2 SVD: this firmware has no general
+   linear algebra.
+3. `ai2d.affine(cv2_bilinear, 0, 0, 127, 1, m6)` then
+   `build([1,3,480,800], [1,3,112,112])` then `run`.
+4. `kpu.outputs_size() == 1`, shape `[1, 512]`. There is **no
+   `aidemo.face_recognition_post_process`**; the post-process is reading the
+   tensor.
+5. Normalise to unit length, compare with `cos/2 + 0.5`.
+
+Two facts that are wrong in the obvious implementation:
+
+- **The feature is 512-dimensional, not 128.** The reference code names
+  `feature_num = 128`; using that stride compares half of one person to half of
+  another and silently produces nonsense.
+- **Normalise with ulab, never a Python loop.** A loop over 512 floats measured
+  **11.1 ms** per call and dominated the frame; `np.dot` plus array division do
+  the same in **0.02 ms**. Keep features as ulab arrays end to end (`.tobytes()`
+  to save, `np.frombuffer` to load) instead of Python lists.
+
+Measured: recognition 4.35 ms including the affine and its rebuild, detection
+9.6 ms, whole app 39 ms/frame (25 fps). Alignment check: mapped eyes land at
+y 53.65 / 53.11 against the canonical 51.70 / 51.50, and the nose at 71.15
+against 71.74, so the transform and the `y_off` subtraction are both right.
+
+Threshold: same-subject pairs over 12 frames measured min **0.9827**, median
+0.9905, sd 0.0025 (66 pairs). The app uses **0.90**, i.e. 32 sd below the worst
+genuine pair. A synthetic unrelated vector scores 0.52, confirming the scale is
+`cos/2 + 0.5`. The impostor distribution of real faces has **not** been
+measured, because only one subject was available; revisit the threshold when a
+second identity can be enrolled.
+
+Storage: features live in `/data/face/recognize`, one `f<NNN>.bin` of 512
+float32 (2048 B) per identity plus a `db.json` index holding the display names.
+The directory is on `/data` because the SD card has about 76 MB free while
+`/data` has 28 GB; see `board-hardware.md`. Writes go to a `.tmp` file and are
+renamed into place, so a power cut cannot leave a truncated 2048-byte feature.
+`os.mkdir` builds one level only, so the app creates `/data/face` before
+`/data/face/recognize`.
+
 ## Memory discipline
 
 With the GUI home screen resident, the MicroPython heap has only about 2.3 MB

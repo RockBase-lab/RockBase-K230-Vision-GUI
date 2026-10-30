@@ -93,6 +93,11 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_vision_fps.py` | Vision app in the real launcher: frame rate and box count |
 | `_probe_recognize_assets.py` | Recognition models, the feature database directory, aidemo symbols |
 | `_probe_storage_persist.py` | Free space on `/sdcard` vs `/data` and whether a marker survives a reset |
+| `_probe_storage_api.py` | `os.rename`/`remove`/nested `mkdir`, json, float32 round-trip |
+| `_probe_ulab_feature.py` | Vectorised vs Python-loop normalise and dot on 512 floats |
+| `_probe_recognize_model.py` | Verification chain: memory, shape, timing, same-subject scores |
+| `_probe_recognize_app.py` | Recognize app end to end: enroll, reload, match, delete, fps |
+| `_cap_face_recognize.py` | Screen capture of the Recognize app with a match |
 | `_cap_run.py` | Run a display probe as a subprocess, capture raw output |
 | `_start_launcher.py` | Start the on-board GUI with a single exec |
 

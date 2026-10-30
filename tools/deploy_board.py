@@ -109,7 +109,9 @@ MANIFEST = [
 if GUI_ONLY:
     MANIFEST = MANIFEST[:1]
 
-# Runtime directories that must exist on board (camera captures / gallery cache / audio)
+# Runtime directories that must exist on board (camera captures / gallery cache /
+# audio / the face feature database). Paths follow the same /data/<app>/<topic>
+# layout: the first level is the app name, the second what the app stores.
 BOARD_MKDIRS = [
     "/data",
     "/data/photos",
@@ -117,6 +119,7 @@ BOARD_MKDIRS = [
     "/data/cache/thumbs",
     "/data/cache/full",
     "/data/audio",
+    "/data/face/recognize",
 ]
 
 SKIP_DIRS = {"__pycache__", ".git"}

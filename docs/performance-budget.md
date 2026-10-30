@@ -42,6 +42,10 @@ plus the widgets that actually changed.
 | mesh: 104 edges (39 nodes) | 38.1 ms |
 | mesh: 94 edges (36 nodes) | 34.8 ms |
 | mesh: 63 edges (26 nodes, app default) | 25.3 ms |
+| 512-float normalise, Python loop | **11.1 ms** |
+| 512-float normalise, ulab `np.dot` + divide | **0.02 ms** |
+| 512-float dot product, ulab | 0.016 ms |
+| 512-float dot product, Python loop | 0.46 ms |
 | mesh: 92 edges + 42 vertex dots | 32.2 ms |
 | 42 vertex dots alone | 5.0 ms |
 
