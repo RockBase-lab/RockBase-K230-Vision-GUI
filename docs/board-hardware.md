@@ -207,6 +207,12 @@ gyro LSB is 15.6 mdps with 0.2-0.5 dps noise, so one decimal suffices.
 ## Camera
 
 - Module: `gc2093_csi2` (type 33, 1920x1080 at 60 fps), **fixed focus, no VCM**.
+- `set_framesize(w=800, h=480, crop=True)` keeps a centred 1600x960 window of
+  the 1920x1080 frame (offset 160,60): `crop=True` picks the largest integer
+  downscale factor, so the preview shows 83.3% of the width and 88.9% of the
+  height, scaled 2:1 with no distortion. A photo snapshots chn0 at 1920x1080
+  without `crop`, so it contains more scene at every edge than the viewfinder
+  showed.
 - The firmware exposes `auto_focus`, `focus_pos` and `focus_caps`, but after
   `sensor.run()` `focus_caps()` returns `(0, 0, 0)` and `focus_pos()` returns
   `None`; `auto_focus(True)` before `run()` returns True but is a silent no-op.
