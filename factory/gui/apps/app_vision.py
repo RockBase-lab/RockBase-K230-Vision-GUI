@@ -43,8 +43,8 @@ import nncase_runtime as nn
 import aidemo
 from libs.AI2D import Ai2d
 from media.sensor import Sensor, CAM_CHN_ID_0, CAM_CHN_ID_1, CAM_CHN_ID_2
-import beep
-from app_error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
+from ui import beep
+from apps.error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                        close_sensor)
 
 PREVIEW_W = 800               # capture size shared by preview and AI (= screen, source == widget)

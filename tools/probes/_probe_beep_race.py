@@ -7,7 +7,7 @@ import sys
 import lvgl as lv
 
 sys.path.insert(0, "/sdcard/factory/gui")
-import beep
+from ui import beep
 
 beep.init()
 beep.set_busy_check(lambda: False)

@@ -27,8 +27,8 @@ import time
 import lvgl as lv
 
 from net import service as net_mgr
-import beep
-import kb_layer
+from ui import beep
+from ui import kb_layer
 
 
 def _font(*names):

@@ -7,10 +7,10 @@ import lvgl as lv
 import uctypes
 import ubinascii
 
-for _m in ("kb_layer", "beep"):
+for _m in ("ui.kb_layer", "ui.beep"):
     if _m in sys.modules:
         del sys.modules[_m]
-import kb_layer
+from ui import kb_layer
 
 scr = lv.obj()
 scr.set_size(800, 480)
@@ -30,7 +30,7 @@ b = kbobj._badge
 print("badge pos=({},{}) size={}x{} hidden={}".format(
     b.get_x(), b.get_y(), b.get_width(), b.get_height(),
     bool(b.has_flag(lv.obj.FLAG.HIDDEN)) if hasattr(b, "has_flag") else "?"))
-src = open("/sdcard/factory/gui/kb_layer.py", "rb").read()
+src = open("/sdcard/factory/gui/ui/kb_layer.py", "rb").read()
 print("board kb_layer has 291x65:", b"291, 65" in src, "| len", len(src))
 
 W, H = 800, 480

@@ -7,7 +7,7 @@
 # keyboard steps on it. It used to be buried inside the network app, unusable
 # elsewhere. Here it is one object:
 #
-#     import kb_layer
+#     from ui import kb_layer
 #     kb = kb_layer.KbLayer(title="join: " + ssid, on_ok=self._connect,
 #                           accent=COL_ACCENT)
 #     # app.step() every frame:
@@ -47,7 +47,7 @@ import time
 
 import lvgl as lv
 
-import beep
+from ui import beep
 
 # Keyboard bin bitmap font (baked offline, deployed to assets/fonts).
 _KB_FONT_BIN = "kb_nunito_bold_28.bin"

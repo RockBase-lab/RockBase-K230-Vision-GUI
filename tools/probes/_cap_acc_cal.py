@@ -11,7 +11,7 @@ for _k in list(sys.modules):
 import lvgl as lv
 import uctypes
 import ubinascii
-import beep
+from ui import beep
 
 beep.init()
 

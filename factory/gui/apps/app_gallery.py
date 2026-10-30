@@ -39,8 +39,8 @@ import time
 import image
 import lvgl as lv
 
-import paging
-import beep
+from ui import paging
+from ui import beep
 
 # Photo directory: must match SAVE_DIR in app_camera.py.
 # Keep it on /data (6.4 GB data partition), not /sdcard (500 MB, GUI assets only).

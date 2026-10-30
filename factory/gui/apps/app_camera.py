@@ -31,7 +31,7 @@ import lvgl as lv
 from media.sensor import Sensor, CAM_CHN_ID_0, CAM_CHN_ID_2
 
 from audio import shutter
-from app_error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
+from apps.error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                        close_sensor)
 
 # Photo output directory. Use /data rather than /sdcard: /data on this board is the

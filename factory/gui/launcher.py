@@ -394,14 +394,14 @@ if _gui_dir not in sys.path:
 # It must be imported after _gui_dir is on sys.path, and it must never import launcher.py
 # back: this file runs via exec(open().read()), so a reverse import would execute it a
 # second time and build a second Launcher.
-import paging
+from ui import paging
 from net import service as net_mgr
 # Signal that an app cannot run (camera missing, ...): the app raises AppUnavailable
 # and this file shows the notice panel.
-from app_error import AppUnavailable
+from apps.error import AppUnavailable
 # Click sound (passive buzzer on IO43). init/poll failures all degrade silently so
 # they never block startup.
-import beep
+from ui import beep
 
 SWIPE_THRESHOLD_PX = paging.SWIPE_THRESHOLD_PX   # 120px, shared with every app
 SNAP_ANIM_MS = paging.SNAP_ANIM_MS               # 200ms
@@ -2144,7 +2144,7 @@ class Launcher:
         lab.set_style_text_color(lv.color_hex(COL_TEXT), 0)
         bold = None
         try:
-            import kb_layer
+            from ui import kb_layer
             bold = kb_layer.load_kb_font()
         except BaseException as error:
             print("[GUI] kb font unavailable: {}".format(error))

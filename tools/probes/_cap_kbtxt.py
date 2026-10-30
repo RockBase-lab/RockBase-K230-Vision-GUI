@@ -5,10 +5,10 @@ sys.path.insert(0, "/sdcard/factory/gui")
 import lvgl as lv
 import uctypes
 import ubinascii
-for _m in ("kb_layer", "beep"):
+for _m in ("ui.kb_layer", "ui.beep"):
     if _m in sys.modules:
         del sys.modules[_m]
-import kb_layer
+from ui import kb_layer
 
 scr = lv.obj()
 scr.set_size(800, 480)

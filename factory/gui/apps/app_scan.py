@@ -27,8 +27,8 @@ import time
 import lvgl as lv
 from media.sensor import Sensor, CAM_CHN_ID_1, CAM_CHN_ID_2
 
-import beep
-from app_error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
+from ui import beep
+from apps.error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                        close_sensor)
 
 DET_W = 640                   # detection channel size (grayscale; 640x480 keeps the QR modules large enough)

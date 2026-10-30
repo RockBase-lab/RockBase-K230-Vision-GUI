@@ -3,7 +3,7 @@
 # special-page guard restores the number page, and repeat guards roll back.
 
 import sys
-for m in ("kb_layer", "apps.app_network"):
+for m in ("ui.kb_layer", "apps.app_network"):
     sys.modules.pop(m, None)
 
 import image
@@ -18,7 +18,7 @@ disp.set_draw_buffers(b1.bytearray(), b2.bytearray(), b1.size(),
                       lv.DISP_RENDER_MODE.FULL)
 disp.set_flush_cb(lambda drv, area, color: drv.flush_ready())
 
-import kb_layer
+from ui import kb_layer
 
 print("kb font:", kb_layer.load_kb_font())
 modes = kb_layer.mode_consts()

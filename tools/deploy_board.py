@@ -14,7 +14,7 @@
 #   python tools/deploy_board.py --smoke                      # extra on-board import smoke test
 #
 # Deployed content (MANIFEST):
-#   factory/gui  -> /sdcard/factory/gui   launcher.py / paging.py / apps / assets (tile cache + fonts + icons)
+#   factory/gui  -> /sdcard/factory/gui   launcher.py / ui / audio / net / apps / assets
 #   factory/test -> /sdcard/factory/test  production test scripts (**without** media >1MB
 #                                         unless --with-test-media). This directory is
 #                                         not part of the public tree; the entry is a
@@ -380,7 +380,7 @@ def main():
             out = run(
                 "import sys\n"
                 "sys.path.insert(0, '/sdcard/factory/gui')\n"
-                "mods = ['paging', 'apps.app_touch', 'apps.app_camera',\n"
+                "mods = ['ui.paging', 'apps.app_touch', 'apps.app_camera',\n"
                 "        'apps.app_gallery', 'apps.app_audio',\n"
                 "        'apps.app_placeholder']\n"
                 "for m in mods:\n"

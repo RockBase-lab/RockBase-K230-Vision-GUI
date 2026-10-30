@@ -17,14 +17,14 @@ disp.set_draw_buffers(b1.bytearray(), b2.bytearray(), b1.size(),
                       lv.DISP_RENDER_MODE.FULL)
 disp.set_flush_cb(lambda drv, area, color: drv.flush_ready())
 
-for m in ("app_error", "apps.app_camera", "gui"):
+for m in ("apps.error", "apps.app_camera", "launcher"):
     sys.modules.pop(m, None)
 
 GUI = "/sdcard/factory/gui"
 if GUI not in sys.path:
     sys.path.insert(0, GUI)
 
-from app_error import AppUnavailable
+from apps.error import AppUnavailable
 from apps.app_camera import create_app
 
 class Ctx:

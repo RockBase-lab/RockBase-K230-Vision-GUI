@@ -5,7 +5,7 @@ import time
 import math
 
 sys.path.insert(0, "/sdcard/factory/gui")
-for _name in ("apps.app_motion", "apps", "app_error"):
+for _name in ("apps.app_motion", "apps", "apps.error"):
     if _name in sys.modules:
         del sys.modules[_name]
 

@@ -1,7 +1,7 @@
 # Generate the eye icon PNG for the "show/hide password" control on the right side
 # of the password box.
 #
-# 24x24, composited straight onto the input row colour (kb_layer's COL_ROW 0x1E262E):
+# 24x24, composited straight onto the input row colour (ui.kb_layer's COL_ROW 0x1E262E):
 # the PNG is opaque, so it blends seamlessly with the input background (a transparent
 # PNG would rely on alpha blending inside LVGL and tends to show colour banding where
 # it overlaps the rounded corners and border).
@@ -22,9 +22,9 @@ sys.path.insert(0, HERE)
 
 import gen_status_icons as gsi  # noqa: E402
 
-# kb_layer.COL_ROW (input box / row background)
+# ui.kb_layer.COL_ROW (input box / row background)
 KB_ROW = 0x1E262E
-# kb_layer.COL_TEXT / COL_MUTED
+# ui.kb_layer.COL_TEXT / COL_MUTED
 KB_TEXT = 0xE6EAF0
 KB_MUTED = 0x8A94A2
 

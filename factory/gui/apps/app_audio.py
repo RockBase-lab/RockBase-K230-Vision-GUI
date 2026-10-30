@@ -31,8 +31,8 @@ import time
 import lvgl as lv
 
 from audio import device
-import beep
-import paging
+from ui import beep
+from ui import paging
 from audio import tone
 
 

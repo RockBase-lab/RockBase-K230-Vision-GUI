@@ -55,9 +55,9 @@ import math
 import lvgl as lv
 from machine import FPIOA, I2C
 
-import beep
-import paging
-from app_error import AppUnavailable
+from ui import beep
+from ui import paging
+from apps.error import AppUnavailable
 
 IMU_UNAVAILABLE = ("IMU (QMI8658A) not detected.\n"
                    "The IMU did not respond on I2C3.\n"
