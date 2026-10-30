@@ -53,20 +53,23 @@ NMS_TH = 0.2
 # half that cost; the face does not move far in 40 ms.
 REBUILD_EVERY = 2
 
-# Anatomical groups. Points index the model's 106-point output; a closed group
-# repeats its first point so the outline joins up.
+# Anatomy the model provides. Only the names in CONTOUR are drawn, one colour for
+# all of them: separate hues for brows and lips were hard to pick out against
+# skin, while the outline colour reads clearly, so the whole contour shares it.
+# A closed group repeats its first point so the outline joins up.
+COL_CONTOUR = 0x00E5A0
 GROUPS = [
     ("basin", [1, 9, 10, 11, 12, 13, 14, 15, 16, 2, 3, 4, 5, 6, 7, 8, 0, 24,
                23, 22, 21, 20, 19, 18, 32, 31, 30, 29, 28, 27, 26, 25, 17],
-     True, 0x00E5A0),
-    ("lbrow", [43, 44, 45, 47, 46, 50, 51, 49, 48], False, 0xFFC857),
-    ("rbrow", [97, 98, 99, 100, 101, 105, 104, 103, 102], False, 0xFFC857),
-    ("leye", [35, 36, 33, 37, 39, 42, 40, 41], True, 0x64B5F6),
-    ("reye", [89, 90, 87, 91, 93, 96, 94, 95], True, 0x64B5F6),
-    ("bridge", [72, 73, 74, 86], False, 0xFF8A65),
-    ("wing", [77, 78, 79, 80, 85, 84, 83], False, 0xFF8A65),
-    ("outlip", [52, 55, 56, 53, 59, 58, 61, 68, 67, 71, 63, 64], True, 0xE88BA8),
-    ("inlip", [65, 54, 60, 57, 69, 70, 62, 66], True, 0xC2708A),
+     True),
+    ("lbrow", [43, 44, 45, 47, 46, 50, 51, 49, 48], False),
+    ("rbrow", [97, 98, 99, 100, 101, 105, 104, 103, 102], False),
+    ("leye", [35, 36, 33, 37, 39, 42, 40, 41], True),
+    ("reye", [89, 90, 87, 91, 93, 96, 94, 95], True),
+    ("bridge", [72, 73, 74, 86], False),
+    ("wing", [77, 78, 79, 80, 85, 84, 83], False),
+    ("outlip", [52, 55, 56, 53, 59, 58, 61, 68, 67, 71, 63, 64], True),
+    ("inlip", [65, 54, 60, 57, 69, 70, 62, 66], True),
 ]
 LINE_W = 2
 
@@ -247,11 +250,11 @@ class FacePointsApp:
         self.img_widget.align(lv.ALIGN.CENTER, 0, 0)
 
         self.lines = []
-        for name, idx, closed, color in GROUPS:
+        for name, idx, closed in GROUPS:
             ln = lv.line(content)
             ln.set_points([{"x": 0, "y": 0}] * 2, 2)
             ln.set_style_line_width(LINE_W, 0)
-            ln.set_style_line_color(lv.color_hex(color), 0)
+            ln.set_style_line_color(lv.color_hex(COL_CONTOUR), 0)
             ln.set_style_line_opa(lv.OPA.COVER, 0)
             try:
                 ln.set_style_line_rounded(False, 0)
@@ -615,7 +618,7 @@ class FacePointsApp:
             ln.add_flag(lv.obj.FLAG.HIDDEN)
         for dot in self.dots:
             dot.add_flag(lv.obj.FLAG.HIDDEN)
-        for gi, (name, idx, closed, color) in enumerate(GROUPS):
+        for gi, (name, idx, closed) in enumerate(GROUPS):
             ln = self.lines[gi]
             if name not in CONTOUR:
                 ln.add_flag(lv.obj.FLAG.HIDDEN)

@@ -272,8 +272,11 @@ Two details that are easy to get wrong:
   so the bbox top IS the brow line; a node fraction of 0 lands on the eyebrows
   and the mesh stops there instead of reaching the hairline.
 
-Ink is teal (`0x00B894` edges, `0x5CE8C0` nodes) rather than white, because white
-washed out against bright scenes; both match the app accent.
+Ink is teal rather than white, because white washed out against bright scenes.
+The mesh uses `0x00B894` for edges and `0x5CE8C0` for nodes; the Contour view
+uses `0x00E5A0` for **all** of its polylines. Per-feature hues (amber brows,
+pink lips) were hard to pick out on skin, and one colour matching the face
+outline reads clearly, so the contour no longer distinguishes anatomy by colour.
 
 Cost: 26 nodes and 63 edges put the app at about 45 ms/frame, 22 fps at 800x480
 under FULL render. The detector plus the preview repaint already cost 36-40 ms,

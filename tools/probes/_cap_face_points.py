@@ -1,5 +1,7 @@
-# Captures the Points app screen (Mask view) to a raw file for host-side viewing.
+# Captures the Points app screen to a raw file for host-side viewing.
 #
+# The view is chosen by VIEW_INDEX (0 = Mesh, 1 = Contour, 2 = Off), so a colour
+# or layout change can be checked per view without touching the probe body.
 # The snapshot needs about 1.5 MB of contiguous heap, so it is taken right after
 # the app is up and a few frames have run, then downsampled to 400x240 before
 # being written. Run with --lvgl and a face in front of the camera.
@@ -8,6 +10,8 @@ import gc
 import struct
 import sys
 import time
+
+VIEW_INDEX = 1
 
 sys.path.insert(0, "/sdcard/factory/gui")
 for _name in ("apps.app_face_points", "apps.app_face_det", "apps",
@@ -35,7 +39,8 @@ for item in G["FOLDER_MEMBERS"]["face"]:
         break
 launcher.open_app(meta)
 app = launcher.active_app
-print("C1 app up face={}".format(app.has_face))
+app.view_idx = VIEW_INDEX
+print("C1 app up face={} view={}".format(app.has_face, VIEW_INDEX))
 
 for i in range(12):
     app.step()
