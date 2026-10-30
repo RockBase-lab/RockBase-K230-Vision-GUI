@@ -43,6 +43,8 @@ nothing points at the cause.
 
 | Symptom | Cause | Do instead |
 |---|---|---|
+| The photo contains much more scene than the viewfinder showed | `crop=True` picks the largest integer downscale window, keeping 1600x960 of a 1920x1080 sensor for an 800x480 output | Set an explicit window at the output aspect (`camera_fov.set_preview`) |
+| An object is visible in the preview but never detected or scanned | The AI/detect channel has a different output aspect, so `crop=True` gives it a different window; the strips only one channel sees are dead | Give both channels the same aspect and the same explicit window |
 | Scores collapse to about 0.006 while the same image scores 0.95 on a PC; per-channel statistics still look correct | The AI channel was `RGB888` (packed) while ai2d declared `NCHW_FMT` | Use `RGBP888` on the AI channel |
 | Boxes all over the screen | Applied sigmoid before `aidemo`; the scores are raw values that include negatives | Threshold the raw value at 0.3-0.35; apply sigmoid only for display |
 | Every detection shifted down by a constant | The post-process does not subtract the letterbox top pad | Subtract `pad_top / scale` (160 for 800x480 into 320) |

@@ -34,14 +34,14 @@ def load_matrix():
         rows.append(row)
     return n, rows
 
-def make_qr_gray(n, rows, scale, margin):
-    """Draw the QR matrix into a 640x480 GRAYSCALE frame, code centred."""
-    img = image.Image(640, 480, image.GRAYSCALE)
+def make_qr_gray(n, rows, scale, margin, w=640, h=480):
+    """Draw the QR matrix into a w x h GRAYSCALE frame, code centred."""
+    img = image.Image(w, h, image.GRAYSCALE)
 
-    img.draw_rectangle(0, 0, 640, 480, color=0xFFFFFF, fill=True)
+    img.draw_rectangle(0, 0, w, h, color=0xFFFFFF, fill=True)
     size = n * scale
-    ox = (640 - size) // 2
-    oy = (480 - size) // 2
+    ox = (w - size) // 2
+    oy = (h - size) // 2
     for y in range(n):
         row = rows[y]
         x = 0
@@ -97,8 +97,8 @@ def snapshot_b64(tag):
     print("SHOTEND {}".format(tag))
 
 def main():
-    from apps.app_scan import ScanApp
-    print("PROBE import ok")
+    from apps.app_scan import ScanApp, DET_W, DET_H
+    print("PROBE import ok det={}x{}".format(DET_W, DET_H))
 
     n, rows = load_matrix()
     print("PROBE qr matrix {} modules".format(n))
@@ -129,7 +129,7 @@ def main():
     app = ScanApp(content, ctx)
     try:
 
-        qr_frame = make_qr_gray(n, rows, scale=12, margin=8)
+        qr_frame = make_qr_gray(n, rows, scale=12, margin=8, w=DET_W, h=DET_H)
         rgb_frame = make_plain_rgb(800, 480)
         real_snapshot = app.sensor.snapshot
 

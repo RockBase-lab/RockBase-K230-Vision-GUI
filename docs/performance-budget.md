@@ -119,6 +119,22 @@ A small single-shot detector therefore fits comfortably; a yolov8n detection
 loop dominates the budget at 31 ms total and lands near 32 fps standalone,
 dropping to about 10 fps inside the GUI because the repaint stacks on top.
 
+## QR detection
+
+Measured on one synthetic code (33 modules, 12 px per module), which is the only
+repeatable frame:
+
+| Detection size | `find_qrcodes` |
+|---|---|
+| 640x480 | 21.6 ms |
+| 800x480 | 23.0 ms |
+
+Both sizes decode it, so matching the detection channel to the preview's 5:3
+aspect costs 1.4 ms and removes the 10% strip on each side that only the
+viewfinder could see. The app's dual-scale fallback (`mean_pool(2, 2)`) adds
+about 22 ms when the first pass finds nothing, which is why the detection
+throttle is 60 ms.
+
 ## Blocking calls that cannot be hidden
 
 These run in C and hold the GIL, so no Python code — including worker threads

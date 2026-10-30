@@ -31,6 +31,7 @@ import lvgl as lv
 from media.sensor import Sensor, CAM_CHN_ID_0, CAM_CHN_ID_2
 
 from audio import shutter
+from camera_fov import set_preview
 from apps.error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                        close_sensor)
 
@@ -176,9 +177,9 @@ class CameraApp:
         try:
             sensor = Sensor(fps=30)
             sensor.reset()
-            # chn2 = preview (matches the screen size; the ISP crops in hardware, so no black
-            # bars and no distortion)
-            sensor.set_framesize(w=self.img_w, h=self.img_h, chn=CAM_CHN_ID_2, crop=True)
+            # chn2 = preview: the ISP scales the widest window that keeps the screen
+            # aspect, so there are no black bars and no distortion
+            set_preview(sensor, CAM_CHN_ID_2, self.img_w, self.img_h)
             sensor.set_pixformat(Sensor.RGB888, chn=CAM_CHN_ID_2)
             # chn0 = capture (native full resolution)
             sensor.set_framesize(w=CAPTURE_W, h=CAPTURE_H, chn=CAM_CHN_ID_0)

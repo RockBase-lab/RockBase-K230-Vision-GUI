@@ -31,8 +31,7 @@ from media.sensor import Sensor, CAM_CHN_ID_1, CAM_CHN_ID_2
 from ui import beep
 from apps.error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                         close_sensor)
-
-PREVIEW_W = 800
+from camera_fov import set_preview
 PREVIEW_H = 480
 
 DET_MODEL = "/sdcard/examples/kmodel/face_detection_320.kmodel"
@@ -400,12 +399,10 @@ class FacePointsApp:
             sensor = Sensor(fps=30)
             sensor.reset()
             # chn1 = AI input, planar RGBP888 because ai2d declares NCHW_FMT.
-            sensor.set_framesize(w=PREVIEW_W, h=PREVIEW_H, chn=CAM_CHN_ID_1,
-                                 crop=True)
+            set_preview(sensor, CAM_CHN_ID_1, PREVIEW_W, PREVIEW_H)
             sensor.set_pixformat(Sensor.RGBP888, chn=CAM_CHN_ID_1)
-            # chn2 = preview, packed RGB888; as_lvgl_img_src only takes packed.
-            sensor.set_framesize(w=PREVIEW_W, h=PREVIEW_H, chn=CAM_CHN_ID_2,
-                                 crop=True)
+            # chn2 = preview display, packed RGB888 (as_lvgl_img_src only takes packed).
+            set_preview(sensor, CAM_CHN_ID_2, PREVIEW_W, PREVIEW_H)
             sensor.set_pixformat(Sensor.RGB888, chn=CAM_CHN_ID_2)
             sensor.run()
         except BaseException as error:

@@ -30,8 +30,13 @@ from media.sensor import Sensor, CAM_CHN_ID_1, CAM_CHN_ID_2
 from ui import beep
 from apps.error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                        close_sensor)
+from camera_fov import set_preview
 
-DET_W = 640                   # detection channel size (grayscale; 640x480 keeps the QR modules large enough)
+# Detection channel size. It must keep the 5:3 output aspect of the preview
+# channel, otherwise the two channels crop different windows and the strips that
+# only the preview sees can never be decoded. Grayscale, because that is the
+# format find_qrcodes decodes reliably.
+DET_W = 800
 DET_H = 480
 DETECT_PERIOD_MS = 60         # detection throttle: ~16 fps of detection is plenty, the saved CPU goes to display
 IGNORE_AGAIN_MS = 2000        # after closing the popup, the same content does not pop up again during this window
@@ -113,9 +118,9 @@ class ScanApp:
         try:
             sensor = Sensor(fps=30)
             sensor.reset()
-            sensor.set_framesize(w=self.img_w, h=self.img_h, chn=CAM_CHN_ID_2, crop=True)
+            set_preview(sensor, CAM_CHN_ID_2, self.img_w, self.img_h)
             sensor.set_pixformat(Sensor.RGB888, chn=CAM_CHN_ID_2)
-            sensor.set_framesize(w=DET_W, h=DET_H, chn=CAM_CHN_ID_1, crop=True)
+            set_preview(sensor, CAM_CHN_ID_1, DET_W, DET_H)
             sensor.set_pixformat(Sensor.GRAYSCALE, chn=CAM_CHN_ID_1)
             sensor.run()
         except BaseException as error:

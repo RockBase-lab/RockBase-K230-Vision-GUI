@@ -1,10 +1,11 @@
-# Print the sensor rectangle that the camera app's preview keeps.
+# Print the sensor rectangle that the firmware keeps for crop=True.
 #
-# The preview channel is configured as set_framesize(w=800, h=480, crop=True).
-# The firmware turns crop=True into a centred crop with an integer downscale
-# factor, so the retained field of view is narrower than the sensor frame even
-# though the 1600x960 window it keeps is exactly 5:3. Print the rectangle for a
-# given preview size so the FOV loss stays a measured fact.
+# The apps do not call crop=True any more: camera_fov.set_preview passes an
+# explicit window. This probe keeps the integer-downscale path measurable, which
+# is both the fallback and the baseline for the field-of-view comparison.
+# crop=True keeps the largest integer downscale factor, so a 5:3 output gets a
+# narrower window than the sensor allows. Prints the rectangle for a given
+# output size so the FOV loss stays a measured fact.
 #
 # Pure Python probe: no Sensor instance, no LVGL, no media init.
 

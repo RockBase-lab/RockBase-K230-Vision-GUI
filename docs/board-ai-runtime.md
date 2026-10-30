@@ -200,14 +200,19 @@ scale = pad_top / scale + screen_y`, so `y_off = pad_top / scale`, which is
 Pad colour is `[104, 117, 123]` (the training mean) with pad parameters
 `[0, 0, 0, 0, top, top, 0, 0]`.
 
-**The AI channel sees only part of the sensor.** Both Face apps configure
-chn1/chn2 with `set_framesize(800, 480, crop=True)`, and the firmware keeps a
-centred 1600x960 window of the 1920x1080 frame (offset 160,60): 83.3% of the
-width and 88.9% of the height, downscaled 2:1. A face outside that window is
-never seen, and one half inside it is truncated at the border, so the app
-cannot detect or track a face that has left the retained field of view even
-though it is still in front of the lens. See `board-hardware.md` and
-`tools/probes/_probe_sensor_crop.py`.
+**The AI channel sees almost the whole sensor.** Both Face apps configure
+chn1/chn2 through `camera_fov.set_preview`, which passes the explicit window
+`(60, 0, 1800, 1080)`: 93.75% of the width and the full height, downscaled
+2.25:1. Anything outside that 3% strip on each side is never seen, so a face
+leaving it cannot be tracked although it is still in front of the lens. Both
+channels must share the window; the overlay maths below depends only on the
+output size, not on the window. See `board-hardware.md` and
+`tools/probes/_probe_sensor_fov.py`.
+
+A narrower window buys detection range back at the cost of field of view: the
+firmware's `crop=True` keeps 1600x960 instead of 1800x1080, which makes a
+subject 12.5% larger in the model input and is the right choice if far-away
+faces matter more than the edges of the frame.
 
 Measured cost (800x480 preview, 320 model): ai2d 1.5 ms + kpu 4.0 ms + post
 3.0 ms = 8.5 ms; 26 fps inside the app including LVGL repaint. At conf 0.5 a

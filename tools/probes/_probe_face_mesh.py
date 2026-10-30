@@ -25,6 +25,7 @@ import nncase_runtime as nn
 import aidemo
 from libs.AI2D import Ai2d
 from media.sensor import Sensor, CAM_CHN_ID_1
+from camera_fov import set_preview
 
 DET_MODEL = "/sdcard/examples/kmodel/face_detection_320.kmodel"
 LM_MODEL = "/sdcard/examples/kmodel/face_landmark.kmodel"
@@ -134,7 +135,7 @@ pts_y = None
 try:
     sensor = Sensor(fps=30)
     sensor.reset()
-    sensor.set_framesize(w=800, h=480, chn=CAM_CHN_ID_1, crop=True)
+    set_preview(sensor, CAM_CHN_ID_1, 800, 480)
     sensor.set_pixformat(Sensor.RGBP888, chn=CAM_CHN_ID_1)
     sensor.run()
 

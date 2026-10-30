@@ -207,12 +207,22 @@ gyro LSB is 15.6 mdps with 0.2-0.5 dps noise, so one decimal suffices.
 ## Camera
 
 - Module: `gc2093_csi2` (type 33, 1920x1080 at 60 fps), **fixed focus, no VCM**.
-- `set_framesize(w=800, h=480, crop=True)` keeps a centred 1600x960 window of
-  the 1920x1080 frame (offset 160,60): `crop=True` picks the largest integer
-  downscale factor, so the preview shows 83.3% of the width and 88.9% of the
-  height, scaled 2:1 with no distortion. A photo snapshots chn0 at 1920x1080
-  without `crop`, so it contains more scene at every edge than the viewfinder
-  showed.
+- Every app configures its channels through `factory/gui/camera_fov.set_preview`,
+  which passes an explicit window at the output aspect: 800x480 gets
+  `crop=(60, 0, 1800, 1080)`, so 93.75% of the width and 100% of the height
+  survive, scaled 2.25:1 with no distortion. The firmware's own `crop=True`
+  picks the largest integer downscale instead and keeps only 1600x960, i.e.
+  83.3% x 88.9% and 74% of the scene. A photo has no crop at all, so it still
+  contains slightly more scene than the viewfinder.
+- The window width is not a multiple of 16 (1800 = 8 x 225) and the firmware
+  accepts it. Measured at 800x480: 34.95 ms per snapshot against 34.95 ms for
+  `crop=True`, and a test target covers 0.883x the pixel width, matching
+  1600/1800. The window costs nothing; it trades subject size for field of view,
+  so a subject covers 11% fewer pixels and, in a 320 model, has 11% less
+  detection range.
+- `camera_fov.set_preview` falls back to `crop=True` when the firmware rejects a
+  window, and prints `[FOV]` rather than letting the AssertionError surface as
+  the app's "camera unavailable" panel.
 - The firmware exposes `auto_focus`, `focus_pos` and `focus_caps`, but after
   `sensor.run()` `focus_caps()` returns `(0, 0, 0)` and `focus_pos()` returns
   `None`; `auto_focus(True)` before `run()` returns True but is a silent no-op.

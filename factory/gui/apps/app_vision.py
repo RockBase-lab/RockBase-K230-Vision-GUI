@@ -46,6 +46,7 @@ from media.sensor import Sensor, CAM_CHN_ID_0, CAM_CHN_ID_1, CAM_CHN_ID_2
 from ui import beep
 from apps.error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                        close_sensor)
+from camera_fov import set_preview
 
 PREVIEW_W = 800               # capture size shared by preview and AI (= screen, source == widget)
 PREVIEW_H = 480
@@ -310,10 +311,10 @@ class VisionApp:
             # read HWC memory as NCHW, so the model sees garbage (measured: scores
             # stuck at ~0.006 where the correct NCHW frame of the same image
             # yields 0.95). Only RGBP888 matches the declaration.
-            sensor.set_framesize(w=PREVIEW_W, h=PREVIEW_H, chn=CAM_CHN_ID_1, crop=True)
+            set_preview(sensor, CAM_CHN_ID_1, PREVIEW_W, PREVIEW_H)
             sensor.set_pixformat(Sensor.RGBP888, chn=CAM_CHN_ID_1)
             # chn2 = preview display, packed RGB888 (as_lvgl_img_src only takes packed).
-            sensor.set_framesize(w=PREVIEW_W, h=PREVIEW_H, chn=CAM_CHN_ID_2, crop=True)
+            set_preview(sensor, CAM_CHN_ID_2, PREVIEW_W, PREVIEW_H)
             sensor.set_pixformat(Sensor.RGB888, chn=CAM_CHN_ID_2)
             # chn0 = full-resolution still channel (reserved for V3; configured,
             # not captured)

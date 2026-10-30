@@ -87,6 +87,10 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_beep_race.py` | Click-sound off-time under a blocking C call |
 | `_probe_tz_hash.py` | Sha256 of the timezone wheel bitmaps |
 | `_probe_sensor_crop.py` | Crop rectangle the firmware keeps for an 800x480 preview |
+| `_probe_sensor_fov.py` | Explicit crop window: stored attributes, snapshot cost, saved frames |
+| `_probe_fov_channels.py` | Shared window on both channels, per-format snapshot cost |
+| `_probe_scan_detect_cost.py` | `find_qrcodes` at 640x480 against 800x480 |
+| `_probe_vision_fps.py` | Vision app in the real launcher: frame rate and box count |
 | `_cap_run.py` | Run a display probe as a subprocess, capture raw output |
 | `_start_launcher.py` | Start the on-board GUI with a single exec |
 

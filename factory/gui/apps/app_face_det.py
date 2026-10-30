@@ -70,6 +70,7 @@ from media.sensor import Sensor, CAM_CHN_ID_1, CAM_CHN_ID_2
 from ui import beep
 from apps.error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                        close_sensor)
+from camera_fov import set_preview
 
 PREVIEW_W = 800               # capture size shared by preview and AI (= screen, source == widget)
 PREVIEW_H = 480
@@ -368,12 +369,10 @@ class FaceDetApp:
             # chn1 = AI input, must be RGBP888 (planar, to_numpy_ref() yields CHW).
             # ai2d declares NCHW_FMT; feeding packed RGB888 makes it read HWC
             # memory as NCHW and the model sees garbage (measured in Vision).
-            sensor.set_framesize(w=PREVIEW_W, h=PREVIEW_H, chn=CAM_CHN_ID_1,
-                                 crop=True)
+            set_preview(sensor, CAM_CHN_ID_1, PREVIEW_W, PREVIEW_H)
             sensor.set_pixformat(Sensor.RGBP888, chn=CAM_CHN_ID_1)
             # chn2 = preview display, packed RGB888 (as_lvgl_img_src only takes packed).
-            sensor.set_framesize(w=PREVIEW_W, h=PREVIEW_H, chn=CAM_CHN_ID_2,
-                                 crop=True)
+            set_preview(sensor, CAM_CHN_ID_2, PREVIEW_W, PREVIEW_H)
             sensor.set_pixformat(Sensor.RGB888, chn=CAM_CHN_ID_2)
             sensor.run()
         except BaseException as error:
