@@ -21,6 +21,11 @@ Recovery for every entry here is a power cycle. Programmatic resets do not help.
 
 | Symptom | Cause | Do instead |
 |---|---|---|
+| Deploy hangs forever after printing the file count | Stock `enter_raw_repl()` relies on pyserial 2.x `interCharTimeout`, which 3.x ignores, so `serial.timeout` stays None on a silent board | Use `_serial_guard.open_board()`, which carries timeouts on every step |
+| Deploy aborts with `OSError: [Errno 1] EPERM` at a random file | Transient FAT error on `open('wb')`, **not** a lock: the same call succeeds on retry, and the file is not held | Retry the snippet with a short backoff; do not remove the file first |
+| A file on the board is 0 bytes after an interrupted push | `open('wb')` truncates before the first chunk is written, so an aborted transfer leaves the file empty | Retry per file and re-verify sizes; `launcher.py` truncated leaves the GUI dead until it is re-pushed |
+| A cancelled push makes the next run soft reset the board | It left the board in the raw REPL, where Ctrl-C produces no echo, so the guard reads silence as "GUI owns the board" | Send Ctrl-B (leave raw REPL) before handing the port to the guard |
+| Long transfer drops at a random percentage | `%r` encoding escapes non-ASCII source up to 4x, stretching the transfer | Send base64 chunks (1.33x, stays printable) |
 | No serial echo, no REPL response | Declared the ai2d input as packed (`RGB_packed`) while passing `[1, 3, H, W]` | Use `RGBP888` with the matching declaration |
 | No serial echo after binding a video layer | Stream resolution is not 800x480 | Validate `w == 800 and h == 480` before creating the decoder |
 | Hard hang, nothing responds | Called `close()` on an audio stream without `stop_stream()` first | Always `stop_stream()` then `close()` |
