@@ -64,6 +64,7 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_face_mesh.py` | Triangulated mesh draw cost on real face geometry |
 | `_cap_face_points.py` | Points app screen capture for host-side viewing |
 | `_probe_landmark_assets.py` | Landmark model files and the aidemo symbols that exist |
+| `_probe_landmark_dump.py` | Dumps the 106 landmark screen coordinates of one face |
 | `_probe_imu_tear.py` | Read tearing signature at exactly 256 LSB |
 | `_probe_imu_lock.py` | Locking sequence effect on peak-to-peak and outliers |
 | `_probe_imu_accuracy.py` | Noise, offset and magnitude for a static board |

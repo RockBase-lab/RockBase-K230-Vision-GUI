@@ -38,6 +38,7 @@ plus the widgets that actually changed.
 | mesh: 23 edges | 11.9 ms |
 | mesh: 46 edges | 19.3 ms |
 | mesh: 92 edges | 30.6 ms |
+| mesh: 123 edges (app default) | 44.2 ms |
 | mesh: 92 edges + 42 vertex dots | 32.2 ms |
 | 42 vertex dots alone | 5.0 ms |
 

@@ -249,11 +249,18 @@ run 1.32 ms. `affine + build` dominates, so the app rebuilds it every other fram
 and reuses the previous points in between. Model load: detector 206 ms, landmark
 106 ms; both models resident leaves 3.65 MB free.
 
-The triangulated mask is nine anatomical polylines plus 32 cross edges and 42
-vertex dots. On a 220x270 face the edges cost 30.6 ms and the dots add 1.2 ms;
-with detection and the preview composite the app settles at about 57 ms/frame
-(17.5 fps). The repaint of the preview alone is about 26 ms, so even an empty
-overlay caps near 25 fps: reduce edge count, not line width.
+The mask is an **even triangle mesh, not a triangulation of the landmarks**. The
+106-point model puts points on the silhouette and on the features and none
+inside the cheeks, so a Delaunay on those points leaves the cheeks empty and
+packs triangles onto the eyes and mouth; that is what makes a naive mesh look
+like a web of stray lines. Instead `tools/gen_face_mesh.py` lays a hexagonal
+lattice inside the outline, triangulates lattice plus feature points once, and
+binds every vertex to three landmarks by barycentric weights. At runtime
+`x = w0*lm[i0] + w1*lm[i1] + w2*lm[i2]`, so the topology is constant while the
+vertices follow any face. The emitted mesh is 52 vertices and 123 edges.
+
+Cost: 123 edges plus 52 vertex dots settle the app at about 50 ms/frame, 20 fps
+at 800x480 under FULL render. Vertex dots add roughly 1.2 ms; the edges dominate.
 
 Opening an audio output stream after this chain still works, so the RetinaFace
 single-model path does not reproduce the audio contamination seen with the
