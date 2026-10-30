@@ -30,6 +30,18 @@ plus the widgets that actually changed.
 | 800x372 ARGB8888 canvas `fill_bg` | **73 ms** |
 | 20 full-width 10 px lines on that canvas | 200 ms |
 | 40 px `hint_multitouch.png` bitmap | 0.8 ms |
+| `lv.line` x1 (face outline, 34 points) | 12.0 ms |
+| `lv.line` x5 | 17.3 ms |
+| `lv.line` x8 | 20.1 ms |
+| `lv.line` x10 | 25.2 ms |
+| `set_points` for 100 points, no repaint | 1.83 ms |
+
+Screen `lv.line` objects scale at roughly 1.2-1.6 ms each after the first, and
+the first one is expensive because it covers the most pixels. The point count
+barely matters: pushing 100 points into ten lines costs 1.83 ms while drawing
+them costs about 20 ms, so a mesh must be batched into polylines instead of one
+object per point. Under FULL render every visible line is redrawn whether or not
+its geometry changed, so hiding a group is the only way to save its cost.
 
 Two consequences that have already shaped this codebase:
 

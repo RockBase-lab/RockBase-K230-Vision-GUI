@@ -59,6 +59,9 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_face_name.py` | Face group display name in the on-board source |
 | `_probe_face_dots.py` | Face app landmark slices stay in sync with their boxes |
 | `_probe_face_conf_sweep.py` | Box count against confidence threshold on one captured frame |
+| `_probe_face_points_cost.py` | `lv.line` mesh cost and landmark model chain timings |
+| `_probe_face_points_app.py` | Points app through the real launcher: frame rate, views, points |
+| `_probe_landmark_assets.py` | Landmark model files and the aidemo symbols that exist |
 | `_probe_imu_tear.py` | Read tearing signature at exactly 256 LSB |
 | `_probe_imu_lock.py` | Locking sequence effect on peak-to-peak and outliers |
 | `_probe_imu_accuracy.py` | Noise, offset and magnitude for a static board |

@@ -219,6 +219,40 @@ Opening an audio output stream after this chain still works, so the RetinaFace
 single-model path does not reproduce the audio contamination seen with the
 full Vision chain. See `reset-matrix.md`.
 
+## Face landmark (106 points)
+
+Files: `face_landmark.kmodel` (1409104 B, 192x192 input) plus the RetinaFace
+detector above. There is **no `aidemo.face_landmark_post_process`** on this
+firmware: the post-processing is plain Python.
+
+Chain per frame:
+
+1. Detect, take the **largest** box (screen coordinates, so subtract `y_off`).
+2. Build an affine matrix that maps the box into the 192 square with a 1.5x
+   margin, centred: `scale = 192 / (max(w, h) * 1.5)`, translation
+   `96 - centre * scale`.
+3. `ai2d.affine(interp_method.cv2_bilinear, 0, 0, 127, 1, [m00, m01, m02,
+   m10, m11, m12])`, then `build([1,3,480,800], [1,3,192,192])`, then `run`.
+4. `kpu.outputs_size() == 1`, shape `[1, 212]` = 106 points. Release it.
+5. Normalise to pixels with `p = (p + 1) * 96` (assign, do not accumulate —
+   writing `p += (p + 1) * 96` pushes every point far off screen).
+6. `aidemo.invert_affine_transform(m)` then `x' = x*i0 + y*i1 + i2`,
+   `y' = x*i3 + y*i4 + i5` for each point.
+
+Measured on board (800x480 preview, largest box 108x132 at (113,119)): all 106
+points inside the screen; the eye centres land within 1 px and 4 px of the
+detector's own 5-point output, and the mouth centre within 3 px. That agreement
+is the correctness check for steps 5 and 6.
+
+Costs: detector 9.6 ms (ai2d + kpu + post), `affine + build` **5.78 ms**, landmark
+run 1.32 ms. `affine + build` dominates, so the app rebuilds it every other frame
+and reuses the previous points in between. Model load: detector 206 ms, landmark
+106 ms; both models resident leaves 3.65 MB free.
+
+Opening an audio output stream after this chain still works, so the RetinaFace
+single-model path does not reproduce the audio contamination seen with the
+full Vision chain. See `reset-matrix.md`.
+
 ## Memory discipline
 
 With the GUI home screen resident, the MicroPython heap has only about 2.3 MB
