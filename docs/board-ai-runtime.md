@@ -257,10 +257,21 @@ like a web of stray lines. Instead `tools/gen_face_mesh.py` lays a hexagonal
 lattice inside the outline, triangulates lattice plus feature points once, and
 binds every vertex to three landmarks by barycentric weights. At runtime
 `x = w0*lm[i0] + w1*lm[i1] + w2*lm[i2]`, so the topology is constant while the
-vertices follow any face. The emitted mesh is 52 vertices and 123 edges.
+vertices follow any face. The emitted mesh is 36 vertices and 94 edges: 14
+lattice nodes, 7 outline anchors (every 5th basin point) and 15 feature nodes
+(brows 2, eyes 4, nose bridge 1, nose wings 2). Outline anchors are required;
+without them the triangulation spans the forehead and the silhouette stops
+looking like a face. The template face is only 97x98 px, so the lattice step
+sets the interior density: 22 px gives 14 interior nodes with the forehead
+covered, while 34 px fits five and leaves the forehead empty.
 
-Cost: 123 edges plus 52 vertex dots settle the app at about 50 ms/frame, 20 fps
-at 800x480 under FULL render. Vertex dots add roughly 1.2 ms; the edges dominate.
+Ink is teal (`0x00B894` edges, `0x5CE8C0` dots) rather than white, because white
+washed out against bright scenes; both match the app accent.
+
+Cost: the app runs at about 50-57 ms/frame, 18-20 fps at 800x480 under FULL
+render. Trimming the mesh from 104 to 94 edges did not change the frame rate
+measurably, because repainting the preview and running the detector already cost
+36-40 ms; the mesh is the remaining half. Vertex dots add roughly 1.2 ms.
 
 Opening an audio output stream after this chain still works, so the RetinaFace
 single-model path does not reproduce the audio contamination seen with the

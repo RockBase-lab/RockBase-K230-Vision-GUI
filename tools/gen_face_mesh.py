@@ -11,8 +11,10 @@
 # Prints the MESH_BARY / MESH_EDGES tables to paste into the app. Needs numpy
 # and scipy on the host; the board does not run this.
 #
-# Measured on board: the emitted mesh is 52 vertices and 123 edges, which costs
-# about 44 ms to draw at 800x480 under FULL render; the app runs at 20 fps.
+# Measured on board: the emitted mesh is 36 vertices and 94 edges, and the app
+# runs at about 50-57 ms/frame (18-20 fps). Trimming the mesh from 104 to 94
+# edges did not change the frame rate measurably: repainting the preview and
+# running the detector already cost 36-40 ms.
 
 import math
 
@@ -51,20 +53,28 @@ TEMPLATE = [
 BASIN = [1, 9, 10, 11, 12, 13, 14, 15, 16, 2, 3, 4, 5, 6, 7, 8, 0, 24,
          23, 22, 21, 20, 19, 18, 32, 31, 30, 29, 28, 27, 26, 25, 17]
 
-# Feature points that must land on a mesh node, so eyes and mouth stay readable
-# after the deformation.
+# Feature points that must land on a mesh node, so eyes and nose stay readable
+# after the deformation. Brows 2, eyes 4, nose bridge 1, nose wings 2. The lips
+# are left to the lattice: adding lip anchors cost 6 nodes for little visible
+# gain at this scale, and the lattice already puts nodes along the mouth.
 FEATURES = [
-    43, 45, 47, 51, 48,
-    97, 99, 101, 105, 102,
-    35, 33, 37, 39, 41,
-    89, 87, 91, 93, 95,
-    72, 74,
-    77, 79, 80, 84,
-    52, 56, 59, 58, 61, 67, 63,
-    65, 60, 69, 62,
+    43, 48,
+    97, 102,
+    35, 33, 39, 41,
+    89, 87, 93, 95,
+    74,
+    77, 84,
 ]
 
-LATTICE_STEP = 21.0
+# Every Nth outline point becomes a mesh node. Without outline anchors the
+# triangulation spans the forehead and the silhouette stops looking like a face;
+# stride 5 was the sparsest that still followed the jaw.
+OUTLINE_STRIDE = 5
+
+# The template face is only 97x98 px, so the lattice step decides how many
+# interior nodes fit. 22 px gives 36 nodes in total with the forehead covered;
+# 34 px fits only five interior nodes and leaves the forehead empty.
+LATTICE_STEP = 22.0
 
 
 def point_in_poly(p, poly):
@@ -109,17 +119,27 @@ def main():
     from scipy.spatial import Delaunay
 
     poly = [TEMPLATE[i] for i in BASIN]
+    outline = BASIN[::OUTLINE_STRIDE]
     verts = list(build_lattice(poly, LATTICE_STEP))
     lattice_n = len(verts)
+    for i in outline:
+        verts.append(TEMPLATE[i])
     for i in FEATURES:
         verts.append(TEMPLATE[i])
-    print("lattice %d + features %d = %d vertices"
-          % (lattice_n, len(FEATURES), len(verts)))
+    # Anchors: outline and feature nodes must survive, otherwise a landmark a few
+    # px outside the basin ends up as a dot with no edges.
+    anchor_from = lattice_n
+    print("lattice %d + outline %d + features %d = %d vertices"
+          % (lattice_n, len(outline), len(FEATURES), len(verts)))
 
     xy = np.array(verts)
     tri = Delaunay(xy)
-    tris = [tuple(sorted(s)) for s in tri.simplices
-            if point_in_poly((xy[s, 0].mean(), xy[s, 1].mean()), poly)]
+    tris = []
+    for s in tri.simplices:
+        if any(int(i) >= anchor_from for i in s):
+            tris.append(tuple(sorted(s)))
+        elif point_in_poly((xy[s, 0].mean(), xy[s, 1].mean()), poly):
+            tris.append(tuple(sorted(s)))
     edges = set()
     for t in tris:
         for a in range(3):
