@@ -32,6 +32,8 @@ from ui import beep
 from apps.error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                         close_sensor)
 from camera_fov import set_preview
+
+PREVIEW_W = 800
 PREVIEW_H = 480
 
 DET_MODEL = "/sdcard/examples/kmodel/face_detection_320.kmodel"

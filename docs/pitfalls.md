@@ -21,6 +21,7 @@ Recovery for every entry here is a power cycle. Programmatic resets do not help.
 
 | Symptom | Cause | Do instead |
 |---|---|---|
+| An app shows the "camera unavailable" panel although the camera works | A `NameError` inside the app's second half is caught by its own `except BaseException` and converted to `AppUnavailable` | Run `python -m pyflakes` on the file; `py_compile` passes such a file |
 | Deploy hangs forever after printing the file count | Stock `enter_raw_repl()` relies on pyserial 2.x `interCharTimeout`, which 3.x ignores, so `serial.timeout` stays None on a silent board | Use `_serial_guard.open_board()`, which carries timeouts on every step |
 | Deploy aborts with `OSError: [Errno 1] EPERM` at a random file | Transient FAT error on `open('wb')`, **not** a lock: the same call succeeds on retry, and the file is not held | Retry the snippet with a short backoff; do not remove the file first |
 | A file on the board is 0 bytes after an interrupted push | `open('wb')` truncates before the first chunk is written, so an aborted transfer leaves the file empty | Retry per file and re-verify sizes; `launcher.py` truncated leaves the GUI dead until it is re-pushed |
