@@ -131,14 +131,15 @@ sudo dd if=sysimage-sdcard.img of=/dev/sdx bs=1M oflag=sync
 .
 ├── README.md              # 英文版产品说明
 ├── README_zh.md           # 简体中文版产品说明
+├── LICENSE                # Apache License 2.0
 ├── AGENTS.md              # 贡献者与 AI 代理的协作约定
 ├── factory/gui/           # 板端 MicroPython GUI 启动器与应用
 ├── stubs/                 # 板端 API 类型存根
 ├── tools/                 # 资源烘焙与部署脚本
 │   └── probes/            # 在板上跑的一次性测量脚本
-├── examples/              # 运行时需要的模型
-│   ├── kmodel/            # 应用引用的 kmodel 文件
-│   └── utils/             # 锚点数据
+├── models/                # 推理资源的参考副本
+│   ├── kmodel/            # 应用加载的 kmodel（含来源说明）
+│   └── utils/             # 人脸检测锚点数据
 └── docs/                  # 板上实测的客观事实
     ├── board-ai-runtime.md      # Ai2d 与 KPU 契约
     ├── board-hardware.md        # IMU、音频、摄像头、视频解码
@@ -167,6 +168,39 @@ K230 视觉识别模块适用于需要端侧 AI 加速的嵌入式开发者、�
 ## 技术支持
 
 如在使用过程中遇到问题，可先查阅 `docs/` 下的文档。若问题仍未解决，欢迎提交 Issue，描述现象、复现步骤与所用版本。
+
+## 运行环境
+
+本仓库**只包含应用层 Python 代码**，不含运行环境，也不分发运行环境的任何组成部分。
+
+GUI 运行在 K230 的 **CanMV MicroPython 固件**上，应用 import 的板端模块
+（`lvgl`、`image`、`media`、`nncase_runtime`、`aidemo`、`ulab`）全部由该固件提供。
+固件需自行从嘉楠获取安装，本仓库不提供替代品。
+
+| 组件 | 维护方 | 授权 |
+| --- | --- | --- |
+| CanMV 固件（`canmv_k230`） | 嘉楠 | 上游截至 2026-10 未发布 LICENSE 文件，请参考上游仓库 |
+| K230 SDK | 嘉楠 | BSD-2-Clause，Copyright (c) 2023 Canaan Bright Sight Co., Ltd |
+| LVGL | LVGL 项目 | MIT |
+
+`stubs/*.pyi` 描述该固件的 API 面，用于让 PC 端类型检查不把板端 import 判为错误。
+它们是本项目编写的类型描述，不是固件源码。
+
+### 推理资源
+
+`models/kmodel/` 与 `models/utils/` 是官方 CanMV 固件镜像中两个目录的**参考副本**，内容未做改动：
+
+| 本仓库 | 板上路径（由固件镜像提供） | 来源 |
+| --- | --- | --- |
+| `models/kmodel/*.kmodel` | `/sdcard/examples/kmodel/` | K230 SDK `src/rtsmart/libs/kmodel/ai_poc/kmodel/` |
+| `models/utils/prior_data_320.bin` | `/sdcard/examples/utils/` | 同上，人脸检测锚点数据 |
+
+应用从板上路径加载，这些文件由 CanMV 固件镜像提供，`tools/deploy_board.py` **不**
+推送它们。放在仓库里是为了让依赖清单、文件名与字节数无需解包固件镜像就能查阅，
+更换模型时能留下可审查的差异。
+
+这些文件属于嘉楠，适用于其原始授权，不属于本项目的 Apache-2.0；
+何况视觉类应用本身也只能与该固件配合使用。
 
 ## 许可证
 

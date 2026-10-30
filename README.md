@@ -132,14 +132,15 @@ This repository will collect the board-specific material needed to build K230 Vi
 .
 ├── README.md              # English product overview
 ├── README_zh.md           # Simplified Chinese product overview
+├── LICENSE                # Apache License 2.0
 ├── AGENTS.md              # Working agreement for contributors and agents
-├── factory/gui/          # Board-side MicroPython GUI launcher and apps
+├── factory/gui/           # Board-side MicroPython GUI launcher and apps
 ├── stubs/                 # Type stubs for the on-board API
 ├── tools/                 # Asset baking and deployment scripts
 │   └── probes/            # One-shot measurement scripts run on the board
-├── examples/              # Models required at runtime
-│   ├── kmodel/            # kmodel files referenced by the apps
-│   └── utils/             # Anchor data
+├── models/                # Reference copies of the inference artefacts
+│   ├── kmodel/            # kmodels the apps load (+ provenance notes)
+│   └── utils/             # Face-detection anchor data
 └── docs/                  # Measured platform facts
     ├── board-ai-runtime.md      # Ai2d and KPU contracts
     ├── board-hardware.md        # IMU, audio, camera, video decoding
@@ -168,6 +169,47 @@ Contributions via Issues and Pull Requests are welcome. When modifying either RE
 ## Technical Support
 
 If you encounter problems, check the documentation under `docs/` first. If the issue persists, open an Issue describing the symptom, reproduction steps, and the version in use.
+
+## Runtime Environment
+
+This repository contains **application-layer Python code only**. It does
+not include the operating environment and does not redistribute any part
+of it.
+
+The GUI runs on the **CanMV MicroPython firmware** for K230, which
+provides the board-only modules the apps import: `lvgl`, `image`,
+`media`, `nncase_runtime`, `aidemo` and `ulab`. Install that firmware
+from Canaan separately; nothing here replaces it.
+
+| Component | Maintained by | Terms |
+| --- | --- | --- |
+| CanMV firmware (`canmv_k230`) | Canaan | No licence file published upstream as of 2026-10; consult the upstream repository |
+| K230 SDK | Canaan | BSD-2-Clause, Copyright (c) 2023 Canaan Bright Sight Co., Ltd |
+| LVGL | LVGL project | MIT |
+
+`stubs/*.pyi` describe this firmware's API surface so a PC-side type
+checker does not flag board-only imports. They are type descriptions
+written for this project, not firmware source.
+
+### Inference artefacts
+
+`models/kmodel/` and `models/utils/` are **reference copies** of two
+directories in the official CanMV firmware image, unmodified:
+
+| Here | Board path (from the firmware image) | Origin |
+| --- | --- | --- |
+| `models/kmodel/*.kmodel` | `/sdcard/examples/kmodel/` | K230 SDK `src/rtsmart/libs/kmodel/ai_poc/kmodel/` |
+| `models/utils/prior_data_320.bin` | `/sdcard/examples/utils/` | Same, face-detection anchors |
+
+The apps load them from the board path, which the CanMV firmware image
+already provides; `tools/deploy_board.py` does not push these files. They
+are kept here so the dependency list, the file names and the byte counts
+are visible and reviewable without unpacking a firmware image, and so a
+model swap is a diff rather than a shrug.
+
+These files belong to Canaan and remain under their origin terms, not
+this project's Apache-2.0 licence; the vision apps are only usable
+together with that firmware anyway.
 
 ## License
 

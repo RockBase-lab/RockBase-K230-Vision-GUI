@@ -67,7 +67,7 @@ runs/
 # ──────────────────────────────────────────────
 # INT8 quantisation calibration data
 train/05_compile/calib_data/
-# Compiled kmodels (the ones under examples/kmodel/ ship with the repo)
+# Compiled kmodels (the ones under models/kmodel/ ship with the repo)
 train/05_compile/*.kmodel
 
 # ──────────────────────────────────────────────
@@ -78,7 +78,7 @@ train/05_compile/*.kmodel
 *.kmodel
 
 # Keep the kmodels that ship with the repo:
-!examples/kmodel/*.kmodel
+!models/kmodel/*.kmodel
 
 # Scratch scripts and experiment output
 tmp/
