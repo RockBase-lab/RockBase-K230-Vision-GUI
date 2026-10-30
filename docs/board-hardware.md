@@ -235,6 +235,30 @@ gyro LSB is 15.6 mdps with 0.2-0.5 dps noise, so one decimal suffices.
 - Only one `Sensor()` can be constructed per MicroPython VM lifetime. See
   `docs/reset-matrix.md`.
 
+## Storage
+
+Two writable filesystems, and they are not interchangeable:
+
+| Mount | Free | Backing | Survives reboot |
+|---|---|---|---|
+| `/sdcard` | about **76 MB** | SD card | yes |
+| `/data` | about **28.6 GB** | eMMC | yes |
+
+Measured with `tools/probes/_probe_storage_persist.py`: a marker written to
+both mounts was still present after `machine.reset()`, so both persist and the
+choice is purely about capacity.
+
+- `/sdcard` holds the deployed product content (`factory/gui`, `examples/kmodel`,
+  `examples/utils`) and has little room left. Do **not** write user data there.
+- `/data` is the runtime area and the only sane place for anything that grows:
+  photos (`/data/photos`), caches (`/data/cache`), audio (`/data/audio`),
+  configuration (`/data/config`) and the face feature database
+  (`/data/faces`).
+- Runtime directories are created by `tools/deploy_board.py` (`BOARD_MKDIRS`),
+  but an app must still create its own directory defensively: a board that was
+  never re-deployed will not have it, and `os.mkdir` here raises `OSError` for
+  an existing directory, so the call is wrapped.
+
 ## Video decoding
 
 `app_video.py` is not part of this repository. The findings are recorded so a
