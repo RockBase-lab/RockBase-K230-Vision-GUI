@@ -207,6 +207,14 @@ large on the right) gives 60/60 detections with zero degenerate boxes after
 the fix, largest box 146x186. `kpu.load` takes about 390 ms, 543 ms including
 sensor init.
 
+Threshold sensitivity, one captured frame re-run at every conf (so the frame
+is identical): 18 boxes at 0.02, 11 at 0.05, 10 for every value from 0.10
+through 0.85, then 8 at 0.90, 7 at 0.95, 6 at 0.97 and 4 at 0.98. Detected
+scores sit mostly above 0.9, so **any conf inside 0.10-0.85 yields the same
+frame**; a preset pair like 0.25/0.50/0.70 is invisible to the user because
+it sits entirely inside that plateau. Move the presets to the ends (about
+0.05 and 0.95) to make the control observable.
+
 Opening an audio output stream after this chain still works, so the RetinaFace
 single-model path does not reproduce the audio contamination seen with the
 full Vision chain. See `reset-matrix.md`.
