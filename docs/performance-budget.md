@@ -139,26 +139,59 @@ Measured on a still frame, 800x480 into the 640 plate detector:
 | Stage | Cost |
 |---|---|
 | ai2d (640x640) | 3 ms |
-| detection kpu | 57-59 ms |
+| detection kpu | 58-64 ms |
 | detection post-process | 0-4 ms |
 | `ocr_rec_preprocess` (1 plate) | 4-11 ms |
-| recognition ai2d + kpu (220x32) | 1 ms + 3-5 ms |
+| recognition ai2d + kpu (220x32) | 1 ms + 6-15 ms |
 | both kmodel loads | 978 ms, once (901 + 77) |
 
 About 65-80 ms per frame with one plate. The detector alone is twice the cost of
-yolov8n at 320, so this app is detection-bound and sits near 12-15 fps. Only one
-plate is recognised per frame (round-robin), which bounds the frame at that number
-instead of scaling with the plate count.
+yolov8n at 320, so this app is detection-bound. Only one plate is recognised per
+detection iteration (round-robin), which bounds the frame at that number instead of
+scaling with the plate count.
 
-Inside the real launcher, with one plate in front of the camera and recognition
-running every frame (3-15 ms), the loop measured **9.8 fps**: 39 frames in 4 s,
-worst single step 95.5 ms, zero errors. Recognition is not the limit; the 640x640
-detector is.
+### where the plate frame time actually goes
 
-A 20 s run over two plates in frame held **9.7 fps** (194 frames, zero errors),
-with recognition still only 6-15 ms per frame; the per-frame cost is 74-79 ms of
-which 70 ms is detection. The same rate held at 10.1-10.2 fps over 202-204 frames
-with a single plate at reading distance (61x20 in frame), so a small box does not
+Instrumented inside the real loop, one plate in view, 120 iterations:
+
+| Segment | Per iteration |
+|---|---|
+| detection (ai2d 3 ms + kpu ~58 ms + post 0-4 ms) | **68.1 ms** |
+| LVGL `task_handler` (FULL render repaint) | **22.5 ms** |
+| recognition (crop + ai2d + kpu + decode) | 6.1 ms |
+| `gc.collect()` every 8 iterations | 1.9 ms |
+| two snapshots, preview blit, overlay update | 2.4 ms |
+| **total** | **101.3 ms** |
+
+Detection is 67% and the full-screen repaint 22%. Nothing else is worth touching:
+the snapshots are 0.5 ms each and the overlay update 0.3 ms.
+
+### detection cadence is the only frame-rate lever
+
+A 640x640 inference is 4x the pixels of the 320 models used elsewhere in this GUI,
+and its cost does not depend on what the loop does between runs. So the lever is
+how often it runs. Measured over 60 iterations each:
+
+| Loop structure | Per iteration | FPS | Preview speedup |
+|---|---|---|---|
+| detect every iteration | 100.5 ms | 9.9 | 1.00x |
+| **detect every 2nd iteration** | **69.1 ms** | **14.5** | **1.46x** |
+| no detection at all (ceiling) | 35.6 ms | 28.1 | 2.82x |
+
+The app ships the middle row: the preview is what the eye watches, so it gets every
+frame, and the plate reading runs at about 7 per second. That is still fast enough
+for the label to settle in under a second at `STREAK_N = 4`, and the overlay holds
+its last box between detections.
+
+Measured after the change, 20 s live: **287 iterations at 14.3 fps, zero errors,
+144 recognition readings all identical** (`川WL8888`), label painted once and never
+changed. Before the change the same scene gave 10.2 fps at 204 iterations.
+
+A moving plate now lags one detection interval (about 140 ms) on screen. At this
+frame rate the lag is not noticeable, and a static plate is unaffected.
+
+The same rate held at 10.1-10.2 fps over 202-204 frames with a single plate at
+reading distance (61x20 in frame) before the cadence change, so a small box does not
 make detection cheaper: the cost is the 640x640 inference regardless of the plate.
 
 ## QR detection

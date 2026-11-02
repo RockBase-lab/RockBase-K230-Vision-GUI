@@ -14,13 +14,13 @@
 #      while the raw quad decoded 6 of 7 correctly.
 #   3. ocr_rec_preprocess returns a single-channel crop, so the recognition ai2d
 #      is built for one channel.
-#   4. A reading's province character can be wrong on one frame while every digit
-#      is right, so the label is the majority of the last few readings rather than
-#      one frame's result.
+#  4. A reading can be wrong in one character while the rest is right, so the label
+#     needs several agreeing readings and a box that stops moving between them.
 #
-# Cost per frame on board: detection 68-72 ms, crop 4-11 ms, recognition 6-15 ms.
-# Recognition runs on at most one plate per frame, round-robin, so several plates
-# in view do not stretch the frame. Measured 9.7 fps with two plates in frame.
+# Cost per iteration on board: detection 68 ms, LVGL repaint 22 ms, recognition
+# 6 ms. Detection is 67% of that and does not shrink with the plate, so it runs
+# every DETECT_EVERY iterations while the preview keeps every one. Measured 14.3
+# fps preview with the plate reading at about 7 per second.
 #
 # Keys: CANCEL (GPIO0) exits (launcher default); OK (GPIO53) freezes/resumes. The
 # top bar is one hit target and toggles the same freeze.
@@ -104,6 +104,22 @@ PLATE_MAX_LEN = 8
 # 18%, both in runs) make the caption flip back and forth every second or so.
 STREAK_N = 4
 STREAK_SWITCH = 8
+
+# Detection runs every DETECT_EVERY iterations, the preview every iteration.
+#
+# Measured per-iteration cost is detection 68 ms, LVGL task 22 ms, recognition
+# 6 ms, the rest ~2.5 ms. Detection is a 640x640 inference that does not depend on
+# what the loop does around it, so running it half as often is the only lever that
+# raises the preview rate:
+#
+#   detect every frame     100.5 ms/iter   9.9 fps
+#   detect every 2nd        69.1 ms/iter  14.5 fps
+#   no detection at all     35.6 ms/iter  28.1 fps
+#
+# The plate reading halves to about 7 per second, which still settles a label in
+# under a second at STREAK_N = 4, and the overlay holds its last box between
+# detections. The preview is what the eye watches, so it gets the extra frames.
+DETECT_EVERY = 2
 
 # Detector boxes jitter by a pixel or two between frames, and the recogniser is
 # sensitive to that: the same plate cropped from a 1 px shifted box measured a
@@ -256,6 +272,8 @@ class PlateApp:
         # the last time each slot was read.
         self._rec_cursor = 0
         self._rec_ms = [0] * MAX_PLATES
+        # Which iteration this is; detection runs when (_tick % DETECT_EVERY) == 0.
+        self._tick = 0
         # Per-slot reading state: the last raw string and how many frames in a row
         # produced it. The label is set when that streak is long enough.
         self._streak_text = [""] * MAX_PLATES
@@ -718,23 +736,29 @@ class PlateApp:
         if self.frozen:
             return
 
+        # The preview frame is grabbed every iteration; the AI frame only on a
+        # detection iteration, because its snapshot is pure overhead otherwise.
         try:
-            ai_img = self.sensor.snapshot(chn=CAM_CHN_ID_1)
             img = self.sensor.snapshot(chn=CAM_CHN_ID_2)
+            due = (self._tick % DETECT_EVERY) == 0
+            ai_img = self.sensor.snapshot(chn=CAM_CHN_ID_1) if due else None
         except BaseException as error:
             print("[Plate] snapshot error:", error)
             self._show_error("snapshot error")
             self._no_signal.on_fail(self.ctx)
+            self._tick += 1
             return
         self._no_signal.on_ok()
+        self._tick += 1
 
-        t0 = time.ticks_ms()
-        quads = []
-        try:
-            quads = self._detect(ai_img)
-        except BaseException as error:
-            print("[Plate] detect error:", error)
-            sys.print_exception(error)
+        quads = None
+        if due:
+            quads = []
+            try:
+                quads = self._detect(ai_img)
+            except BaseException as error:
+                print("[Plate] detect error:", error)
+                sys.print_exception(error)
 
         # preview always updates, even when detection failed
         try:
@@ -744,7 +768,34 @@ class PlateApp:
             self._show_error("display error")
             return
 
-        # ---- recognition: one plate per frame, round-robin ----
+        if due:
+            self._run_detection_cycle(ai_img, quads)
+
+        # LVGL image sources and sensor frames are reference cycles that never
+        # get freed by refcounting; without a periodic collect the contiguous
+        # heap fills and to_numpy starts failing.
+        self._gc_tick += 1
+        if self._gc_tick >= 8:
+            self._gc_tick = 0
+            gc.collect()
+
+        self.frame_count += 1
+        now = time.ticks_ms()
+        elapsed = time.ticks_diff(now, self.last_fps_ms)
+        if elapsed >= 1000:
+            self.fps_text = "{:.1f}".format(self.frame_count * 1000.0 / elapsed)
+            self.frame_count = 0
+            self.last_fps_ms = now
+            self._update_stat()
+
+    def _run_detection_cycle(self, ai_img, quads):
+        """Everything that only has to happen on a detection iteration.
+
+        Kept out of step() so the preview path stays short: this is the part that
+        costs 68 ms (inference) plus 6 ms (recognition), and the overlay update.
+        """
+        t0 = time.ticks_ms()
+
         # Slots are matched by index, so a change in count means the on-screen
         # plates were re-ordered or replaced: drop the old strings rather than
         # paint the previous car's number onto the next one.
@@ -769,12 +820,12 @@ class PlateApp:
             self._centres[i] = (cx, cy)
             quads[i] = self._smooth_box(i, q)
 
-        now = time.ticks_ms()
+        # ---- recognition: one plate per detection, round-robin ----
         if quads:
             slot = self._rec_cursor % len(quads)
             self._rec_cursor += 1
-            waited = time.ticks_diff(now, self._rec_ms[slot])
-            if waited >= REC_PERIOD_MS:
+            now = time.ticks_ms()
+            if time.ticks_diff(now, self._rec_ms[slot]) >= REC_PERIOD_MS:
                 self._rec_ms[slot] = now
                 try:
                     chw = ai_img.to_numpy_ref()
@@ -790,26 +841,8 @@ class PlateApp:
         self.plate_count = len(quads)
         self._show_plates(quads)
         self._print_state(quads)
-
         self.infer_ms = time.ticks_diff(time.ticks_ms(), t0)
         del quads
-
-        # LVGL image sources and sensor frames are reference cycles that never
-        # get freed by refcounting; without a periodic collect the contiguous
-        # heap fills and to_numpy starts failing.
-        self._gc_tick += 1
-        if self._gc_tick >= 8:
-            self._gc_tick = 0
-            gc.collect()
-
-        self.frame_count += 1
-        now = time.ticks_ms()
-        elapsed = time.ticks_diff(now, self.last_fps_ms)
-        if elapsed >= 1000:
-            self.fps_text = "{:.1f}".format(self.frame_count * 1000.0 / elapsed)
-            self.frame_count = 0
-            self.last_fps_ms = now
-            self._update_stat()
 
     def _smooth_box(self, slot, quad):
         """Exponential moving average of a slot's box.

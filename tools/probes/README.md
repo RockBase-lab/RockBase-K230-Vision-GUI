@@ -86,6 +86,8 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_plate_stability_run.py` | 20 s live run: raw reading distribution vs displayed label |
 | `_probe_plate_live_diag.py` | Live frame: every raw box with its score, gate verdict, and decode |
 | `_probe_plate_scores.py` | What each post-process return element holds (quads, rects, scores) |
+| `_probe_plate_frametime.py` | Per-segment cost of one plate iteration inside the real loop |
+| `_probe_plate_loopvar.py` | Preview rate for three loop structures (detect every frame / every 2nd / none) |
 | `_probe_plate_sensor_order.py` | Whether the RGBP888 plane order matches the RGB888 packed order |
 | `_probe_plate_font.py` | Baked CJK plate font loads and renders (needs `--lvgl`) |
 | `_probe_plate_caption_style.py` | Caption font size and ink colour (needs `--lvgl`) |

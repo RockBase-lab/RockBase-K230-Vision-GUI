@@ -170,11 +170,15 @@ recogniser. Both names come from the vendor and keep their spelling.
 
 | Model | Input | Output | Cost (800x480 frame) |
 | --- | --- | --- | --- |
-| `yolo_license_plate_det.kmodel` | 640x640 | `(1, 13, 8400)` | 57-59 ms kpu, 3 ms ai2d |
-| `licence_reco.kmodel` | 220x32 | `(55, 1, 74)` | 3-5 ms kpu |
+| `yolo_license_plate_det.kmodel` | 640x640 | `(1, 13, 8400)` | 68 ms kpu + post |
+| `licence_reco.kmodel` | 220x32 | `(55, 1, 74)` | 6-15 ms kpu |
 
-Load cost is 901 ms for the detector and 77 ms for the recogniser. A full frame
-with one plate measures about 65-80 ms.
+Load cost is 901 ms for the detector and 77 ms for the recogniser. A whole
+iteration with one plate measures about 68 ms of detection plus 22 ms of LVGL
+repaint plus 6 ms of recognition, so the detector sets the rate: 9.9 fps when it
+runs every iteration, 14.5 fps when it runs every second one. The app uses the
+latter and keeps the preview on every iteration; the breakdown is in
+`docs/performance-budget.md`.
 
 ```python
 grid = raw[0].transpose().copy()          # (8400, 13); aidemo needs contiguous
