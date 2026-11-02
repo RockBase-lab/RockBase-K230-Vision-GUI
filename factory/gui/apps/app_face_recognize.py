@@ -56,6 +56,7 @@ from libs.AI2D import Ai2d
 from media.sensor import Sensor, CAM_CHN_ID_1, CAM_CHN_ID_2
 from ui import beep
 from ui import kb_layer
+from audio import greet
 from apps.error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                         close_sensor)
 
@@ -93,6 +94,9 @@ LIVE_REAL = 0.50
 # path mirrors the /data/<app>/<topic> layout used by photos and cache.
 DB_DIR = "/data/face/recognize"
 DB_INDEX = DB_DIR + "/db.json"
+# Greeting WAVs live beside the features but in their own directory, because the
+# feature files are renumbered on every save while these are keyed by name.
+VOICE_DIR = DB_DIR + "/voice"
 TMP_SUFFIX = ".tmp"
 
 # Feature vectors per identity, captured at different viewing angles. The
@@ -356,6 +360,20 @@ class FaceRecognizeApp:
         self.photos_allowed = True
         self._switch = None       # top-bar PHOTO switch (None = not built)
 
+        # Greeting state. voice_on is persisted with photos_allowed; the greeter
+        # only exists while a WAV is playing, so an app that never speaks holds
+        # no audio stream.
+        self.voice_on = True
+        self.greeter = greet.Greeter(VOICE_DIR)
+        # Greeting synthesis queue. The three TTS models cost about 6 s to load,
+        # so one instance is kept alive across the whole batch and a single name
+        # is built per step: the UI advances between names instead of freezing
+        # for the full run.
+        self._synth = None
+        self._voice_queue = []
+        self._voice_done = 0
+        self._voice_total = 0
+
         self.img_w = ctx.width
         self.img_h = ctx.height
 
@@ -578,6 +596,7 @@ class FaceRecognizeApp:
         # An index written before the photo feature has no key: default on, so
         # upgrading never silently narrows an existing database.
         self.photos_allowed = bool(data.get("photos_allowed", True))
+        self.voice_on = bool(data.get("voice_on", True))
         self.db_names = []
         self.db_feats = []
         self.db_srcs = []
@@ -651,7 +670,8 @@ class FaceRecognizeApp:
                           "name": self.db_names[i],
                           "src": self.db_srcs[i]})
         out = {"next": self._db_next, "items": items,
-               "photos_allowed": self.photos_allowed}
+               "photos_allowed": self.photos_allowed,
+               "voice_on": self.voice_on}
         text = json.dumps(out)
         tmp = DB_INDEX + TMP_SUFFIX
         f = open(tmp, "w")
@@ -711,11 +731,17 @@ class FaceRecognizeApp:
         return self._db_count(name)
 
     def _db_delete_name(self, name):
-        """Delete one identity and all of its samples."""
+        """Delete one identity, all of its samples and its greeting."""
         removed = self._db_drop_name(name)
         if removed:
             print("[Recognize] delete '{}' ({} sample(s))".format(name, removed))
             self._db_write_all()
+        # The greeting belongs to the identity, so it goes with it; otherwise a
+        # later enrollment of the same name would silently reuse stale speech.
+        try:
+            os.remove(self._voice_path(name))
+        except BaseException:
+            pass
         return removed
 
     def _db_write_all(self):
@@ -1180,9 +1206,87 @@ class FaceRecognizeApp:
         if n >= SAMPLES_PER_NAME:
             self._end_add_session()
             self._note("{} {}/{} done".format(name, n, SAMPLES_PER_NAME))
+            # All angles are in: queue the greeting. It is built on a later
+            # frame, not here, so this frame still renders the note.
+            if self.voice_on:
+                self._queue_voices([name])
         else:
             self._add_ms = time.ticks_ms()
             self._note("{} {}/{} - turn".format(name, n, SAMPLES_PER_NAME))
+
+    # ---------- greeting voice ----------
+    def _voice_path(self, name):
+        return VOICE_DIR + "/" + name + ".wav"
+
+    def _has_voice(self, name):
+        try:
+            return os.stat(self._voice_path(name))[6] > 44
+        except BaseException:
+            return False
+
+    def _make_greeting(self, name):
+        """Synthesise the greeting WAV for `name` with the shared Synth.
+
+        Returns the PCM byte count, or -1 when the model is unavailable.
+        """
+        from audio import tts
+        if self._synth is None:
+            self._synth = tts.Synth()
+        return self._synth.text_to_wav(tts.speak_text(name),
+                                       self._voice_path(name))
+
+    def _missing_voices(self):
+        """Identities with no greeting on disk, in database order."""
+        return [n for n in self._db_names_unique() if not self._has_voice(n)]
+
+    def _queue_voices(self, names):
+        """Queue names for greeting synthesis; already-voiced ones are skipped."""
+        todo = [n for n in names if not self._has_voice(n)]
+        if not todo:
+            return
+        self._voice_queue = todo
+        self._voice_done = 0
+        self._voice_total = len(todo)
+        self._note("voice 0/{}".format(self._voice_total))
+
+    def _step_voice(self):
+        """Build one queued greeting. Returns True when it did work.
+
+        Called once per frame so the preview keeps advancing between names. The
+        first call also loads the three models (about 6 s) and shows its own
+        note so the stall is explained rather than looking like a hang.
+        """
+        if not self._voice_queue:
+            return False
+        name = self._voice_queue.pop(0)
+        try:
+            t0 = time.ticks_ms()
+            size = self._make_greeting(name)
+            print("[Recognize] greeting '{}' {} B in {} ms".format(
+                name, size, time.ticks_diff(time.ticks_ms(), t0)))
+        except BaseException as e:
+            print("[Recognize] greeting for '{}' failed: {}".format(name, e))
+            sys.print_exception(e)
+            size = 0
+        self._voice_done += 1
+        if self._voice_queue:
+            self._note("voice {}/{}".format(self._voice_done,
+                                            self._voice_total))
+        else:
+            self._close_synth()
+            self._note("voices ready {}/{}".format(self._voice_done,
+                                                   self._voice_total))
+        return True
+
+    def _close_synth(self):
+        """Release the three TTS models. A missed release leaks native memory."""
+        if self._synth is None:
+            return
+        try:
+            self._synth.close()
+        except BaseException as e:
+            print("[Recognize] synth close failed:", e)
+        self._synth = None
 
     # ---------- manage overlay ----------
     def _open_manage(self):
@@ -1200,9 +1304,13 @@ class FaceRecognizeApp:
         backdrop.add_flag(lv.obj.FLAG.CLICKABLE)
         beep.on_click(backdrop, lambda e: self._close_manage())
 
+        # One extra row for the VOICE toggle above the identity list, plus one
+        # more when there are greetings to rebuild and the switch is on.
         rows = min(max(len(self._db_names_unique()), 1), 6)
+        missing = self._missing_voices() if self.voice_on else []
+        extra = 152 + (38 if missing else 0)
         panel = lv.obj(backdrop)
-        panel.set_size(560, 96 + rows * 56)
+        panel.set_size(560, extra + rows * 56)
         panel.align(lv.ALIGN.CENTER, 0, 0)
         panel.set_style_bg_color(lv.color_hex(0x101418), 0)
         panel.set_style_bg_opa(lv.OPA.COVER, 0)
@@ -1224,14 +1332,64 @@ class FaceRecognizeApp:
         hint.set_style_text_color(lv.color_hex(0x8A97A3), 0)
         hint.align(lv.ALIGN.TOP_MID, 0, 26)
 
+        # VOICE row: speak the matched name. Kept here rather than in the top
+        # bar, which is already full at 800 px.
+        voice_row = lv.btn(panel)
+        voice_row.set_size(524, 44)
+        voice_row.align(lv.ALIGN.TOP_MID, 0, 48)
+        voice_row.set_style_radius(10, 0)
+        voice_row.set_style_bg_color(lv.color_hex(0x16202A), 0)
+        voice_row.set_style_bg_opa(lv.OPA.COVER, 0)
+        voice_row.set_style_border_width(0, 0)
+        voice_row.set_style_pad_all(0, 0)
+        voice_row.clear_flag(lv.obj.FLAG.SCROLLABLE)
+        voice_row.add_flag(lv.obj.FLAG.CLICKABLE)
+        vlab = lv.label(voice_row)
+        vlab.set_text("VOICE  say the name")
+        vlab.set_style_text_color(
+            lv.color_hex(COL_KNOWN if self.voice_on else COL_UNKNOWN), 0)
+        if self.bar_font is not None:
+            vlab.set_style_text_font(self.bar_font, 0)
+        vlab.align(lv.ALIGN.LEFT_MID, 12, 0)
+        vlab.clear_flag(lv.obj.FLAG.CLICKABLE)
+        voice_sw = lv.switch(voice_row)
+        voice_sw.set_size(46, 24)
+        voice_sw.align(lv.ALIGN.RIGHT_MID, -12, 0)
+        voice_sw.clear_flag(lv.obj.FLAG.SCROLLABLE)
+        voice_sw.add_flag(lv.obj.FLAG.CHECKABLE)
+        voice_sw.set_style_bg_color(lv.color_hex(0x1E262E), 0)
+        if self.voice_on:
+            voice_sw.add_state(lv.STATE.CHECKED)
+        beep.on_click(voice_sw, lambda e: self._toggle_voice(voice_sw))
+
+        # Identities enrolled before the greeting feature have no WAV, so give
+        # the user an explicit rebuild instead of silently greeting nobody.
+        if missing:
+            fix = lv.btn(panel)
+            fix.set_size(524, 34)
+            fix.align(lv.ALIGN.TOP_MID, 0, 96)
+            fix.set_style_radius(8, 0)
+            fix.set_style_bg_color(lv.color_hex(0x20303C), 0)
+            fix.set_style_bg_opa(lv.OPA.COVER, 0)
+            fix.set_style_border_width(0, 0)
+            fix.set_style_pad_all(0, 0)
+            fix.clear_flag(lv.obj.FLAG.SCROLLABLE)
+            fix.add_flag(lv.obj.FLAG.CLICKABLE)
+            flab = lv.label(fix)
+            flab.set_text("make {} missing voice(s)".format(len(missing)))
+            flab.set_style_text_color(lv.color_hex(COL_FPS), 0)
+            flab.center()
+            flab.clear_flag(lv.obj.FLAG.CLICKABLE)
+            beep.on_click(fix, lambda e: self._rebuild_voices(missing))
+
         names = self._db_names_unique()
         if not names:
             empty = lv.label(panel)
             empty.set_text("none yet - press OK to enroll")
             empty.set_style_text_color(lv.color_hex(COL_HINT), 0)
-            empty.align(lv.ALIGN.TOP_MID, 0, 56)
+            empty.align(lv.ALIGN.TOP_MID, 0, 104)
         else:
-            y = 52
+            y = 100 if not missing else 138
             for name in names[:6]:
                 cnt = self._db_count(name)
                 # The tag describes the identity, so it warns whenever any of
@@ -1273,6 +1431,26 @@ class FaceRecognizeApp:
                 y += 56
 
         self._manage = backdrop
+
+    def _toggle_voice(self, sw):
+        """VOICE switch handler: persist, and stop talking immediately if off."""
+        self.voice_on = bool(sw.has_state(lv.STATE.CHECKED))
+        if not self.voice_on:
+            try:
+                self.greeter.stop()
+            except BaseException as e:
+                print("[Recognize] greeter stop failed:", e)
+        try:
+            self._db_save_index()
+        except BaseException as e:
+            print("[Recognize] voice setting save failed:", e)
+        self._close_manage()
+        self._note("voice {}".format("on" if self.voice_on else "off"))
+
+    def _rebuild_voices(self, names):
+        """Start the batch from the manage panel, then get out of the way."""
+        self._close_manage()
+        self._queue_voices(names)
 
     def _delete_from_manage(self, name):
         self._close_manage()
@@ -1353,6 +1531,11 @@ class FaceRecognizeApp:
         if self.frozen:
             return
 
+        # Deferred greeting synthesis: one frame of UI feedback has been shown,
+        # so blocking here is a visible pause rather than a silent freeze.
+        if self._step_voice():
+            return
+
         try:
             ai_img = self.sensor.snapshot(chn=CAM_CHN_ID_1)
             img = self.sensor.snapshot(chn=CAM_CHN_ID_2)
@@ -1422,6 +1605,14 @@ class FaceRecognizeApp:
 
         self._draw_box(box, self._name is not None)
 
+        # Greeting: one spoken name per arrival, never a repeat while the person
+        # stays in view. pump() keeps the stream paced; the WAV's own length ends
+        # it. Disabled while the keyboard or the manage overlay owns the screen,
+        # which frozen already covers.
+        if self.greeter.update(self._name, self.voice_on and not self.frozen):
+            print("[Recognize] greeting '{}'".format(self._name))
+        self.greeter.pump()
+
         # LVGL image sources and sensor frames are cyclic garbage; without a
         # periodic collect to_numpy starts failing every few dozen frames.
         self._gc_tick += 1
@@ -1440,6 +1631,16 @@ class FaceRecognizeApp:
 
     def destroy(self):
         print("[Recognize] destroy begin")
+        # Both the greeting stream and the TTS models own native handles;
+        # stopping them here is what keeps an app exit from leaking one.
+        try:
+            self.greeter.stop()
+        except BaseException as e:
+            print("[Recognize]   greeter stop error: {}".format(e))
+        try:
+            self._close_synth()
+        except BaseException as e:
+            print("[Recognize]   synth close error: {}".format(e))
         if self.kb is not None:
             try:
                 self.kb.close()

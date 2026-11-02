@@ -98,6 +98,10 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_recognize_model.py` | Verification chain: memory, shape, timing, same-subject scores |
 | `_probe_recognize_app.py` | Recognize app end to end: enroll, reload, match, delete, fps |
 | `_probe_rec_photo.py` | Photo enrollment: PHOTO switch, src tagging, match filter, persistence |
+| `_probe_tts_measure.py` | TTS pipeline: model load, synthesis cost, ASCII names, heap |
+| `_probe_tts_leak.py` | Three load/release cycles plus the `ttszh` frontend, to prove no leak |
+| `_probe_greet.py` | Greeting trigger matrix, playback completion, stream cleanup |
+| `_probe_greet_bench.py` | Per-block cost split: stereo conversion, WAV read, blocking write |
 | `_cap_face_recognize.py` | Screen capture of the Recognize app with a match |
 | `_cap_recognize_empty.py` | Screen capture of the empty-database panel |
 | `_probe_back_out.py` | Layered CANCEL ladder on the real launcher, incl. page restore |

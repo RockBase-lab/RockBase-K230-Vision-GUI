@@ -890,21 +890,26 @@ class WavPlayer:
         self.muted = False
         self.active = False
 
-    def start(self, gain=1.0, muted=True):
+    def start(self, gain=1.0, muted=True, path=None):
         """Open the WAV and the output stream.
 
         muted=True: prefill silence only, then call unmute() when playback really
         starts. The switch exists for a future "pause" (keep writing silent blocks
         to hold the codec clock).
+
+        path: WAV to play. Defaults to the Audio app's recording, so callers
+        that speak a different file (TTS greetings) do not have to copy it over
+        the recording first.
         """
         self.reset()
         import media.wave as wave
+        src = path or wav_path()
 
         # Try already during header reading: any failure in get_framerate etc. must
         # still close the handle
         wf = None
         try:
-            wf = wave.open(wav_path(), "rb")
+            wf = wave.open(src, "rb")
             rate = wf.get_framerate()
             width = wf.get_sampwidth()
             channels = wf.get_channels()
@@ -920,7 +925,7 @@ class WavPlayer:
                 total = getattr(wf, "_nframes", 0) or 0
             if not total or total < 0:
                 try:
-                    total = (os.stat(wav_path())[6] - 44) // max(1, width * channels)
+                    total = (os.stat(src)[6] - 44) // max(1, width * channels)
                 except OSError:
                     total = 0
         except BaseException:

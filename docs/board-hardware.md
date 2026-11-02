@@ -250,10 +250,23 @@ choice is purely about capacity.
 
 - `/sdcard` holds the deployed product content (`factory/gui`, `examples/kmodel`,
   `examples/utils`) and has little room left. Do **not** write user data there.
-- `/data` is the runtime area and the only sane place for anything that grows:
-  photos (`/data/photos`), caches (`/data/cache`), audio (`/data/audio`),
-  configuration (`/data/config`) and the face feature database
-  (`/data/faces`).
+  Only the deploy tools write this partition.
+- `/data` is the runtime area and the only sane place for anything the product
+  creates. **One directory per app**, so a feature's files are always found and
+  removed together:
+
+  | App | Path |
+  | --- | --- |
+  | Camera / Gallery | `/data/photos` |
+  | Gallery caches | `/data/cache/thumbs`, `/data/cache/full` |
+  | Audio | `/data/audio` |
+  | Settings | `/data/config` |
+  | Recognize | `/data/face/recognize` |
+  | TTS voice | `/data/face/recognize/voice` |
+
+  Nesting under a topic (`/data/face/recognize`) is fine; the rule is that the
+  first level below `/data` names the owning app or feature, never `tmp`,
+  `misc` or a shared bucket.
 - Runtime directories are created by `tools/deploy_board.py` (`BOARD_MKDIRS`),
   but an app must still create its own directory defensively: a board that was
   never re-deployed will not have it, and `os.mkdir` here raises `OSError` for

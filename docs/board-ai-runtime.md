@@ -411,6 +411,61 @@ value in `ENROLL_MATCH` was measured with one sample per identity; a database
 enrolled at three angles needs its own cross-angle matrix before the value can
 be trusted.
 
+### Greeting voice (TTS)
+
+`audio/tts.py` turns `你好，<name>` into a 24 kHz mono WAV. The model is split
+into three kmodels and that split is the model's own contract, not a choice:
+
+| Stage | Model | Output |
+| --- | --- | --- |
+| encoder | `zh_fastspeech_1_f32.kmodel` | per-phoneme encodings + durations |
+| decoder | `zh_fastspeech_2.kmodel` | mel, fixed 600-frame window |
+| vocoder | `hifigan.kmodel` | PCM, in 100-frame slices |
+
+Measured on board (2026-11-02):
+
+| Step | Cost |
+| --- | --- |
+| load the three models | **5970 ms** |
+| synthesise `你好，<name>` | **1340 ms**, 22016 samples, 44032 B |
+| load + 8 greetings in one batch | 18949 ms (8580 for the first) |
+| heap across a load/release cycle | flat, three cycles |
+| ASCII name in the text | **accepted**, so no fixed-phrase fallback is needed |
+
+**Synthesis never runs in the recognition loop.** Loading the three models
+costs about 6 s, so greetings are built once, at enrollment, and playback only
+reads the WAV. Identities enrolled before this feature have no WAV; the manage
+overlay offers a batch rebuild, which keeps one `Synth` alive across the run and
+builds one name per frame so the preview advances between names.
+
+Playback discipline, in `audio/greet.py`:
+
+- The WAV is written through `device.WavPlayer`, i.e. the differential stereo
+  path the BTL amplifier requires, opened per greeting and closed with
+  `stop_stream()` then `close()`.
+- **`start()` opens muted**, so `unmute()` is mandatory: without it every
+  `pump()` reports "data" forever and a 0.9 s clip is still playing after 12 s
+  (measured).
+- One 320-frame block is only **13 ms** of audio at 24 kHz while a recognition
+  frame is **39 ms**, so pumping a single block per frame starves the AO buffer.
+  `pump()` writes until progress catches up with the wall clock instead (capped
+  at 6 blocks). The side effect is that the frame rate roughly halves while a
+  greeting plays; the audio stays continuous, which is the priority for a
+  one-second event.
+- The greeting is scaled to **48%FS** before the 16-bit write. The codec
+  saturates near 390 mV and 48%FS is the 350 mV red line, so a full-scale write
+  would clip. Same calibration as the recording path.
+
+Trigger rules, so a person standing in front of the camera is announced once:
+
+| Constant | Value | Purpose |
+| --- | --- | --- |
+| `TRIGGER_FRAMES` | 8 (0.32 s) | the name must repeat before it is spoken, filtering a one-frame misread |
+| `LOST_FRAMES` | 10 (0.4 s) | re-arm only after the face is really gone, so detector flicker does not repeat the greeting |
+| `COOLDOWN_MS` | 8000 | the same identity is not spoken again within 8 s |
+
+Speeches are never queued: while a WAV is playing, new triggers are dropped.
+
 ## Face liveness (spoof detection)
 
 Model: `face_liveness_rgb.kmodel` (380096 B, 112x112 input). It runs after the

@@ -119,6 +119,7 @@ nothing points at the cause.
 | Code changes have no effect | No soft reset after deploying a `.py` | Ctrl-D |
 | `SyntaxError` on line 1 of an uploaded file | The file carries a UTF-8 BOM | Strip it before upload |
 | Every later probe fails with an empty `UnicodeError` on line 2 | A crashed probe left the transfer temp file locked | Use unique temp names; only a power cycle clears an already-locked file |
+| `OSError: [Errno 28]` or a deploy that suddenly cannot write | Runtime data was written to `/sdcard` and filled the 76 MB deploy partition | Every runtime file goes under `/data/<app>/`; `/sdcard` is written only by the deploy tools |
 
 ### Network
 

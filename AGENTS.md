@@ -222,6 +222,14 @@ corrupts behaviour. Each one links to the measured explanation.
     stay the 112-byte three-line launcher stub; copying `launcher.py` over it
     boots a stale snapshot that no probe will reveal. See
     `docs/pitfalls.md`.
+11. **Every runtime data path belongs under `/data/<app>/`, one directory
+    per app.** `/sdcard` is the ~76 MB deploy partition that holds product
+    content (`factory/gui`, `examples/kmodel`, `examples/utils`) and must
+    only ever be written by the deploy tools. Any file the product creates
+    at runtime — recordings, photos, TTS audio, caches, settings,
+    databases — goes to `/data/<app>/...` so it survives a re-flash of the
+    deploy partition and cannot fill it. `/data` is the ~28.6 GB eMMC
+    partition. See `docs/board-hardware.md`.
 
 The complete list of traps, including the ones that fail silently instead
 of hanging the board, is `docs/pitfalls.md`. Read it before writing a new
