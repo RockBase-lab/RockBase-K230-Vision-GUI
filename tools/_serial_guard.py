@@ -30,7 +30,7 @@ import time
 # A command line carrying these keywords marks a leftover process of this project's own
 # toolchain, which is safe to clear.
 SELF_KEYS = ("canmv_driver.py", "_run_remote.py", "deploy_board.py",
-             "_push_file.py", "ampy")
+             "_push_file.py", "_soft_reset.py", "ampy")
 
 _PS_QUERY = (
     "Get-CimInstance Win32_Process | "
