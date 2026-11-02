@@ -4,22 +4,27 @@
 # 112x112 -> face_liveness_rgb.kmodel -> one score, where a higher value means more
 # likely a real person.
 #
-# The crop is the detected box, resized to 112x112 with a mid-grey letterbox pad.
-# Op order is crop -> resize -> pad. Measured on a photo displayed on a monitor:
-# this pipeline scores it 0.11-0.33 (SPOOF), while padding before the resize with the
-# detector's BGR mean scored the same photo 0.73-0.94, and expanding the box by
-# 224x192 scored it 0.9996-0.9999 (confidently REAL). Both alternatives are wrong.
+# The crop is **expanded** by CROP_PAD_W / CROP_PAD_H before the resize. That margin
+# is what carries the signal, and the measurements are unambiguous:
+#
+#                     expanded 224x192    tight box
+#   live person       0.999 (index 1)     0.06-0.32, overlapping
+#   screen photo      0.000 (index 1)     0.11-0.33, overlapping
+#
+# A tight crop collapses both classes onto the same values, so it cannot be used even
+# though it looks like the more faithful input. Op order is crop -> resize -> pad
+# with mid grey 128, which is also what the model was trained against.
 #
 # Measured on board: detector 9.6 ms, liveness run 1.36 ms (constant), model loads
-# 198 ms and 78 ms (380 KB), and the app holds 25.5 fps with a face in view.
+# 198 ms and 78 ms (380 KB), and the app holds 25.4 fps with a face in view.
 #
-# The output is one tensor of shape [1, 2] summing to 1, and **index 0 is the live
-# probability**: reading index 1 made every face report SPOOF.
+# The output is one tensor of shape [1, 2] summing to 1, and **index 1 is the live
+# probability**: a live face measured 0.9989-0.9997 there while a screen-replayed
+# photo measured 0.0001-0.0004. Reading index 0 inverts every verdict.
 #
-# Score spread over 24 frames of a screen-replayed photo, tight crop: min 0.1105,
-# p25 0.1674, median 0.2007, p75 0.2615, max 0.3259. A live subject has NOT been
-# measured on this pipeline yet, so the threshold stays adjustable on the board
-# through the three presets instead of being frozen in code.
+# Score spread with the expanded crop: live 0.9989-0.9997 over 24 frames, photo
+# 0.0001-0.0004. The two classes are three orders of magnitude apart, so 0.50 is a
+# safe default with a wide margin on both sides.
 
 import gc
 import os
@@ -49,17 +54,14 @@ ANCHOR_N = 4200
 DET_CONF = 0.50
 NMS_TH = 0.2
 
-# Crop padding, in source pixels. **Deliberately zero**, and measured: expanding the
-# box by 224x192 around a screen-replayed photo drove the score from 0.11-0.33 up to
-# 0.9996-0.9999, i.e. it turned a correct SPOOF verdict into a confident REAL one.
-# The tight crop is what carries the signal here, so the box is used as-is.
-CROP_PAD_W = 0
-CROP_PAD_H = 0
+# Crop expansion, in source pixels. Required, not cosmetic: see the note above.
+CROP_PAD_W = 224
+CROP_PAD_H = 192
 PAD_GREY = [128, 128, 128]
 
-# Score presets. Index 0 of the model output rises with liveness. A screen-replayed
-# photo measured 0.11-0.33 on this pipeline, so 0.50 sits between the two known
-# bands. The rows stay adjustable because a live subject is still unmeasured.
+# Score presets. Index 1 of the model output is the live probability: a live face
+# measured 0.9989-0.9997 and a screen photo 0.0001-0.0004, so 0.50 sits in the middle
+# of an empty band.
 THRESHOLDS = [
     ("Lenient 0.30", 0.30),
     ("Normal 0.50", 0.50),
@@ -460,10 +462,10 @@ class FaceLivenessApp:
         if flat is None or len(flat) == 0:
             return None
         # The model emits one tensor of shape [1, 2], a two-class softmax whose
-        # values sum to 1. Measured on a live subject: [0.848, 0.152], so **index 0
-        # is the live probability and index 1 is the spoof one**. Reading index 1
-        # reported every real face as SPOOF 0.00, which is how this was found.
-        score = float(flat[0])
+        # values sum to 1. **Index 1 is the live probability**: a live face measured
+        # 0.9989-0.9997 there against 0.0001-0.0004 for a screen-replayed photo.
+        # Index 0 is the spoof class, so reading it inverts every verdict.
+        score = float(flat[1]) if len(flat) > 1 else float(flat[0])
         del flat
         return score
 

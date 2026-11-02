@@ -177,15 +177,25 @@ try:
             sum(float(outs[0].flatten()[k]) for k in range(2))))
 
         # Collect live-probability (index 0) under both crop modes.
+        #
+        # Only fully visible faces are scored: a box cut off by the frame edge gives
+        # a truncated crop, and the model read those as spoof. The skip count is
+        # printed so a run with nothing valid is obvious instead of looking like a
+        # real measurement.
         for mode, pw, ph in (("box only", 0, 0), ("expanded", 224, 192)):
             scores = []
             times = []
             frames = 0
-            while len(scores) < N_FRAMES and frames < N_FRAMES * 4:
+            clipped = 0
+            while len(scores) < N_FRAMES and frames < N_FRAMES * 6:
                 frames += 1
                 img = sensor.snapshot(chn=CAM_CHN_ID_1)
                 box = detect(img)
                 if box is None:
+                    continue
+                bx, by, bw, bh = box
+                if bx < 8 or by < 8 or bx + bw > 792 or by + bh > 472:
+                    clipped += 1
                     continue
                 outs, ms = liveness(img, box, pw, ph)
                 if not outs:
@@ -194,14 +204,16 @@ try:
                 flat = outs[0].flatten()
                 scores.append(float(flat[0]))
             if not scores:
-                print("L8 {}: no score".format(mode))
+                print("L8 {}: no usable frame ({} clipped)".format(mode, clipped))
                 continue
             scores.sort()
             n = len(scores)
-            print("L8 {:<9} n={} min={:.4f} p25={:.4f} median={:.4f} "
-                  "p75={:.4f} max={:.4f}".format(
-                      mode, n, scores[0], scores[n // 4], scores[n // 2],
-                      scores[3 * n // 4], scores[-1]))
+            print("L8 {:<9} n={} clipped={} min={:.4f} p25={:.4f} "
+                  "median={:.4f} p75={:.4f} max={:.4f}".format(
+                      mode, n, clipped, scores[0], scores[n // 4],
+                      scores[n // 2], scores[3 * n // 4], scores[-1]))
+            print("L9 {:<9} raw={}".format(
+                mode, " ".join("{:.3f}".format(s) for s in scores)))
             print("L10 {:<9} run min={:.2f} mean={:.2f} max={:.2f} ms".format(
                 mode, min(times), sum(times) / len(times), max(times)))
         gc.collect()
