@@ -35,6 +35,20 @@ copyright notice and this permission notice appear in all copies.
 渲染为 112x112 PNG，背景 #23262A（与桌面图标瓦片底色一致）。
 src_*.svg 为官方原始文件（含 ISC 头注释），保留在此作为出处凭证。
 
+以下一个图标不来自 Lucide:
+
+icon_plate.png <- src_license-plate.svg
+
+  图标: IconOven "license-plate"（车牌外形 + 两颗固定螺丝 + 两条字符线）
+  作者: Appic Marketing
+  来源: https://iconoven.com/icons ，经 Iconify API 获取
+        (https://api.iconify.design/iconoven/license-plate.svg)
+  授权: MIT
+  处理: 描边宽统一为 1.6（原图 1.5/2.0 混用），其余形状保持原样。
+
+  原先用的是 Lucide "car"（一辆车），实际使用中被误读成"识别车辆"的应用，
+  换成车牌外形后一眼可辨。src_car.svg 已删除。
+
 ----
 
 Nunito-Bold-700.ttf  <- Nunito Bold 静态 TTF（tiny_ttf 运行时渲染）

@@ -88,6 +88,7 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_plate_font.py` | Baked CJK plate font loads and renders (needs `--lvgl`) |
 | `_probe_plate_caption_style.py` | Caption font size and ink colour (needs `--lvgl`) |
 | `_cap_plate.py` | Captures the caption region to a PNG for visual checks (needs `--lvgl`) |
+| `_cap_vision_folder.py` | Captures the Vision flyout, where member icons are actually drawn |
 | `_probe_imu_tear.py` | Read tearing signature at exactly 256 LSB |
 | `_probe_imu_lock.py` | Locking sequence effect on peak-to-peak and outliers |
 | `_probe_imu_accuracy.py` | Noise, offset and magnitude for a static board |

@@ -1,9 +1,14 @@
-# Generate desktop app icon PNGs (Lucide, ISC).
+# Generate desktop app icon PNGs from SVG sources.
 #
 # This is the single generator for assets/icon_touch|camera|audio|gallery.png. Those
 # icons used to be rendered one-off with no script in the repository, so adding an
 # icon meant hand-drawing it (unreliable). This script captures the pipeline: a new
 # app icon only needs one extra row in ICONS.
+#
+# Sources are Lucide (ISC) by default; plate uses IconOven (MIT) because no Lucide
+# icon means "licence plate". A local assets/src_<name>.svg is always preferred, so
+# a non-Lucide source is committed once instead of being downloaded per build. The
+# licence of every source is recorded in assets/LICENSE.txt.
 #
 # Pipeline (it matches the spec recorded in assets/LICENSE.txt):
 #   1. take the official Lucide SVG (reuse local assets/src_<name>.svg when present,
@@ -94,7 +99,10 @@ ICONS = {
     "orient": "compass",
     "person": "user-round",
     "fall": "trending-down",
-    "plate": "car",
+    # IconOven "license-plate" (MIT): a plate body with two fixing bolts and two
+    # character lines. Used instead of Lucide "car", which read as "vehicle
+    # recognition rather than "licence plate".
+    "plate": "license-plate",
     "cvlab": "flask-conical",
     "ocr": "scan-text",
     "face_det": "scan-face",
@@ -106,18 +114,20 @@ ICONS = {
 
 BASE_URL = "https://unpkg.com/lucide-static@latest/icons/{}.svg"
 
+def fetch_svg(icon_name):
+    """Prefer the local src_<icon>.svg; fetch it from Lucide when missing.
 
-def fetch_svg(lucide_name):
-    """Prefer the local src_<lucide>.svg; fetch and store it when missing.
+    Source files are named after the icon, not the app: several apps can reuse the
+    same source, and there is never a src_touch.svg duplicating the content of
+    src_hand.svg.
 
-    Source files are named after the Lucide icon (src_hand.svg / src_camera.svg /
-    src_mic.svg / src_image.svg), decoupled from the app name: several apps can reuse
-    the same icon source, and there is never a src_touch.svg duplicating the content
-    of src_hand.svg.
+    Lucide is the default upstream because most icons come from there. A source
+    with a different upstream (plate -> IconOven) is committed under assets/ and
+    therefore resolves locally; only a missing Lucide name triggers a download.
     """
-    path = os.path.join(ASSETS, "src_{}.svg".format(lucide_name))
+    path = os.path.join(ASSETS, "src_{}.svg".format(icon_name))
     if not os.path.exists(path):
-        url = BASE_URL.format(lucide_name)
+        url = BASE_URL.format(icon_name)
         print("  fetch", url)
         data = urllib.request.urlopen(url, timeout=20).read()
         with open(path, "wb") as f:
@@ -208,12 +218,12 @@ def main():
         print("nothing to do; known icons:", ", ".join(sorted(ICONS)))
         return
     for app_name in sorted(names):
-        lucide_name = ICONS[app_name]
+        icon_name = ICONS[app_name]
         acc = APP_ACCENTS.get(app_name)
         ink = ((acc >> 16) & 255, (acc >> 8) & 255, acc & 255) if acc else (255, 255, 255)
-        print("[{}] lucide/{} ink=#{:06X}".format(app_name, lucide_name,
+        print("[{}] source/{} ink=#{:06X}".format(app_name, icon_name,
                                                   ink[0] << 16 | ink[1] << 8 | ink[2]))
-        svg = fetch_svg(lucide_name)
+        svg = fetch_svg(icon_name)
         out = os.path.join(ASSETS, "icon_{}.png".format(app_name))
         render(svg, out, ink)
 
