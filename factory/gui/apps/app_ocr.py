@@ -10,6 +10,10 @@
 # the frame with a full-screen translucent mask holding one line per region, in
 # reading order.
 #
+# Open stays cheap on purpose (models only, ~2 s): the 4.9 s CJK font load runs
+# on the first scan instead, so the preview is already smooth when the app
+# appears. Only the first scan pays it; the font is cached at module level.
+#
 # chn1 is 800x480 like the preview: ocr_post_process reports coordinates in the
 # ai2d input space, so with input == widget size the boxes map to the screen
 # with no scaling (the letterbox pad is inside ai2d and already undone).
@@ -67,9 +71,7 @@ COL_SEP = 0x3A4650
 COL_HINT = 0x7A8794
 COL_BUSY = 0xFFC857           # amber: a pass is running
 COL_ERROR = 0xFF6B6B
-COL_BOX = 0x5CE8C0            # text box outline: same mint as the plate boxes
 
-BOX_LINE_W = 2
 MASK_PAD_X = 28               # side margin so a full poem line does not touch
 MASK_PAD_Y = 20
 MASK_GAP = 6                  # row gap; shrinks when a frame holds many lines
@@ -87,8 +89,10 @@ MODEL_MISSING = ("OCR models missing on SD card.\n"
 # symbol characters + a space (tools/ocr_charset.txt). Omitting the punctuation
 # renders every comma and full stop as a box. lv.font_load costs ~1.2 ms per
 # glyph and is not cached by the loader, so glyph count is the only lever: this
-# build loads in 4.9 s, the full 6547-glyph dict in 8.3 s. Cached at module level
-# and loaded at open, folded into the existing open cost so a scan stays ~1.4 s.
+# build loads in 4.9 s, the full 6547-glyph dict in 8.3 s.
+# Loaded on the first scan, not at open: at open it froze the screen for 4.9 s
+# before any preview appeared, which reads as the app hanging. The user already
+# accepts a wait after tapping Scan, and the module cache makes later scans fast.
 FONT_FILE = "ocr_cjk_16.bin"
 _OCR_FONT = None
 
@@ -172,6 +176,7 @@ class OcrApp:
         self.fps_text = "-"
         self.texts = []
         self._gc_tick = 0
+        self._font_applied = False
         self._no_signal = NoSignalCounter()
 
         self.img_w = ctx.width
@@ -182,23 +187,11 @@ class OcrApp:
         self.img_widget.set_size(self.img_w, self.img_h)
         self.img_widget.align(lv.ALIGN.CENTER, 0, 0)
 
-        # ---- box overlay pool: closed quad per detected text region ----
-        self.boxes = []
-        for _ in range(MAX_BOXES):
-            outline = lv.line(content)
-            outline.set_points([{"x": 0, "y": 0}] * 5, 5)
-            outline.set_style_line_width(BOX_LINE_W, 0)
-            outline.set_style_line_color(lv.color_hex(COL_BOX), 0)
-            outline.set_style_line_opa(lv.OPA.COVER, 0)
-            outline.add_flag(lv.obj.FLAG.HIDDEN)
-            self.boxes.append(outline)
-
-        # ---- result panel: one numbered line per recognised region ----
-        # A panel instead of per-box captions because OCR strings are long and
-        # text regions overlap; captions would collide.
-        # Full-screen translucent mask over the frozen frame: one line of
-        # recognised text per row, in reading order. Created before the top bar
-        # so the bar keeps its z-order and stays readable above the mask.
+        # ---- result view: full-screen translucent mask over the frozen frame,
+        # one line of recognised text per row in reading order. A mask instead
+        # of per-box captions because OCR strings are long and text regions
+        # overlap, so captions would collide. Created before the top bar so the
+        # bar keeps its z-order and stays readable above the mask.
         self.mask = lv.obj(content)
         self.mask.set_size(self.img_w, self.img_h)
         self.mask.align(lv.ALIGN.CENTER, 0, 0)
@@ -221,18 +214,14 @@ class OcrApp:
         self.mask.set_flex_align(lv.FLEX_ALIGN.CENTER, lv.FLEX_ALIGN.CENTER,
                                  lv.FLEX_ALIGN.CENTER)
         self.panel_labels = []
-        # Load the CJK font here (open phase), not on first scan: the load is
-        # paid once per process (module cache) and folded into the open_app
-        # wait, so a scan stays fast.
-        panel_font = _ocr_font()
+        # The CJK font is applied by _ensure_font on the first scan, not here:
+        # loading it at open froze the screen for ~4.9 s before the preview ran.
         for _ in range(MAX_BOXES):
             lab = lv.label(self.mask)
             lab.set_text("")
             lab.set_width(lv.pct(100))
             lab.set_style_text_align(lv.TEXT_ALIGN.CENTER, 0)
             lab.set_style_text_color(lv.color_hex(COL_RESULT), 0)
-            if panel_font is not None:
-                lab.set_style_text_font(panel_font, 0)
             lab.clear_flag(lv.obj.FLAG.CLICKABLE)
             lab.add_flag(lv.obj.FLAG.HIDDEN)
             self.panel_labels.append(lab)
@@ -479,7 +468,9 @@ class OcrApp:
 
     def _scan(self):
         """Full pass on the current frame: detect, recognize, draw. Blocking by
-        design (~0.3 s det + ~70 ms per box; the font already loaded at open)."""
+        design (~0.3 s det + ~70 ms per box; the first call also loads the CJK
+        font, which costs about 4.9 s)."""
+        self._ensure_font()
         self.texts = []
         try:
             ai_img = self.sensor.snapshot(chn=CAM_CHN_ID_1)
@@ -502,6 +493,21 @@ class OcrApp:
         self._update_stat()
 
     # ---------------- drawing ----------------
+    def _ensure_font(self):
+        """Apply the CJK font to the result labels, loading it on first use.
+
+        Called from the scan pass, never from __init__: the load freezes the
+        screen for ~4.9 s, which at open looks like the app has hung before any
+        preview is shown.
+        """
+        if self._font_applied:
+            return
+        font = _ocr_font()
+        if font is not None:
+            for lab in self.panel_labels:
+                lab.set_style_text_font(font, 0)
+        self._font_applied = True
+
     def _show_results(self):
         # Reading order, not detection order: the post-process emits boxes in
         # mask scan order, which splits a column of text unpredictably.
@@ -527,18 +533,12 @@ class OcrApp:
             lab.set_text(order[i][1])
             lab.clear_flag(lv.obj.FLAG.HIDDEN)
 
-        # The mask covers them; hide so a redraw cannot leak an outline through.
-        for outline in self.boxes:
-            outline.add_flag(lv.obj.FLAG.HIDDEN)
-
         if n:
             self.mask.clear_flag(lv.obj.FLAG.HIDDEN)
         else:
             self.mask.add_flag(lv.obj.FLAG.HIDDEN)
 
     def _clear_overlays(self):
-        for outline in self.boxes:
-            outline.add_flag(lv.obj.FLAG.HIDDEN)
         for lab in self.panel_labels:
             lab.add_flag(lv.obj.FLAG.HIDDEN)
         self.mask.add_flag(lv.obj.FLAG.HIDDEN)
@@ -553,7 +553,12 @@ class OcrApp:
             self.stat_count.set_style_text_color(
                 lv.color_hex(COL_COUNT_IDLE), 0)
         if self.state == "BUSY":
-            self.stat_hint.set_text("READING...")
+            if not self._font_applied:
+                # First scan: most of the wait is the one-off font load, so say
+                # so instead of "READING..." for five seconds.
+                self.stat_hint.set_text("LOADING...")
+            else:
+                self.stat_hint.set_text("READING...")
             self.stat_hint.set_style_text_color(lv.color_hex(COL_BUSY), 0)
         elif self.state == "RESULT":
             self.stat_hint.set_text("TAP resume")

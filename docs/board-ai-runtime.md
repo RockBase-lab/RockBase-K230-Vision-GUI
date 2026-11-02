@@ -410,9 +410,13 @@ Rendering recognised text needs a baked CJK font (`ocr_cjk_16.bin`). `font_load`
 costs ~1.2 ms per glyph and is not cached by the loader, so glyph count is the
 only lever: the shipped 4036 glyphs (GB2312 level-1 hanzi the dictionary uses,
 plus every punctuation and symbol character it can emit, plus a space) load in
-4908 ms, the full 6547-glyph dict in 8276 ms. Dropping the punctuation instead
+4900 ms, the full 6547-glyph dict in 8276 ms. Dropping the punctuation instead
 renders every comma and full stop as a box, which is what the first build did.
-Load the font at app open (module-cached) so a scan stays ~1.4 s; see
+
+Load it on the **first scan**, not at open: at open it froze the screen for
+4.9 s before the preview ever appeared, which the user reads as a hang. The app
+open then costs 2.2 s (models only) and the preview runs at 28.4 fps from the
+first frame. The font is module-cached, so only the first scan pays it; see
 `docs/performance-budget.md`.
 
 ## Human pose (17 keypoints)

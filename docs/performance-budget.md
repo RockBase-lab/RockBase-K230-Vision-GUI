@@ -202,21 +202,27 @@ runs one blocking detect+recognize pass. Measured inside the real launcher
 
 | Stage | Cost |
 |---|---|
-| det kmodel + rec kmodel load | 1776 ms, once at open |
-| CJK font load (4036 glyphs) | 4908 ms, once at open |
-| app open total (incl. font + models) | 6946 ms |
+| det kmodel + rec kmodel load | 1900 ms, once at open |
+| app open total (models only) | 2200 ms |
+| CJK font load (4036 glyphs) | 4900 ms, once on the first scan |
+| first scan, 12 lines | 6300 ms (font + detect + recognize) |
+| later scans, 12 lines | 1400 ms |
 | detection (ai2d 640x640 + kpu + `ocr_post_process`) | ~230-294 ms |
 | recognition per box (rec ai2d 512x32 + kpu + CTC) | ~70 ms |
-| one scan pass, 12 lines | 1377 ms |
+| preview while idle | 28.4 fps, no frame over 40 ms |
 
-The font dominates open, so it loads there (folded into the existing open cost)
-and is module-cached, making a second open instant. The glyph count is the only
-font-load lever: measured ~1.2 ms per glyph, independent of file size or range
-count. The shipped subset is 4036 glyphs: the 3743 GB2312 level-1 hanzi the
-dictionary uses, plus the 292 punctuation and symbol characters it can emit and
-a space. Dropping the punctuation renders every comma and full stop as a box;
-dropping the rare hanzi instead costs almost nothing. The full 6547-glyph dict
-costs 8276 ms and was rejected.
+The font is loaded on the **first scan**, not at open. At open it froze the
+screen for 4.9 s before any preview appeared, which reads as the app hanging;
+moving it to the scan the user explicitly triggers keeps open at 2.2 s and the
+preview smooth from the first frame. It is module-cached, so only the first scan
+in a process pays it.
+
+The glyph count is the only font-load lever: measured ~1.2 ms per glyph,
+independent of file size or range count. The shipped subset is 4036 glyphs: the
+3743 GB2312 level-1 hanzi the dictionary uses, plus the 292 punctuation and
+symbol characters it can emit and a space. Dropping the punctuation renders every
+comma and full stop as a box; dropping the rare hanzi instead costs almost
+nothing. The full 6547-glyph dict costs 8276 ms and was rejected.
 
 ## QR detection
 
