@@ -184,12 +184,33 @@ gyro LSB is 15.6 mdps with 0.2-0.5 dps noise, so one decimal suffices.
 - `ADC(4)` is not usable: opening it wedges the board and drops the serial
   link. Channels 0-3 read steady 0.34-0.90 V values and are unrelated to the
   pack.
-- The percentage shown by the app comes from a resting Li-ion open-circuit
-  curve, so it over-reads while charging and under load. It is an estimate,
-  not a fuel gauge.
-- The status bar uses the same curve to pick one of four battery icons, one
-  cell per 25 %. Both the bar and the Battery app read through `batt.py`, which
-  owns the single ADC5 handle; opening the channel twice is untested.
+- **The voltage-to-charge mapping follows the gauge indicator's own LED
+  thresholds**, not a generic Li-ion curve. The four indicator outputs switch at
+  fixed pack voltages and each marks 25 % of charge, so they are the reference
+  the product is specified against:
+
+  | Output | Charging (rising) | Discharging (falling) |
+  | --- | --- | --- |
+  | D1 (25 %) | 3.40 V | 3.10 V |
+  | D2 (50 %) | 3.55 V | 3.50 V |
+  | D3 (75 %) | 3.70 V | 3.64 V |
+  | D4 (100 %) | 3.87 V | 3.80 V |
+
+  The display follows the falling edge, which is the level an indicator shows
+  while the board runs off the pack. Percentage is linear between anchors, and
+  0 % is the first segment extrapolated 400 mV below D1, i.e. 2.70 V. Every
+  voltage at or above 3.80 V reads as 100 %.
+- The status bar takes its four-cell icon from the same anchors, counted
+  rather than divided: D1 lit is one cell at 25 %, D2 is two at 50 %, D3 is
+  three at 75 %, and the fourth cell appears only at a full 100 %. Dividing the
+  percentage into quarters instead would show two cells at 25 %, one step
+  ahead of the hardware.
+- The Battery app resolves the same percentage into ten segments, one per
+  10 %, so the on-screen scale stops implying more precision than the anchors
+  provide. Both consumers read through `batt.py`, which owns the single ADC5
+  handle; opening the channel twice is untested.
+- Charge still cannot be measured, only inferred: the anchors are voltage
+  thresholds, so the reading sags under load and lifts while charging.
 - Reading the ADC while another app owns the camera or KPU produced an
   alternating two-value pattern (raw 3837/3297, a false 2.4 V span) that did
   not reproduce on an idle board. Confirm the board is idle before diagnosing

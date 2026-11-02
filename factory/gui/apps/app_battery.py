@@ -61,9 +61,6 @@ CHARGE_MIN_MV = 4250
 PRESENT_MAX_MV = 4600
 FAIL_LIMIT = 20             # consecutive ADC exceptions = the channel is gone
 
-# Resting OCV table shared with the status bar (one source for both).
-OCV_CURVE = batt.OCV_CURVE
-
 # ---- UI ----
 COL_TEXT = 0xE6EAF0
 COL_MUTED = 0x8A94A2
@@ -74,6 +71,7 @@ COL_OK = 0x4CD97B
 COL_WARN = 0xFFC857
 COL_ERR = 0xFF6B6B
 COL_GAUGE_EDGE = 0x55606E
+COL_SEG_OFF = 0x2A3138      # unlit segment: a step darker than the card fill
 
 CARD_Y = 20
 CARD_H = 384
@@ -97,12 +95,18 @@ GAUGE_INNER_H = GAUGE_H - GAUGE_INSET * 2
 NUB_W = 16
 NUB_H = 50
 
+SEG_COUNT = 10              # gauge resolution: one segment per 10% of charge
+SEG_GAP = 6
+SEG_W = (GAUGE_INNER_W - (SEG_COUNT - 1) * SEG_GAP) // SEG_COUNT
+SEG_RUN_W = SEG_COUNT * SEG_W + (SEG_COUNT - 1) * SEG_GAP
+SEG_X0 = (GAUGE_INNER_W - SEG_RUN_W) // 2   # centre the row inside the body
+
 HISTORY_POINTS = 60         # one reading per second = one minute
 SPARK_X = 16
 SPARK_Y = 282
 SPARK_W = RIGHT_W - 32
 SPARK_H = 68
-SPARK_MIN_MV = 3300
+SPARK_MIN_MV = 3000     # just under the D1 anchor, so a low pack is not clipped
 SPARK_MAX_MV = 4400     # covers the charging plateau, not just a resting pack
 
 STATUS_MEASURING = "MEASURING"
@@ -137,12 +141,16 @@ def _percent(mv):
     return batt.percent(mv)
 
 
-def _level_color(pct):
-    if pct is None:
-        return COL_MUTED
-    if pct <= 10:
+def _seg_color(index):
+    """Colour of gauge segment `index` (0-based): red at the low end, green at the top.
+
+    Coloured by position, not by the current reading, so the scale itself reads as a
+    fuel gauge: the lit segments always show the same colour progression. The bands
+    follow the icon's quarters (red to 25%, yellow to 50%) so both displays agree.
+    """
+    if index <= 1:
         return COL_ERR
-    if pct <= 25:
+    if index <= 4:
         return COL_WARN
     return COL_OK
 
@@ -286,7 +294,7 @@ class BatteryApp(object):
         self.status_label = _label(left, STATUS_MEASURING, 0, 330, LEFT_W,
                                    COL_MUTED, self._mid_font,
                                    lv.TEXT_ALIGN.CENTER)
-        _label(left, "voltage estimate, not a fuel gauge", 0, 360, LEFT_W,
+        _label(left, "charge from pack voltage", 0, 360, LEFT_W,
                COL_MUTED, self._small, lv.TEXT_ALIGN.CENTER)
 
         body = _plain(left, GAUGE_X, GAUGE_Y, GAUGE_W, GAUGE_H)
@@ -303,15 +311,20 @@ class BatteryApp(object):
         nub.set_style_radius(4, 0)
         nub.clear_flag(lv.obj.FLAG.SCROLLABLE)
 
-        self.fill = lv.obj(body)
-        # Placed at the content-area origin, so the inset above covers the whole gap.
-        self.fill.set_pos(0, 0)
-        self.fill.set_size(0, GAUGE_INNER_H)
-        self.fill.set_style_bg_color(lv.color_hex(COL_MUTED), 0)
-        self.fill.set_style_bg_opa(lv.OPA.COVER, 0)
-        self.fill.set_style_border_width(0, 0)
-        self.fill.set_style_radius(9, 0)
-        self.fill.clear_flag(lv.obj.FLAG.SCROLLABLE)
+        # Ten segments rather than one continuous bar: the charge anchors are a
+        # discrete scale (one step per LED threshold), so segments match what the
+        # reading actually resolves instead of implying finer accuracy.
+        self.segs = []
+        for i in range(SEG_COUNT):
+            seg = lv.obj(body)
+            seg.set_pos(SEG_X0 + i * (SEG_W + SEG_GAP), 0)
+            seg.set_size(SEG_W, GAUGE_INNER_H)
+            seg.set_style_bg_color(lv.color_hex(COL_SEG_OFF), 0)
+            seg.set_style_bg_opa(lv.OPA.COVER, 0)
+            seg.set_style_border_width(0, 0)
+            seg.set_style_radius(3, 0)
+            seg.clear_flag(lv.obj.FLAG.SCROLLABLE)
+            self.segs.append(seg)
 
         # ---- right: numeric rows ----
         _label(right, "MEASUREMENT", 20, 18, RIGHT_W - 40, COL_MUTED,
@@ -383,16 +396,23 @@ class BatteryApp(object):
         status = self._status
         tap_mv = self._tap_uv // 1000 if self._tap_uv else 0
 
+        # Segments light left to right. The last segment only lights on a full gauge,
+        # and any non-zero charge lights at least one, so an empty row really means
+        # empty instead of "below one step".
         if pct is None:
             self.pct_label.set_text("--")
-            self.fill.set_size(0, GAUGE_INNER_H)
+            lit = 0
         else:
             self.pct_label.set_text("{}%".format(pct))
-            width = GAUGE_INNER_W * pct // 100
-            if pct > 0 and width < 4:
-                width = 4
-            self.fill.set_size(width, GAUGE_INNER_H)
-            self.fill.set_style_bg_color(lv.color_hex(_level_color(pct)), 0)
+            # Round to the nearest segment, but any real charge lights at least one.
+            lit = (pct * SEG_COUNT + 50) // 100
+            if pct > 0 and lit == 0:
+                lit = 1
+        for i, seg in enumerate(self.segs):
+            if i < lit:
+                seg.set_style_bg_color(lv.color_hex(_seg_color(i)), 0)
+            else:
+                seg.set_style_bg_color(lv.color_hex(COL_SEG_OFF), 0)
 
         if mv is None:
             self.volt_label.set_text("--")

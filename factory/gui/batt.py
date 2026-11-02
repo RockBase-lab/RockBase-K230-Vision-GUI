@@ -30,13 +30,25 @@ ADC_FULL_MV = 1800000
 MAX_INPUT_UV = 2200000      # above this the sample is not a real tap voltage
 ABSENT_MAX_MV = 100         # a disconnected pack leaves the tap near ground
 
-# Resting open-circuit voltage of a single Li-ion cell, in 25mV steps.
-OCV_CURVE = (
-    (4200, 100), (4150, 97), (4100, 93), (4050, 89), (4000, 84),
-    (3950, 79), (3900, 73), (3850, 66), (3800, 58), (3750, 49),
-    (3700, 39), (3650, 29), (3600, 20), (3550, 13), (3500, 8),
-    (3450, 4), (3400, 2), (3300, 0),
+# ---- pack voltage -> charge ----
+# Anchors are the four LED thresholds of the gauge indicator this board's battery
+# circuit is specified against: D1-D4 switch at fixed pack voltages and each one marks
+# a quarter of the charge. The datasheet gives both edges, and they differ by up to
+# 300mV because the indicator adds hysteresis:
+#   charging  (rising):  D1 3400, D2 3550, D3 3700, D4 3870 mV
+#   discharging (falling): D1 3100, D2 3500, D3 3640, D4 3800 mV
+# The display follows the falling edge: that is the level an indicator shows while the
+# board runs off the pack, which is the normal case. Percent is linear between anchors,
+# and 0% is the first segment extrapolated (400mV below D1), i.e. 2700mV.
+CHARGE_MV = (
+    (2700, 0),
+    (3100, 25),     # D1
+    (3500, 50),     # D2
+    (3640, 75),     # D3
+    (3800, 100),    # D4
 )
+CHARGE_RISE_MV = (3400, 3550, 3700, 3870)   # the charging-edge D1..D4, for reference
+CHARGE_FULL_MV = CHARGE_MV[-1][0]           # 3800: at or above this, the gauge is full
 
 # Status-bar refresh period. Charge moves over minutes, and the divider cannot save
 # power anyway (GPIO69 does not gate it), so polling faster only costs I2C time.
@@ -76,19 +88,25 @@ def pack_mv(uv):
 
 
 def percent(mv):
-    """Estimate charge from the resting OCV curve; 0-100."""
-    if mv >= OCV_CURVE[0][0]:
+    """Charge 0-100 from the pack voltage, linear between the gauge anchors."""
+    if mv >= CHARGE_FULL_MV:
         return 100
-    for i in range(1, len(OCV_CURVE)):
-        hi_mv, hi_pct = OCV_CURVE[i - 1]
-        lo_mv, lo_pct = OCV_CURVE[i]
-        if mv >= lo_mv:
+    if mv <= CHARGE_MV[0][0]:
+        return 0
+    for i in range(1, len(CHARGE_MV)):
+        hi_mv, hi_pct = CHARGE_MV[i]
+        if mv <= hi_mv:
+            lo_mv, lo_pct = CHARGE_MV[i - 1]
             return lo_pct + (mv - lo_mv) * (hi_pct - lo_pct) // (hi_mv - lo_mv)
-    return 0
+    return 100
 
 
 def level(mv):
-    """Icon level 0-3, one per quarter of the estimated charge.
+    """Icon level 0-3 for the four-cell status icon, matching the gauge anchors.
+
+    The anchors are the indicator's LED thresholds, so the icon has to count them, not
+    divide the percentage: D1 lights at 25%, which is one cell, not two. From there
+    each further 25% adds one cell and the fourth only appears at a full 100%.
 
     A pack that is not there, or reads below the absent threshold, returns 0 so the
     status bar shows an empty icon rather than an invention.
@@ -96,8 +114,10 @@ def level(mv):
     if mv is None or mv <= ABSENT_MAX_MV:
         return 0
     pct = percent(mv)
-    lv = pct // 25
-    if lv > 3:
+    lv = (pct - 25) // 25
+    if lv < 0:
+        lv = 0
+    elif lv > 3:
         lv = 3
     return lv
 
