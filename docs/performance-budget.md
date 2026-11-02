@@ -48,6 +48,9 @@ plus the widgets that actually changed.
 | 512-float dot product, Python loop | 0.46 ms |
 | mesh: 92 edges + 42 vertex dots | 32.2 ms |
 | 42 vertex dots alone | 5.0 ms |
+| pose: 6 skeleton polylines, 3 px, rounded | 5.5 ms |
+| pose: 17 joint dots (8 px) | 4.8 ms |
+| pose: 6 polylines + 17 dots together | 5.9 ms |
 
 Screen `lv.line` objects scale at roughly 1.2-1.6 ms each after the first, and
 the first one is expensive because it covers the most pixels. The point count
@@ -115,9 +118,15 @@ preview with a 320 model:
 |---|---|
 | snapshot | 0.5 ms |
 | ai2d | 1.0-1.5 ms |
-| kpu | 4.0 ms (RetinaFace) / 28 ms (yolov8n) |
+| kpu | 4.0 ms (RetinaFace) / 28 ms (yolov8n) / 19 ms (yolo11n-pose) |
 | post-process | 1.4-3.0 ms |
-| kmodel load | 390-560 ms, once |
+| kmodel load | 390-560 ms, once (pose models: 680-770 ms) |
+
+The pose chain therefore runs at about 19 fps end to end on board (measured
+inside the real launcher over 5 s: 96 steps, zero errors), with a 21 ms
+inference plus a 22 ms LVGL task handler per iteration. Inference is the limit;
+the skeleton geometry costs 5.9 ms and the joint dots are almost free once the
+polylines are drawn.
 
 A small single-shot detector therefore fits comfortably; a yolov8n detection
 loop dominates the budget at 31 ms total and lands near 32 fps standalone,

@@ -108,6 +108,7 @@ nothing points at the cause.
 | Audio doubles in size | `np.clip` promotes int16 to int32 | Clamp with integers without promotion |
 | Probe reports 9-24 fps for an app that runs at 50 | Sparse `step()` calls are throttled by the cadence gate | Measure through a real launcher loop |
 | A widget reports width 0 | Layout has not resolved yet | Read the context or the snapshot instead |
+| Keypoint arrays are silently skipped as if they were scalars | `hasattr(arr, "__len__")` is **False** for ulab ndarrays, though `len(arr)` works | Test with `try: len(x)`, never `hasattr` |
 
 ### ADC and battery
 

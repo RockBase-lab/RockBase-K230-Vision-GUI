@@ -159,6 +159,57 @@ is always 160, independent of a 224 or 320 model input (both measured at 160).
 Still compute it from the formula rather than hard-coding, so a future preview
 size stays correct.
 
+## Human pose (17 keypoints)
+
+| Model | Output shape | kpu cost | Post-process |
+|---|---|---|---|
+| `yolo11n-pose.kmodel` | `(1, 56, 2100)` | 19.1 ms | `person_kp_postprocess` |
+| `yolov8n-pose.kmodel` | `(1, 56, 2100)` | 22.6 ms | `person_kp_postprocess` |
+| `yolo26n-pose.kmodel` | `(1, 300, 57)` | 20.9 ms | `yolo26_pose_postprocess` |
+
+All three ship in the firmware image at `/sdcard/examples/kmodel/`. Measured at
+800x480 into a 320 model, mean of five runs on the same frame.
+
+```python
+res = aidemo.person_kp_postprocess(raw[0], [H, W], [mw, mh], conf, nms)
+```
+
+Five positional arguments, no display-size parameter. **Pass `raw[0]` as is**:
+transposing it makes the C layer compare an int against an ndarray and raise.
+A sixth argument raises "takes 5 positional arguments".
+
+`res` is `[boxes, kps, scores]`:
+
+| Item | Shape | Contents |
+|---|---|---|
+| `boxes` | `(N, 4)` int16 | x, y, w, h |
+| `kps` | `(N, 17, 3)` | x, y, score per joint |
+| `scores` | `(N,)` | person score |
+
+Keypoint scores are probabilities (measured 0.65-0.99 on a real person), unlike
+the raw logits the YOLO detection family emits.
+
+### pose y needs no letterbox correction
+
+The detection post-process leaves the top pad in y; this one does not. Measured
+with the same 800x480 into 320 frame: box y=85 h=399 with the nose at y=120,
+i.e. `nose - box_top = 35 = 0.09 * h`, which is where a nose belongs. The
+detection models report the same box 160 px too low. Do not copy the `y_off`
+subtraction from the detection path.
+
+### ulab arrays have no `__len__` attribute
+
+`hasattr(arr, "__len__")` is **False** for a ulab ndarray even though `len(arr)`
+works. Code that uses it to tell a row from a scalar silently treats every array
+as a scalar; in the pose app that dropped all 17 keypoints. Use `try: len(obj)`.
+
+### background detections are real, not duplicates
+
+The model fires on printed photographs and edge objects as well as live people.
+Measured on a wall of posters: 4 boxes with 11-17 confident joints each, which
+no joint-count filter can separate. An app that claims a person count must
+either draw all of them or report only the one it follows.
+
 ## RetinaFace face detection
 
 Files: `/sdcard/examples/kmodel/face_detection_320.kmodel` (584576 B) and

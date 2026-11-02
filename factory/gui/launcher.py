@@ -337,8 +337,13 @@ FOLDER_MEMBERS = {
         {"id": "detect", "name": "Detect", "icon": "assets/icon_vision.png",
          "symbol": _sym("CPU"), "module": "apps.app_vision",
          "immersive": True, "release_home": True},
+        # Live 17-keypoint skeleton (yolo11n-pose 320). Same immersive shell as
+        # detect. release_home: the (1,56,2100) output tensor needs a ~470KB
+        # contiguous block, measured to sit at 2.1MB free with the home screen
+        # resident -- workable but tight enough that the cached tiles go first.
         {"id": "pose", "name": "Pose", "icon": "assets/icon_pose.png",
-         "symbol": _sym("USER"), "module": "apps.app_placeholder"},
+         "symbol": _sym("USER"), "module": "apps.app_pose",
+         "immersive": True, "release_home": True},
         {"id": "segment", "name": "Segment", "icon": "assets/icon_segment.png",
          "symbol": _sym("CROP"), "module": "apps.app_placeholder"},
         {"id": "orient", "name": "Orient", "icon": "assets/icon_orient.png",
