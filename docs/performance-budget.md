@@ -157,7 +157,9 @@ detector is.
 
 A 20 s run over two plates in frame held **9.7 fps** (194 frames, zero errors),
 with recognition still only 6-15 ms per frame; the per-frame cost is 74-79 ms of
-which 70 ms is detection.
+which 70 ms is detection. The same rate held at 10.1-10.2 fps over 202-204 frames
+with a single plate at reading distance (61x20 in frame), so a small box does not
+make detection cheaper: the cost is the 640x640 inference regardless of the plate.
 
 ## QR detection
 

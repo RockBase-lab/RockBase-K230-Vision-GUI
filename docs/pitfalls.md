@@ -63,7 +63,9 @@ nothing points at the cause.
 | Plate boxes land ~160 px too low | The plate post-process leaves the letterbox top pad in y | Subtract `pad_top * preview_w / model_w` (160 for 800x480 into 640) |
 | Passing a different `display_size` to the plate post-process changes nothing | The argument is ignored by that routine; only its `rgb` argument has an effect, and changing that breaks x | Compensate in Python, do not look for the right display argument |
 | A wide plate loses its last character | The detector under-reads the box width by up to 21% at full-frame plate size | Accept it; do not force the box to the plate aspect, which breaks the province character far more often than it helps |
-| The province character decodes as a different province while every digit is right | Single-frame reading; a low-quality frame substitutes a whole character | Vote over the last few readings per plate instead of showing one frame's result |
+| A clearly readable plate is not detected at all, and moving closer fixes it | A minimum box height or area floor rejected it; a plate at reading distance is only about 20 px tall | Filter on the post-process detection score instead, which measured 0.885 for that plate |
+| A size floor does not remove background clutter | The clutter boxes measured 144x48 and 151x61, i.e. taller than a distant real plate | Rank by detection score and validate the decoded string's format; geometry alone cannot separate them |
+| The province character decodes as a different province while every digit is right | Single-frame reading, often from a crop that shifted by a pixel or two | Smooth the detector box per plate before cropping; a 1 px box shift was enough to change a character |
 | The plate box is a rotated quad and the crop looks squeezed | The quad was collapsed to an axis-aligned rectangle | Pass the four detected corners through; `ocr_rec_preprocess` rectifies them |
 | `ocr_rec_preprocess` raises `expected ndarray` | Passed a Python list of lists | Pass a list of float ndarrays |
 | `ocr_rec_preprocess` raises `expected list` | Passed a single ndarray | Wrap the quads in a list |

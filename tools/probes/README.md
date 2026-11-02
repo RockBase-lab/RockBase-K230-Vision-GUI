@@ -84,6 +84,8 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_plate_widen.py` | Symmetric widening vs the raw quad, on four plate sizes |
 | `_probe_plate_right_widen.py` | Right-edge-only widening; scores each strategy out of seven frames |
 | `_probe_plate_stability_run.py` | 20 s live run: raw reading distribution vs displayed label |
+| `_probe_plate_live_diag.py` | Live frame: every raw box with its score, gate verdict, and decode |
+| `_probe_plate_scores.py` | What each post-process return element holds (quads, rects, scores) |
 | `_probe_plate_sensor_order.py` | Whether the RGBP888 plane order matches the RGB888 packed order |
 | `_probe_plate_font.py` | Baked CJK plate font loads and renders (needs `--lvgl`) |
 | `_probe_plate_caption_style.py` | Caption font size and ink colour (needs `--lvgl`) |

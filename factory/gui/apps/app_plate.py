@@ -69,23 +69,51 @@ Y_OFF = int(PAD_TOP * PREVIEW_W / DET_IN[0])
 # detected and stability comes from time-domain voting instead.
 QUAD_POINTS = 5               # four corners plus the closing point
 
-# Geometry gate on a detection. A Chinese plate is 3.14:1, so anything far from
-# that is background clutter: measured on a cluttered scene, the low 0.2
-# confidence threshold also passes 144x48 and 151x61 boxes that decode as random
-# strings. The aspect band is deliberately wide because a plate seen at an angle
-# foreshortens, and the height floor drops boxes too small to hold 7 glyphs.
+# Detection gate. The post-process returns one score per box (res[2], measured
+# 0.74-0.89 on real plates), which is the reliable discriminator: a plate 61x20 in
+# frame scored 0.885, higher than a near plate at 0.736.
+#
+# A height floor was used first and had to be withdrawn: it dropped that 61x20 plate
+# entirely (nothing on screen, while the box was correct and the string decoded),
+# and it never rejected any of the clutter boxes measured, because those were 144x48
+# and 151x61, i.e. taller than the floor.
+DET_SCORE_MIN = 0.35
+MIN_PLATE_H = 12              # only rejects degenerate boxes, not distant plates
+
+# Geometry band. A plate is 3.14:1, but it foreshortens at an angle, so the band is
+# wide. Measured: every accepted real plate sat at 2.2-3.9.
 MIN_ASPECT = 2.0
 MAX_ASPECT = 4.6
-MIN_PLATE_H = 34
 
-# One recognition per frame per plate, and a plate's label is the majority of the
-# last VOTE_WINDOW readings. A single frame can decode a wrong province character
-# (measured: 渝 -> 川 / 浙 / 新 under blur and low resolution) while the digits stay
-# right, so voting on the whole string fixes the only unstable part.
-VOTE_WINDOW = 5
-VOTE_MIN = 3                  # readings a string needs before it is displayed
+# A decoded string must look like a plate. The province slot is a closed set, so a
+# random reading such as "HA188E" (H is not a province) is rejected outright; the
+# length band admits both the 7-character standard and the 8-character new-energy
+# format.
+PLATE_MIN_LEN = 6
+PLATE_MAX_LEN = 8
+
+# A reading is only shown after STREAK_N consecutive identical readings. A plate far
+# away puts about 8x14 pixels behind each character, so a single frame is often
+# wrong in a character or two (measured: 14 distinct readings over 192 frames of one
+# plate), but the correct string is the most frequent and arrives in runs. Counting
+# a streak rejects the scattered wrong readings that a 5-frame majority let through.
+#
+# STREAK_SWITCH is a hysteresis band: a label that is already on screen is only
+# replaced by a different run of this length. Without it, two readings that both
+# reach STREAK_N (measured: the true string at 77% and a one-character variant at
+# 18%, both in runs) make the caption flip back and forth every second or so.
+STREAK_N = 4
+STREAK_SWITCH = 8
+
+# Detector boxes jitter by a pixel or two between frames, and the recogniser is
+# sensitive to that: the same plate cropped from a 1 px shifted box measured a
+# different second character. The box a slot uses is therefore an exponential moving
+# average of what the detector reports, so a static plate converges on one crop and
+# the reading becomes reproducible. BOX_EMA is the weight of the newest box; 0.35
+# settles in about three frames, which is faster than STREAK_N needs.
+BOX_EMA = 0.35
 REC_PERIOD_MS = 0             # 0 = every frame; recognition measured 6-15 ms
-MIN_TEXT_LEN = 2              # blank noise decodes as one stray character
+MIN_TEXT_LEN = 2              # crude floor; _valid_text is the real check
 # A plate that moved this far is a different plate, so its history is dropped
 # rather than voted together with the previous one.
 MOVE_RESET_PX = 96
@@ -127,6 +155,10 @@ DICT = ["挂", "使", "领", "澳", "港", "皖", "沪", "津", "渝", "冀",
         "L", "M", "N", "P", "Q", "R", "S", "T", "U", "V",
         "W", "X", "Y", "Z", "_", "-"]
 DICT_SIZE = len(DICT)
+
+# Every character the recogniser can emit in the province slot: the dictionary's
+# first 38 entries, which include the special prefixes (挂 / 使 / 领 / 澳 / 港).
+PROVINCE_CHARS = "".join(DICT[:38])
 
 MODEL_MISSING = ("Plate models missing on SD card.\n"
                  "Expected:\n"
@@ -224,14 +256,17 @@ class PlateApp:
         # the last time each slot was read.
         self._rec_cursor = 0
         self._rec_ms = [0] * MAX_PLATES
-        # Per-slot vote history: the last VOTE_WINDOW readings. The displayed text
-        # is their majority, so one bad frame cannot change the label.
-        self._hist = [[] for _ in range(MAX_PLATES)]
+        # Per-slot reading state: the last raw string and how many frames in a row
+        # produced it. The label is set when that streak is long enough.
+        self._streak_text = [""] * MAX_PLATES
+        self._streak_n = [0] * MAX_PLATES
         self._texts = [""] * MAX_PLATES
         self._last_count = 0
         # Centre of each slot's box last frame, used to notice that a different
-        # plate took the slot (the vote history then has to be dropped).
+        # plate took the slot (the reading history then has to be dropped).
         self._centres = [(0, 0)] * MAX_PLATES
+        # Smoothed box per slot: the geometry actually cropped and drawn.
+        self._box_ema = [None] * MAX_PLATES
 
         self.img_w = ctx.width
         self.img_h = ctx.height
@@ -445,25 +480,51 @@ class PlateApp:
             [PREVIEW_H, PREVIEW_W], DET_CONF, DET_NMS, DET_MAX)
         del grid
 
-        quads = []
+        # The post-process returns (quads, rects, scores). The score is what makes
+        # a distant plate usable: the 640 model localises a 61x20 plate with 0.885
+        # confidence, so filtering on size instead threw it away.
         src = res[0]
+        scores = res[2]
         n = _seq_len(src)
-        for i in range(n if n < MAX_PLATES else MAX_PLATES):
+        candidates = []
+        for i in range(n):
+            try:
+                score = float(scores[i])
+            except BaseException:
+                score = 1.0
+            if score < DET_SCORE_MIN:
+                continue
             quad = self._correct_quad(src[i])
             if self._plausible(quad):
-                quads.append(quad)
+                candidates.append((score, quad))
         del res
+
+        # Highest confidence first, so a real plate wins a slot over background
+        # clutter when there are more candidates than slots. Insertion sort: at
+        # most DET_MAX (10) entries, and MicroPython's sort does not take a key.
+        for a in range(1, len(candidates)):
+            current = candidates[a]
+            b = a - 1
+            while b >= 0 and candidates[b][0] < current[0]:
+                candidates[b + 1] = candidates[b]
+                b -= 1
+            candidates[b + 1] = current
+
+        quads = []
+        for i in range(len(candidates) if len(candidates) < MAX_PLATES else MAX_PLATES):
+            quads.append(candidates[i][1])
+        del candidates
         return quads
 
     @staticmethod
     def _plausible(quad):
-        """Whether a detected quad has a plate's proportions and size.
+        """Whether a detected quad has a plate's proportions.
 
-        The confidence threshold has to stay low (0.2) to catch a distant plate,
-        which also lets background edges through: measured on a cluttered scene,
-        four boxes appeared and three of them were 144x48 or 151x61 clutter that
-        decoded as random strings. Filtering on geometry removes them without
-        costing a real plate, because every true detection measured 2.2-3.9 : 1.
+        The height floor only rejects degenerate boxes. It is deliberately small:
+        a plate at 61x20 in frame is a normal reading distance, and rejecting it was
+        the cause of "clearly visible but not recognised". Clutter is handled by the
+        detection score and by the decoded-string format check instead, because
+        clutter boxes measured larger (144x48, 151x61) than that plate.
         """
         xs = [quad[0], quad[2], quad[4], quad[6]]
         ys = [quad[1], quad[3], quad[5], quad[7]]
@@ -473,6 +534,19 @@ class PlateApp:
             return False
         aspect = w / h
         return MIN_ASPECT <= aspect <= MAX_ASPECT
+
+    @staticmethod
+    def _valid_text(text):
+        """Whether a decoded string has a plate's shape.
+
+        The province slot is a closed set of 38 characters, so a reading whose first
+        character is not one of them (measured noise: "HA188E") cannot be a plate
+        and is dropped before it can enter a vote. The length band admits the
+        7-character standard and the 8-character new-energy format.
+        """
+        if not (PLATE_MIN_LEN <= len(text) <= PLATE_MAX_LEN):
+            return False
+        return text[0] in PROVINCE_CHARS
 
     def _correct_quad(self, q):
         """Detected quad with the letterbox pad removed, rotation preserved.
@@ -678,17 +752,22 @@ class PlateApp:
             self._last_count = len(quads)
             self._reset_votes()
 
-        # A slot whose box jumped is a different plate, so its history is not a
-        # valid sample of the same string any more.
+        # A slot whose box jumped is a different plate, so its reading history is
+        # not a valid sample of the same string any more. Otherwise the box is
+        # smoothed, because a static plate's crop has to stop moving for the
+        # recogniser to return the same string frame after frame.
         for i in range(len(quads)):
             q = quads[i]
             cx = int((q[0] + q[2] + q[4] + q[6]) * 0.25)
             cy = int((q[1] + q[3] + q[5] + q[7]) * 0.25)
             ox, oy = self._centres[i]
             if abs(cx - ox) > MOVE_RESET_PX or abs(cy - oy) > MOVE_RESET_PX:
-                self._hist[i] = []
+                self._streak_text[i] = ""
+                self._streak_n[i] = 0
                 self._texts[i] = ""
+                self._box_ema[i] = None
             self._centres[i] = (cx, cy)
+            quads[i] = self._smooth_box(i, q)
 
         now = time.ticks_ms()
         if quads:
@@ -732,49 +811,75 @@ class PlateApp:
             self.last_fps_ms = now
             self._update_stat()
 
+    def _smooth_box(self, slot, quad):
+        """Exponential moving average of a slot's box.
+
+        Returns a new array so the caller can replace its quad without touching the
+        detector's output. With BOX_EMA = 0.35 a static plate settles on one crop
+        within about three frames; a moving plate lags slightly, which is invisible
+        on a 164 px tile but keeps the reading reproducible.
+        """
+        old = self._box_ema[slot]
+        if old is None:
+            smoothed = quad
+        else:
+            keep = 1.0 - BOX_EMA
+            smoothed = np.array([
+                old[0] * keep + quad[0] * BOX_EMA,
+                old[1] * keep + quad[1] * BOX_EMA,
+                old[2] * keep + quad[2] * BOX_EMA,
+                old[3] * keep + quad[3] * BOX_EMA,
+                old[4] * keep + quad[4] * BOX_EMA,
+                old[5] * keep + quad[5] * BOX_EMA,
+                old[6] * keep + quad[6] * BOX_EMA,
+                old[7] * keep + quad[7] * BOX_EMA])
+        self._box_ema[slot] = smoothed
+        return smoothed
+
     def _reset_votes(self):
         """Forget every reading; used when the plate count changed."""
-        self._hist = [[] for _ in range(MAX_PLATES)]
+        self._streak_text = [""] * MAX_PLATES
+        self._streak_n = [0] * MAX_PLATES
         self._texts = [""] * MAX_PLATES
         self._rec_ms = [0] * MAX_PLATES
         self._centres = [(0, 0)] * MAX_PLATES
+        self._box_ema = [None] * MAX_PLATES
 
     def _vote(self, slot, text):
-        """Add a reading to the slot's history and show the majority.
+        """Record a reading and show it once STREAK_N frames agree.
 
-        The province character is the only unstable part of a reading: with a
-        plate a little far away, the model returns 川 / 浙 / 新 where 渝 was
-        intended, while every digit stays correct. Requiring a majority over the
-        last VOTE_WINDOW frames turns those into a minority that never reaches
-        the label, without delaying a correct reading by more than a few frames.
+        A distant plate hides only about 8x14 pixels behind each character, so one
+        frame is frequently wrong in a character or two while the rest of the string
+        is right (measured: 14 distinct readings over 192 frames of a single plate).
+        The correct string still dominates and arrives in runs, so a streak of
+        identical readings separates it from the scattered noise.
 
-        A string shorter than MIN_TEXT_LEN is blank noise and is not recorded: it
-        would otherwise be a vote that no other reading can equal.
+        Counting a streak rather than a majority means a wrong reading cannot
+        accumulate its way into the label: one different reading resets the count.
+        It also means a replaced plate cannot inherit the previous plate's label
+        once the box moves, which is handled by _centres in step().
+
+        STREAK_SWITCH applies once a label is already on screen, so a variant string
+        has to hold for longer than a fresh label does. That is what stops the
+        caption from alternating between two close readings.
+
+        A string that cannot be a plate is not recorded at all: it would only reset
+        a streak that is on its way to being right.
         """
         if len(text) < MIN_TEXT_LEN:
             return
-        hist = self._hist[slot]
-        hist.append(text)
-        if len(hist) > VOTE_WINDOW:
-            del hist[0]
+        if not self._valid_text(text):
+            return
 
-        # Majority without a Counter (MicroPython has none); VOTE_WINDOW is 5, so
-        # the double loop is 25 comparisons at most.
-        best = ""
-        best_n = 0
-        for candidate in hist:
-            n = 0
-            for other in hist:
-                if other == candidate:
-                    n += 1
-            if n > best_n:
-                best_n = n
-                best = candidate
+        if text == self._streak_text[slot]:
+            self._streak_n[slot] += 1
+        else:
+            self._streak_text[slot] = text
+            self._streak_n[slot] = 1
 
-        # VOTE_MIN keeps a single reading from painting the label, and re-reading
-        # the same string must not reset a vote that is already settled.
-        if best_n >= VOTE_MIN and self._texts[slot] != best:
-            self._texts[slot] = best
+        needed = STREAK_N if not self._texts[slot] else STREAK_SWITCH
+        if self._streak_text[slot] != self._texts[slot] and self._streak_n[slot] >= needed:
+            self._texts[slot] = self._streak_text[slot]
 
     def _print_state(self, quads):
         """Serial line, throttled: what is on screen, so a run can be checked."""

@@ -232,8 +232,8 @@ Two further reasons to pass the corners through untouched:
   whole plate.
 
 So the app subtracts `y_off` and clamps, and does nothing else to the geometry.
-The province character is instead stabilised in the **time domain**: see the
-voting note below.
+The crop size is what limits a distant plate, and that is handled by accepting the
+detection score instead of a size floor (below).
 
 ### the province character needs voting, not a better crop
 
@@ -250,29 +250,77 @@ separate it: the output is **logits, not probabilities** (top1 values measured a
 -0.02 to -1.02, so a 0-1 threshold is meaningless), and a wrong province
 character measured a *higher* margin than a correct one on some frames.
 
-Voting on the decoded string works where a threshold does not. The app keeps the
-last 5 readings per plate and displays a string only when it has 3 votes. A
-deliberately wrong reading fed twice after five correct ones did not change the
-label (measured on board).
+Voting on the decoded string works where a threshold does not. It does not fix a
+reading that is stably wrong, though: a 61x20 plate measured `川WL8888` on 94% of
+frames and that string was **correct** (verified against the captured frame by eye).
+A consistently wrong reading is a model limitation that only a larger crop fixes,
+which is what moving closer does. Voting fixes the frames that disagree with the
+majority.
 
-Measured over a 20 s live run with the plate held in view: 107 raw readings, all
-`渝A999U9`, and the label was painted after the third reading and never changed
-again.
+The app settles the label with a streak of identical readings plus hysteresis, and
+smooths the detector box so the crop stops moving; the measured effect of each step
+is in the stability section below.
 
-### filter detections on geometry, not just confidence
+### use the detection score, not the box size
 
-The confidence threshold has to stay at 0.2 to catch a distant plate, which also
-lets background edges through. On a cluttered scene the post-process returned
-four boxes and three were 144x48 or 151x61 clutter that decoded as random strings
-(`京AL8888`, `黑N88888`).
+`yolo_license_plate_det_postprocess` returns three lists: quads, rectangles, and
+**one detection score per box** (index 2). The score is the reliable
+discriminator, and it is high even for a distant plate:
 
-Rejecting boxes outside a plate's proportions removes them without costing a real
-detection: every true plate measured 2.2-3.9 : 1, while the allowed band is
-2.0-4.6 : 1 with a 34 px height floor. After the gate, a 20 s run over two plates
-in frame produced **194 readings and exactly 2 distinct strings**, one per plate.
+| Plate in frame | Detected box | Score |
+| --- | --- | --- |
+| Near, filling most of the width | 588x267 | 0.736 |
+| Half width | 376x137 | 0.885 |
+| Reading distance (the failing case) | 61x20 | **0.885** |
 
-The band is wider than the plate's real 3.14:1 on purpose: a plate seen at an
-angle foreshortens, and a tight band would drop it.
+A height floor was tried before the score and had to be withdrawn. `MIN_PLATE_H = 34`
+rejected the 61x20 plate above — the box was correct, the score was 0.885, and the
+string decoded — so the app showed nothing while the plate was plainly readable by
+eye. Moving closer made the box exceed the floor, which is exactly the reported
+symptom. Worse, the floor never rejected the clutter it was added for: that
+measured 144x48 and 151x61, i.e. **taller** than the floor.
+
+The gate is now: score >= 0.35, aspect within 2.0-4.6 : 1, height >= 12 px (only
+degenerate boxes). Clutter is handled by the score and by the decoded-string format
+check below, and candidates are ranked by score so a real plate wins a slot over
+background.
+
+### a decoded string must look like a plate
+
+The province slot is a closed set of 38 characters, so a reading whose first
+character is not one of them cannot be a plate. Measured noise such as `HA188E` is
+dropped this way. Length is accepted between 6 and 8 characters, which covers the
+7-character standard and the 8-character new-energy format.
+
+This does not reject everything: clutter can decode as a plausible plate such as
+`京AL8888`. Those are handled in the time domain instead.
+
+### stability comes from time, in three steps
+
+Measured on one 61x20 plate over 20 s at 10 fps, applying one measure at a time:
+
+| Measure | Distinct readings | Label changes | Dominant reading |
+| --- | --- | --- | --- |
+| none (per-frame result shown) | 14 | 9 | 56% |
+| streak of 4 identical readings | 4 | 5 | 77% |
+| + hysteresis (8 to replace a shown label) | 12 | 5 | — |
+| + box smoothing (EMA 0.35) | **2** | **1** | **94%** |
+
+The decisive step is **box smoothing**, and the reason is worth recording: the
+detector's box jitters by a pixel or two between frames, and the recogniser is
+sensitive enough that the same plate cropped from a 1 px shifted box measured a
+different second character. Averaging the box per slot (`new = 0.65*old +
+0.35*detected`) converges a static plate onto one crop, after which the reading is
+reproducible.
+
+The hysteresis row shows its own cost: once a label is on screen, a variant has to
+hold for 8 frames, so in that run a settled label took longer to be replaced and
+more wrong readings accumulated before the change. It is kept because a caption that
+alternates between two close readings is worse than one that is briefly stale, and
+with box smoothing in place a variant rarely reaches the switch threshold at all.
+
+A moving plate lags about three frames from the smoothing, which is invisible at
+this frame rate.
 
 ### ocr_rec_preprocess contract
 
