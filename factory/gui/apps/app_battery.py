@@ -141,16 +141,16 @@ def _percent(mv):
     return batt.percent(mv)
 
 
-def _seg_color(index):
-    """Colour of gauge segment `index` (0-based): red at the low end, green at the top.
+def _seg_color(pct):
+    """Colour for the lit segments, from the current charge.
 
-    Coloured by position, not by the current reading, so the scale itself reads as a
-    fuel gauge: the lit segments always show the same colour progression. The bands
-    follow the icon's quarters (red to 25%, yellow to 50%) so both displays agree.
+    Level-based, not position-based: a full pack shows ten green segments and a low
+    one shows a couple of red, which is how the status icon behaves. A fixed colour
+    per position leaves a glowing red block at the left of a full gauge.
     """
-    if index <= 1:
+    if pct <= 25:
         return COL_ERR
-    if index <= 4:
+    if pct <= 50:
         return COL_WARN
     return COL_OK
 
@@ -402,17 +402,17 @@ class BatteryApp(object):
         if pct is None:
             self.pct_label.set_text("--")
             lit = 0
+            seg_color = COL_SEG_OFF
         else:
             self.pct_label.set_text("{}%".format(pct))
             # Round to the nearest segment, but any real charge lights at least one.
             lit = (pct * SEG_COUNT + 50) // 100
             if pct > 0 and lit == 0:
                 lit = 1
+            seg_color = _seg_color(pct)
         for i, seg in enumerate(self.segs):
-            if i < lit:
-                seg.set_style_bg_color(lv.color_hex(_seg_color(i)), 0)
-            else:
-                seg.set_style_bg_color(lv.color_hex(COL_SEG_OFF), 0)
+            seg.set_style_bg_color(
+                lv.color_hex(seg_color if i < lit else COL_SEG_OFF), 0)
 
         if mv is None:
             self.volt_label.set_text("--")
