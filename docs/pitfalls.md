@@ -71,6 +71,7 @@ nothing points at the cause.
 | The rightmost image column is brighter by about 8 levels | 32 bpp rendering processes four pixels at a time | Make image width a multiple of 4 |
 | Shapes drawn on a grayscale frame do not show | Integer colours are interpreted as RGB, so `255` is blue with luminance 29 | Use `0xFFFFFF` for white |
 | Text renders as boxes | The font lacks those code points, often the LVGL private-use symbols | Use a font that carries them, or bake a bitmap |
+| The screen stays black although the board booted and the log is healthy | `Display.init()` brings up the panel and the frame pipeline but does not drive the backlight, which is a separate GPIO (25); LVGL renders normally and a snapshot still succeeds because it reads the LVGL buffer, not the panel | Drive GPIO25 as a 1 kHz PWM to 100% (or set the pin high) right after `Display.init()` |
 | Everything looks stale after a rebuild | Module bytecode cache survived the soft reset | `del sys.modules[name]` in the probe |
 
 ### Layout and widget behaviour

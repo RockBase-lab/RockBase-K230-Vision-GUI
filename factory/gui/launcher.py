@@ -41,7 +41,7 @@ import gc
 import image
 import lvgl as lv
 import uctypes
-from machine import FPIOA, Pin
+from machine import FPIOA, Pin, PWM
 from media.display import Display
 from media.media import ALIGN_UP
 from machine import TOUCH
@@ -122,6 +122,18 @@ TILE_PAD = 10              # minimum icon spacing (real spacing is derived from 
 NAME_COLOR = 0xC7CDD6      # tile name text colour (parsed by the offline baker)
 NAME_BOTTOM_MARGIN = 10    # px from the name ink bottom to the tile bottom (offline baker)
 STATUS_BATT_W = 32         # status-bar battery icon width (wifi position depends on it)
+
+# ---- panel backlight ----
+# The backlight is a separate GPIO (25). Display.init() brings up the panel and the
+# frame pipeline but leaves this pin alone, so a boot without this code renders into a
+# dark screen: LVGL runs and the logs look healthy, and a snapshot still succeeds
+# because it reads the LVGL buffer rather than the panel. GPIO output state also
+# survives a soft reset, so a probe that dimmed the pin leaves the next boot dark.
+BACKLIGHT_PIN = 25
+BACKLIGHT_PWM_HZ = 1000
+BACKLIGHT_FADE_STEPS = 10  # 10 steps x 15ms = 150ms fade-in
+BACKLIGHT_FADE_MS = 15
+_BACKLIGHT = None          # keep the PWM/Pin object alive; dropped objects stop driving
 
 # Per-app icon tint (app id -> RGB hex). This breaks up the monotone "all icons are
 # white" look, but saturation is held at ~35-40% (glazed grey): a high-saturation
@@ -1204,6 +1216,38 @@ class HardwareButtons:
             print("[Key] CANCEL pressed (GPIO{})".format(self.CANCEL_PIN))
             return launcher.back_out()
         return False
+
+
+def _backlight_on():
+    """Drive the panel backlight to full brightness.
+
+    PWM first for a short fade, then a plain GPIO high, then give up loudly: a silent
+    failure here is indistinguishable from a dead board from the user's side.
+    """
+    global _BACKLIGHT
+    try:
+        pwm = PWM(BACKLIGHT_PIN, freq=BACKLIGHT_PWM_HZ, duty=0)
+        for step in range(1, BACKLIGHT_FADE_STEPS + 1):
+            pwm.duty(step * 100 // BACKLIGHT_FADE_STEPS)
+            time.sleep_ms(BACKLIGHT_FADE_MS)
+        _BACKLIGHT = pwm
+        print("[GUI] backlight on: PWM {}Hz {}%, fade {}ms".format(
+            BACKLIGHT_PWM_HZ, 100, BACKLIGHT_FADE_STEPS * BACKLIGHT_FADE_MS))
+        return
+    except BaseException as error:
+        print("[GUI] backlight PWM unavailable: {}".format(error))
+    try:
+        fpioa = FPIOA()
+        fn = getattr(FPIOA, "GPIO25", None)
+        if fn is None:
+            fn = FPIOA.GPIO0 + BACKLIGHT_PIN
+        fpioa.set_function(BACKLIGHT_PIN, fn)
+        pin = Pin(BACKLIGHT_PIN, Pin.OUT, pull=Pin.PULL_NONE, drive=7)
+        pin.value(1)
+        _BACKLIGHT = pin
+        print("[GUI] backlight on: GPIO{} high".format(BACKLIGHT_PIN))
+    except BaseException as error:
+        print("[GUI] backlight GPIO failed: {} (the panel will stay dark)".format(error))
 
 
 def lvgl_setup():
@@ -2497,6 +2541,9 @@ def main():
     # Display rotation is applied at the Display layer.
     Display.init(DISPLAY_TYPE, width=DISPLAY_WIDTH, height=DISPLAY_HEIGHT,
                  flag=DISPLAY_FLAG, to_ide=True)
+    # Light the panel as early as possible: everything below can take a second (tile
+    # bake) and the user must see that the board booted.
+    _backlight_on()
     try:
         lvgl_setup()
         # Buzzer before the UI so the very first tap after boot has sound

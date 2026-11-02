@@ -13,6 +13,7 @@
 import base64
 import os
 import sys
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -46,7 +47,20 @@ try:
     run("try:\n    f.close()\nexcept:\n    pass\n"
         "import os\n"
         "try:\n    os.remove('{}')\nexcept:\n    pass".format(REMOTE))
-    run("f = open('{}', 'wb')".format(REMOTE))
+    # EPERM on open('wb') is a transient FAT error on this board, not a lock: the same
+    # call succeeds after a short pause. Retrying beats failing the whole push.
+    last = None
+    for attempt in range(4):
+        try:
+            run("f = open('{}', 'wb')".format(REMOTE))
+            last = None
+            break
+        except BaseException as error:
+            last = error
+            print("[WARN] open failed ({}), retry {}/4".format(error, attempt + 1))
+            time.sleep(0.6)
+    if last is not None:
+        raise last
     done = 0
     for off in range(0, len(data), CHUNK):
         b64 = base64.b64encode(data[off:off + CHUNK]).decode("ascii")

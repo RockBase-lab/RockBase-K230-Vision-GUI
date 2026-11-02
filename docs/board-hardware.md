@@ -13,6 +13,14 @@ board revision, so they are stated as facts rather than as procedures.
   already matches the corrected display, so no extra rotation argument is
   needed.
 - The driver reports 4-bit `track_id` values per contact.
+- **The backlight is a separate GPIO (25) and `Display.init()` does not drive
+  it.** A boot that renders correctly but never touches this pin shows a black
+  panel: LVGL reports a healthy frame rate, the boot log has no error, and a
+  snapshot still succeeds because it reads the LVGL buffer instead of the
+  panel. Drive it as a PWM at 1 kHz and fade 0 → 100 % (measured: the 10-step,
+  15 ms fade-in is invisible and adds 150 ms to boot), or set the pin high as
+  a fallback. GPIO output state survives a soft reset, so a probe that dimmed
+  the pin leaves the next boot dark until the state is overwritten.
 
 ## Physical buttons
 
