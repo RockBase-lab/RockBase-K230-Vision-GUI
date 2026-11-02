@@ -120,6 +120,7 @@ nothing points at the cause.
 | `SyntaxError` on line 1 of an uploaded file | The file carries a UTF-8 BOM | Strip it before upload |
 | Every later probe fails with an empty `UnicodeError` on line 2 | A crashed probe left the transfer temp file locked | Use unique temp names; only a power cycle clears an already-locked file |
 | `OSError: [Errno 28]` or a deploy that suddenly cannot write | Runtime data was written to `/sdcard` and filled the 76 MB deploy partition | Every runtime file goes under `/data/<app>/`; `/sdcard` is written only by the deploy tools |
+| A `/data` file that was just written reports `ENOENT` | **This firmware has no `os.sync()`**: a reset or power cut soon after the write can lose it. Measured: 4 of 8 freshly written WAVs were gone after a restart | Read the file back before reporting success, and treat generated assets as a rebuildable cache — the owner must be able to regenerate one on demand rather than retrying forever |
 
 ### Network
 

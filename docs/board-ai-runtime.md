@@ -477,6 +477,13 @@ greeting at 27.5%FS and audible RMS at 4.0%FS; normalising gives 48.0%FS and
 8.2-10.0%FS, about 6 dB louder, while staying exactly on the amplifier's red
 line. `ulab.numpy` has no `abs()`, so the peak comes from `np.max` and `np.min`.
 
+Greeting files are a **cache, not a record**: this firmware has no `os.sync()`,
+and a reset soon after a write can lose it (measured: four of eight freshly
+written WAVs were gone after a restart). The greeter therefore reports a file it
+could not open, and the app rebuilds that one on the next frame instead of
+staying silent. The manage overlay also offers a batch rebuild for identities
+enrolled before this feature.
+
 Playback discipline, in `audio/greet.py`:
 
 - The WAV is written through `device.WavPlayer`, i.e. the differential stereo

@@ -1612,6 +1612,12 @@ class FaceRecognizeApp:
         if self.greeter.update(self._name, self.voice_on and not self.frozen):
             print("[Recognize] greeting '{}'".format(self._name))
         self.greeter.pump()
+        # A greeting file can be absent (the board has no os.sync(), so a reset
+        # right after writing can lose it). Rebuild it instead of staying silent.
+        lost = self.greeter.take_missing()
+        if lost is not None and self.voice_on and not self._voice_queue:
+            print("[Recognize] greeting '{}' missing, rebuilding".format(lost))
+            self._queue_voices([lost])
 
         # LVGL image sources and sensor frames are cyclic garbage; without a
         # periodic collect to_numpy starts failing every few dozen frames.

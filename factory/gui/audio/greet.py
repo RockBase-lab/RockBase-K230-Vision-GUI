@@ -49,7 +49,22 @@ class Greeter:
         self._lost = 0
         self._armed = True
         self._last_ms = {}
+        self._missing = []
         self.active = False
+
+    def take_missing(self):
+        """Names whose WAV could not be opened since the last call, then clear.
+
+        The caller rebuilds them: a greeting file can vanish (the board has no
+        os.sync(), so a reset soon after writing can lose it), and staying
+        silent forever would look like a broken feature.
+        """
+        if not self._missing:
+            return None
+        name = self._missing.pop(0)
+        if not self._missing:
+            self._missing = []
+        return name
 
     def _path_for(self, name):
         return self.voice_dir + "/" + name + ".wav"
@@ -108,6 +123,8 @@ class Greeter:
                 self.player.stop()
             except BaseException:
                 pass
+            if name not in self._missing:
+                self._missing.append(name)
             return False
 
         self._last_ms[name] = now
