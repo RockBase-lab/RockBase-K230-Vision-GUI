@@ -8,6 +8,9 @@
 #     starts at the top-left
 #   - Page indicator dots: 12px dot / 30x12 pill when active
 #   - Physical keys: GPIO0=CANCEL (active low), GPIO53=OK (active high)
+#   - Navigation: CANCEL goes back exactly one level along the path the user came in
+#     by (app -> the folder flyout it was opened from -> the page that folder lives on
+#     -> page 0). See Launcher.back_out(), which owns the rule.
 #
 # Performance constraint (do not go back to live text):
 #   This firmware runs LVGL in DISP_RENDER_MODE.FULL, so every refresh repaints the
@@ -1095,8 +1098,10 @@ class HardwareButtons:
     3.3V).
     The main loop calls poll() every ~5ms for edge detection plus debounce (a level only
     counts once it has been stable for >= DEBOUNCE_MS).
-    CANCEL: inside an app -> request_exit back to the home screen; on the home screen ->
-    nothing.
+    CANCEL walks back one layer per press, along the path the user came in by:
+    inside an app -> the folder flyout it was opened from (or the desktop, for a
+    top-level app) -> the desktop page the folder lives on -> page 0. An app can take
+    over the first step through ctx.back_handler.
     OK: no function bound yet, only printed (reserved for confirm/select semantics).
     """
 
@@ -1171,25 +1176,7 @@ class HardwareButtons:
                 launcher.ctx.ok_pressed = True
         if cancel_press:
             print("[Key] CANCEL pressed (GPIO{})".format(self.CANCEL_PIN))
-            # First level of a layered back-out: with a desktop folder flyout open,
-            # CANCEL only closes the flyout.
-            # (launcher.ctx is always None on the home screen, so without this guard the
-            # press would fall through to the app-exit branch below.)
-            if launcher.ctx is None and launcher.folder is not None:
-                launcher._close_folder()
-                return True
-            if launcher.ctx is not None:
-                # The app may intercept first (layered back-out: full screen -> grid ->
-                # home screen)
-                handler = launcher.ctx.back_handler
-                if handler is not None:
-                    try:
-                        if handler():
-                            return True
-                    except BaseException as error:
-                        print("[GUI] back handler error: {}".format(error))
-                launcher.ctx.request_exit()
-                return True
+            return launcher.back_out()
         return False
 
 
@@ -1300,6 +1287,15 @@ class Launcher:
         self.clock_imgs = None  # clock bitmap widgets of the current screen (None = none)
         self.dots = []
         self.pager = None      # home pager (paging.SnapPager; None when there is one page)
+        # Home page to restore. A release_home app deletes the home screen, so the pager
+        # is rebuilt from scratch and would otherwise always come back on page 0. The
+        # page is saved before that deletion so CANCEL can step back one level at a time
+        # (app -> folder flyout -> the page the folder lives on -> page 0).
+        self.home_page = 0
+        # Folder the running app was opened from, so exiting returns to its flyout
+        # instead of the bare desktop. None when the app was opened from a top-level
+        # tile.
+        self.return_folder = None
         self.home_scr = None   # built once and kept resident for reuse
         self.app_scr = None    # current app screen, deleted explicitly on exit
         self.app_content = None  # current app content container (hidden if it fails later)
@@ -1479,9 +1475,14 @@ class Launcher:
         cache in about a second).
         """
         if self.home_scr is not None:
+            # Save the page before the pager is destroyed. build_home() rebuilds it from
+            # scratch after a release_home, and a fresh SnapPager always starts on page 0.
+            if self.pager is not None:
+                self.home_page = self.pager.page
             try:
                 self.home_scr.delete()
-                print("[GUI]   home screen deleted for release_home")
+                print("[GUI]   home screen deleted for release_home (page {})".format(
+                    self.home_page))
             except BaseException as error:
                 print("[GUI]   home screen delete error:", error)
             self.home_scr = None
@@ -1652,6 +1653,17 @@ class Launcher:
         lv.scr_load(scr)
         print("[GUI] build_home: {} pages, {} apps | {}".format(
             len(pages), len(APPS), _mem_str()))
+        # Restore the page the user left from. A rebuild drops the pager, and without
+        # this the desktop always came back on page 0, which is what made CANCEL look
+        # like it skipped the folder level entirely.
+        if self.pager is not None and self.home_page > 0:
+            if self.home_page < self.pager.page_count:
+                self.pager.go(self.home_page, animate=False)
+                for di, dot in enumerate(self.dots):
+                    self._set_dot_style(dot, di == self.home_page)
+                print("[GUI] home page restored: {}".format(self.home_page))
+            else:
+                self.home_page = 0
         self.home_scr = scr
         self.home_clock_imgs = self.clock_imgs
         # The home wifi icon needs its own reference: entering an app makes _build_shell
@@ -1710,6 +1722,10 @@ class Launcher:
             if m.get("folder"):
                 self._open_folder(m)
             else:
+                # A top-level tile has no folder level to return to. Clearing the
+                # breadcrumb here (not only in close_app) keeps a failed launch from
+                # leaving a stale one behind for the next app.
+                self.return_folder = None
                 self.open_app(m)
 
         # Click sound plus app launch (beep.on_click plays first, then invokes the callback)
@@ -1897,6 +1913,11 @@ class Launcher:
 
         def on_clicked(event, m=meta):
             print("[GUI] folder member clicked: '{}'".format(m["name"]))
+            # Remember the folder this member came from. Exiting the app then reopens
+            # this flyout, so CANCEL walks back the way the user came in instead of
+            # jumping straight to the desktop.
+            if self.folder is not None:
+                self.return_folder = self.folder["meta"]
             # Close the flyout before opening the app: open_app switches screens and may
             # call release_home, which would destroy the flyout objects still attached to
             # the home screen and leave the state dangling.
@@ -1924,6 +1945,46 @@ class Launcher:
         if self.pager is not None:
             self.pager.set_enabled(True)
         print("[GUI] folder closed | {}".format(_mem_str()))
+
+    def back_out(self):
+        """Walk back exactly one navigation level. Returns whether a layer was consumed.
+
+        The levels, in order: the app (or its own handler) -> the folder flyout the app
+        was entered from, or the desktop for a top-level app -> the desktop page the
+        folder sits on -> page 0. Each press moves one level, so the user retraces the
+        path they came in by instead of being dropped on the first page.
+
+        Kept as one method rather than inlined in the key poll so the whole back-out
+        ladder can be exercised without physical button events.
+        """
+        # An app may intercept first (gallery full screen -> grid, and so on).
+        if self.ctx is not None:
+            handler = self.ctx.back_handler
+            if handler is not None:
+                try:
+                    if handler():
+                        return True
+                except BaseException as error:
+                    print("[GUI] back handler error: {}".format(error))
+            self.ctx.request_exit()
+            return True
+
+        # Desktop with a flyout open: close it and stay on this page.
+        if self.folder is not None:
+            self._close_folder()
+            return True
+
+        # Desktop with nothing open: step back one page. On page 0 there is nothing
+        # left, which is what lets the last press end the back-out quietly.
+        pager = self.pager
+        if pager is not None and pager.page > 0:
+            print("[GUI] CANCEL: page {} -> 0".format(pager.page))
+            self.home_page = 0
+            # go() overwrites an in-flight snap safely, so this also works right after
+            # a swipe.
+            pager.go(0)
+            return True
+        return False
 
     def _wifi_state_key(self):
         """Pick the wifi icon variant ("off"/"1"/"2"/"3") from net_mgr's connection
@@ -2203,6 +2264,9 @@ class Launcher:
         # screen's tap detection)
         if TOUCH_INPUT is not None:
             TOUCH_INPUT.clear_raw()
+        # A top-level tile clears the breadcrumb; only a folder member keeps one.
+        returning_to = self.return_folder
+        self.return_folder = None
         print("[GUI] close '{}' begin | {}".format(app_id, _mem_str()))
         if app is not None:
             try:
@@ -2223,6 +2287,12 @@ class Launcher:
                 print("[GUI]   app screen delete error: {}".format(error))
             self.app_scr = None
         gc.collect()
+        # Layered back-out, second step: the app was entered from a folder flyout, so
+        # reopen that flyout on the home screen we just restored. The page is already
+        # correct because build_home() restores self.home_page.
+        if returning_to is not None:
+            print("[GUI]   returning to folder '{}'".format(returning_to["id"]))
+            self._open_folder(returning_to)
         print("[GUI] close '{}' done in {}ms | after gc: {}".format(
             app_id, time.ticks_diff(time.ticks_ms(), t0), _mem_str()))
 
