@@ -528,8 +528,25 @@ Trigger rules, so a person standing in front of the camera is announced once:
 | Constant | Value | Purpose |
 | --- | --- | --- |
 | `TRIGGER_FRAMES` | 8 (0.32 s) | the name must repeat before it is spoken, filtering a one-frame misread |
-| `LOST_FRAMES` | 10 (0.4 s) | re-arm only after the face is really gone, so detector flicker does not repeat the greeting |
+| `LOST_FRAMES` | 10 (0.4 s) | the same person leaving and returning is only re-armed after this many frames with no face, so detector flicker does not repeat the greeting |
 | `COOLDOWN_MS` | 8000 | the same identity is not spoken again within 8 s |
+
+Two details that decide whether a greeting happens at all, both found by a
+failing case rather than by reading the code:
+
+- **A different name re-arms immediately.** Re-arming only after a gap with no
+  face misses the ordinary case of one person replacing another while the
+  detector still sees somebody in every frame, which left the second person
+  unannounced until the app was restarted.
+- **The frame threshold is a lower bound, not an equality test.** A trigger
+  frame that lands while a previous clip still plays has to be skipped, and
+  testing `streak == TRIGGER_FRAMES` then never matches again for as long as the
+  person stays in view. With `streak >= TRIGGER_FRAMES` the greeting starts as
+  soon as the player is free.
+
+The per-name cooldown is what stops a misrecognising detector from alternating
+between two identities and speaking continuously; the 8-frame agreement
+requirement is the primary filter, and the cooldown only bounds the worst case.
 
 Speeches are never queued: while a WAV is playing, new triggers are dropped.
 

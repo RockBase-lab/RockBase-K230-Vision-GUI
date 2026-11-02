@@ -7,9 +7,13 @@
 #
 #   TRIGGER_FRAMES  the name must repeat for 8 frames (about 0.32 s) before it
 #                   is spoken, which filters a one-frame misrecognition
-#   LOST_FRAMES     a name is only re-armed after 10 frames (about 0.4 s) with
-#                   no face, so detector flicker does not repeat the greeting
+#   LOST_FRAMES     the same person leaving and coming back is only re-armed
+#                   after 10 frames (about 0.4 s) with no face, so detector
+#                   flicker does not repeat the greeting
 #   COOLDOWN_MS     the same name is not spoken again within 8 s
+#
+# A *different* name re-arms immediately: one person replacing another is a new
+# arrival even if the detector never reported an empty frame between them.
 #
 # Speech is never queued: while a WAV is playing, new triggers are dropped. A
 # queue would make the app talk over itself after a group walks past.
@@ -80,7 +84,16 @@ class Greeter:
         if not enabled:
             if self.active:
                 self.stop()
+            # Skip the frames, not the state: the caller disables this while the
+            # keyboard or the manage overlay is open, and whoever is in view
+            # when it closes must still be treated as an arrival. Resetting the
+            # streak is what makes the next 8 frames count from zero instead of
+            # inheriting a count that already passed the threshold. The
+            # per-name cooldown keeps a reopened overlay from talking repeatedly
+            # about the same person.
             self._name = name
+            self._streak = 0
+            self._armed = True
             return False
 
         if name is None:
@@ -96,10 +109,18 @@ class Greeter:
         if name != self._name:
             self._name = name
             self._streak = 1
+            # A different face is a new arrival, so it gets its own greeting.
+            # Waiting for a gap with no face would miss the common case of one
+            # person being replaced by another while the detector still sees
+            # somebody in every frame.
+            self._armed = True
         else:
             self._streak += 1
 
-        if not self._armed or self._streak != TRIGGER_FRAMES:
+        # A lower bound, not an equality test: the trigger frame can be skipped
+        # while a previous greeting still plays, and an equality test then
+        # never matches again for as long as the person stays in view.
+        if not self._armed or self._streak < TRIGGER_FRAMES:
             return False
         if self.active:
             return False
