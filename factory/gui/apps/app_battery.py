@@ -82,7 +82,14 @@ GAUGE_W = 280
 GAUGE_H = 120
 GAUGE_X = (LEFT_W - GAUGE_W) // 2
 GAUGE_Y = 140
+# The fill is a child of the body, and LVGL insets a child's coordinate space by the
+# border width plus the padding. Both are therefore part of the inset: ignoring the
+# border left a 7px gap on top against 1px at the bottom (measured in a snapshot).
+GAUGE_BORDER = 3
 GAUGE_PAD = 4
+GAUGE_INSET = GAUGE_BORDER + GAUGE_PAD
+GAUGE_INNER_W = GAUGE_W - GAUGE_INSET * 2
+GAUGE_INNER_H = GAUGE_H - GAUGE_INSET * 2
 NUB_W = 16
 NUB_H = 50
 
@@ -270,9 +277,10 @@ class BatteryApp(object):
                self._small, lv.TEXT_ALIGN.CENTER)
 
         body = _plain(left, GAUGE_X, GAUGE_Y, GAUGE_W, GAUGE_H)
-        body.set_style_border_width(3, 0)
+        body.set_style_border_width(GAUGE_BORDER, 0)
         body.set_style_border_color(lv.color_hex(COL_GAUGE_EDGE), 0)
         body.set_style_radius(14, 0)
+        body.set_style_pad_all(GAUGE_PAD, 0)
         nub = lv.obj(left)
         nub.set_pos(GAUGE_X + GAUGE_W, GAUGE_Y + (GAUGE_H - NUB_H) // 2)
         nub.set_size(NUB_W, NUB_H)
@@ -283,8 +291,9 @@ class BatteryApp(object):
         nub.clear_flag(lv.obj.FLAG.SCROLLABLE)
 
         self.fill = lv.obj(body)
-        self.fill.set_pos(GAUGE_PAD, GAUGE_PAD)
-        self.fill.set_size(0, GAUGE_H - GAUGE_PAD * 2)
+        # Placed at the content-area origin, so the inset above covers the whole gap.
+        self.fill.set_pos(0, 0)
+        self.fill.set_size(0, GAUGE_INNER_H)
         self.fill.set_style_bg_color(lv.color_hex(COL_MUTED), 0)
         self.fill.set_style_bg_opa(lv.OPA.COVER, 0)
         self.fill.set_style_border_width(0, 0)
@@ -363,14 +372,13 @@ class BatteryApp(object):
 
         if pct is None:
             self.pct_label.set_text("--")
-            self.fill.set_size(0, GAUGE_H - GAUGE_PAD * 2)
+            self.fill.set_size(0, GAUGE_INNER_H)
         else:
             self.pct_label.set_text("{}%".format(pct))
-            inner_w = GAUGE_W - GAUGE_PAD * 2
-            width = inner_w * pct // 100
+            width = GAUGE_INNER_W * pct // 100
             if pct > 0 and width < 4:
                 width = 4
-            self.fill.set_size(width, GAUGE_H - GAUGE_PAD * 2)
+            self.fill.set_size(width, GAUGE_INNER_H)
             self.fill.set_style_bg_color(lv.color_hex(_level_color(pct)), 0)
 
         if mv is None:

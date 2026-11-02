@@ -78,6 +78,7 @@ nothing points at the cause.
 | Symptom | Cause | Do instead |
 |---|---|---|
 | Content bunched to one side; a row is wider than designed | A default `lv.obj` carries about 20 px of padding | `set_style_pad_all(0, 0)` on every self-built container |
+| A bar or fill inside a bordered frame sits off-centre (7 px above, 1 px below) | Child coordinates are inset by the border width as well as the padding, so positioning by padding alone ignores the border and the height overflows it | Put the child at `(0, 0)` with `set_style_pad_all(pad)` on the parent, and size it from `w - 2 * (border + pad)` |
 | A thin light line on the panel's right edge | Default `FLAG.SCROLLABLE` produced a scrollbar | `clear_flag(lv.obj.FLAG.SCROLLABLE)` |
 | A widget jumped somewhere unexpected and no error was raised | Passed `TEXT_ALIGN.*` to `set_align()`, whose values collide with `ALIGN.*` | Use `set_style_text_align()` for text alignment |
 | Tapping an icon body does nothing, its blank edge works | An `lv.obj` child is CLICKABLE by default and swallows the hit without bubbling | `clear_flag(lv.obj.FLAG.CLICKABLE)` on decorative children |
