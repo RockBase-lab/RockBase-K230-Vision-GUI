@@ -37,8 +37,6 @@ ADC_CHANNEL = batt.ADC_CHANNEL   # only channel whose reading matches a divider 
 # constants live in batt.py rather than being duplicated here.
 DIV_NUM = batt.DIV_NUM      # 1.5k + 1k divider, tap at 1k: pack = tap * 5/2
 DIV_DEN = batt.DIV_DEN
-VREF_FIX_NUM = batt.VREF_FIX_NUM
-VREF_FIX_DEN = batt.VREF_FIX_DEN
 ADC_FULL_CODE = batt.ADC_FULL_CODE
 ADC_FULL_MV = batt.ADC_FULL_MV
 MAX_INPUT_UV = batt.MAX_INPUT_UV
@@ -466,13 +464,13 @@ class BatteryApp(object):
             self._rejected += 1
             return
 
-        # Derive the 12-bit code from the un-corrected voltage, then apply the Vref
-        # correction so the multiply stays inside 32 bits.
+        # Derive the 12-bit code from the same conversion instead of reading the
+        # channel twice. No Vref scaling: read_uv() already reports against the 1.8V
+        # full scale the code assumes (see the note in batt.py).
         raw = uv * ADC_FULL_CODE // ADC_FULL_MV
-        uv = uv * VREF_FIX_NUM // VREF_FIX_DEN
         self._tap_uv = uv
         self._raws.append(raw)
-        self._mvs.append(uv * DIV_NUM // DIV_DEN // 1000)
+        self._mvs.append(batt.pack_mv(uv))
 
     def _publish(self):
         raws = sorted(self._raws)

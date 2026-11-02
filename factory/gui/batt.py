@@ -4,12 +4,18 @@
 # untested on this board, and a second handle is the obvious way to break it.
 #
 # Conversion chain, measured on board:
-#   the divider is 1.5k over 1k, so the tap is 2/5 of the pack;
-#   read_uv() assumes a 1.80V reference while the rail measures 1.88V, so raw values
-#   are 4.4% low and get scaled by 47/45;
-#   the code is a plain 12-bit conversion (measured raw=3417 next to 1501mV).
+#   the divider is 1.5k over 1k, so the pack is tap * 5/2;
+#   the code is a plain 12-bit conversion against an ideal 1.8V full scale, and
+#   read_uv() already reports it that way: measured raw=3809 next to 1674mV, and
+#   3809 * 1800 / 4095 = 1674. No reference correction is applied -- see below.
 #   The percentage comes from a resting Li-ion OCV curve: it reads high while
 #   charging and low under load, so it is an estimate, not a fuel gauge.
+#
+# Do not scale read_uv() by 1880/1800. That correction was in an earlier version on
+# the theory that the 1.8V rail measures 1.88V; with it applied the app reported
+# 4357mV for a pack measured at 4.15V, i.e. 4.4% high, which is exactly that ratio.
+# raw 3809 -> 1674mV tap -> 4185mV pack matches the meter, so the conversion is
+# already correct as the firmware delivers it.
 
 import time
 
@@ -19,8 +25,6 @@ ADC_CHANNEL = 5             # channel 4 wedges the board; never open it
 
 DIV_NUM = 5
 DIV_DEN = 2
-VREF_FIX_NUM = 47           # 1880/1800 in lowest terms, keeps the multiply 32-bit
-VREF_FIX_DEN = 45
 ADC_FULL_CODE = 4095
 ADC_FULL_MV = 1800000
 MAX_INPUT_UV = 2200000      # above this the sample is not a real tap voltage
@@ -52,8 +56,13 @@ def adc():
 
 
 def correct(uv):
-    """Apply the per-board Vref correction to a raw read_uv() value."""
-    return uv * VREF_FIX_NUM // VREF_FIX_DEN
+    """Return the tap voltage in uV as read.
+
+    Kept as a named step so the conversion chain stays readable in one place. It is
+    deliberately the identity: measured raw and read_uv() agree on a 1.8V full
+    scale, and an earlier 1880/1800 factor here made every reading 4.4% high.
+    """
+    return uv
 
 
 def delta_code(uv):

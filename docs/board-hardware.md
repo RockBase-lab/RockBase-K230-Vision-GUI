@@ -149,25 +149,27 @@ gyro LSB is 15.6 mdps with 0.2-0.5 dps noise, so one decimal suffices.
 - Kept as an integer fraction (numerator 5, denominator 2) to avoid float mV.
 - **The divider value has changed twice** (1k+1k → 3k+1k → 1.5k+1k).
   Always confirm the current ratio with hardware before relying on it.
-- Vref correction: `machine.ADC.read_uv()` assumes an ideal 1.80 V reference,
-  but this board's 1.8 V rail measures 1.88 V, so raw `read_uv()` is about
-  4.4 % low. Scale immediately after `read_uv()`:
-  `value * 1880 // 1800`. `BATTERY_ADC_VREF_ACTUAL_MV` is a per-board
-  measurement, not a universal constant, and must be re-measured when the board
-  revision or batch changes.
+- **Do not scale `read_uv()` for the reference voltage.** `machine.ADC.read_uv()`
+  already reports against the 1.8 V full scale that the 12-bit code implies, so
+  the value is usable as delivered. An earlier version of this app multiplied
+  by `1880 // 1800` on the theory that the rail measures 1.88 V; with that
+  factor the app read 4357-4376 mV for a pack a meter put at 4.15 V, i.e. 4.4 %
+  high — exactly that ratio. The check is arithmetic: `raw 3809` gives
+  `3809 * 1800 / 4095 = 1674 mV` at the tap, and `1674 * 2.5 = 4185 mV`, which
+  matches the meter.
 
-### Measured on board (charging pack, one pack)
+### Measured on board (pack on charge, one pack)
 
-- ADC5 is the only channel whose value matches a divider tap: 1440-1530 mV raw,
-  1501-1531 mV after the Vref correction, pack 3766-3830 mV, rising slowly
-  while the charger is connected.
-- **A charging pack reads above 4.2 V.** Measured 4363 mV with the cable
-  connected, against a resting full pack at about 4.2 V. This is the charger
-  holding the rail, not a divider error, so a reading in that band must be
-  reported as charging: treating anything over 4.2 V as "out of range" flags a
-  healthy board every time it is on charge. The app therefore reports
-  `CHARGING` from 4.25 V and keeps `OUT OF RANGE` for values above 4.6 V,
-  where the divider ratio or the Vref constant really would be wrong.
+- ADC5 is the only channel whose value matches a divider tap: `raw` 3809-3813,
+  tap 1674-1676 mV, pack 4186-4190 mV, and the pack measured about 4.15 V with
+  a meter at the same moment (0.96 % apart, inside the ADC and divider-tolerance
+  budget).
+- **A pack on charge can read above 4.2 V.** The charger holds the rail higher
+  than a resting full pack, so a reading in that band must be reported as
+  charging rather than as a fault: rejecting everything over 4.2 V flags a
+  healthy board every time it is plugged in. The app reports `CHARGING` from
+  4.25 V and keeps `OUT OF RANGE` above 4.6 V, where the divider ratio really
+  would be wrong.
 - `read_u16()` and `read_uv()` describe the same 12-bit conversion with a
   1.8 V full scale: `raw = 3417` pairs with `1501 mV`, and
   `1501 * 4095 / 1800 = 3414`. Either one alone is usable and they may be read
