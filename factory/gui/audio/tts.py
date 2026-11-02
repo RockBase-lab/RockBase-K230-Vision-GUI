@@ -40,7 +40,11 @@ PHASE_PATH = "/sdcard/examples/utils/small_pinyin.txt"
 MAP_PATH = "/sdcard/examples/utils/phone_map.txt"
 
 OUT_RATE = 24000
-# 48%FS = the 350 mV red line; see the amplifier calibration in device.py.
+# The codec saturates near 390 mV and 48%FS is the 350 mV red line measured for
+# this board (see the amplifier calibration in device.py). The model's own peak
+# is only about 57% of full scale, so the clip is **normalised** to this value
+# rather than multiplied by it: multiplying left the greeting at 27.5%FS, which
+# measured far quieter than the recorded audio path.
 PEAK_FS = 0.48
 # Decoder input is a fixed 600-frame window; longer utterances clamp per-phoneme
 # durations down until they fit (that is the model's own scheme).
@@ -180,8 +184,14 @@ class Synth:
         if dur_sum <= 0 or not mel:
             return 0
         clip = np.clip(np.array(mel[:dur_sum * 256], dtype=np.float), -1.0, 1.0)
-        # PEAK_FS, not full scale: see the module header.
-        pcm = np.array(clip * (32767.0 * PEAK_FS), dtype=np.int16).tobytes()
+        # Normalise to the red line. The vocoder's own peak is well below full
+        # scale, so a flat multiply by PEAK_FS would keep it quiet. ulab has no
+        # abs(), so the peak comes from the two extremes.
+        hi = float(np.max(clip))
+        lo = float(np.min(clip))
+        peak = hi if hi > -lo else -lo
+        gain = (PEAK_FS / peak) if peak > 1e-6 else 0.0
+        pcm = np.array(clip * (32767.0 * gain), dtype=np.int16).tobytes()
         ensure_dir(path.rsplit("/", 1)[0])
         tmp = path + ".tmp"
         wf = wave.open(tmp, "wb")
@@ -221,6 +231,93 @@ class Synth:
 
 
 def speak_text(name):
-    """Greeting for an enrolled identity. Chinese prefix keeps the phrase
-    pronounceable even though the name itself may be ASCII."""
-    return "你好，" + name if name else "你好"
+    """Greeting for an enrolled identity.
+
+    The zh frontend reads Han characters only and emits silence for Latin text,
+    so an ASCII name has to be converted to characters that carry the same
+    syllables. Measured on board: `你好，nina` left the name segment at 0%FS
+    while `你好，妮娜` and a converted pinyin name both voiced every segment.
+    """
+    if not name:
+        return "你好"
+    spoken = name_to_hanzi(name)
+    return "你好，" + spoken if spoken else "你好"
+
+
+def _is_han(ch):
+    return 0x4E00 <= ord(ch) <= 0x9FFF
+
+
+def _segment(name):
+    """Split an ASCII name into pinyin syllables, or None.
+
+    Chooses the split with the fewest uncommon syllables, then the fewest
+    syllables: `nina` is nin+a (囜+锕) if the rare syllable wins, but ni+na
+    (你+那) costs less and is the pronunciation the user meant. The table is
+    small and names are short, so a plain best-path scan is enough.
+    """
+    from audio import pinyin_map
+    table = pinyin_map.PINYIN_CHAR
+    common = pinyin_map.COMMON
+    text = "".join(ch for ch in name.lower() if "a" <= ch <= "z")
+    n = len(text)
+    if not n:
+        return None
+    far = (1 << 30, 1 << 30)
+    best = [far] * (n + 1)
+    back = [None] * (n + 1)
+    best[0] = (0, 0)
+    for i in range(n):
+        if best[i] is far:
+            continue
+        for ln in range(1, min(6, n - i) + 1):
+            cand = text[i:i + ln]
+            if cand not in table:
+                continue
+            cost = (best[i][0] + (0 if cand in common else 1),
+                    best[i][1] + 1)
+            if cost < best[i + ln]:
+                best[i + ln] = cost
+                back[i + ln] = (i, cand)
+    if back[n] is None:
+        return None
+    out = []
+    k = n
+    while k > 0:
+        i, cand = back[k]
+        out.append(table[cand])
+        k = i
+    out.reverse()
+    return out or None
+
+
+def name_to_hanzi(name):
+    """Characters whose pronunciation matches `name`, or None.
+
+    Han characters pass through unchanged. A pinyin name is segmented into
+    syllables; when that fails (an English name such as `tony`), each letter is
+    spoken with the Chinese name of that letter so the greeting still says
+    something instead of going silent.
+    """
+    if any(_is_han(ch) for ch in name):
+        return name
+    syls = _segment(name)
+    if syls is not None:
+        return "".join(syls)
+    out = []
+    for ch in name.lower():
+        sound = LETTER_SOUND.get(ch)
+        if sound:
+            out.append(sound)
+    return "".join(out) or None
+
+
+# Chinese names of the Latin letters, used when a name is not pinyin at all.
+LETTER_SOUND = {
+    "a": "诶", "b": "比", "c": "西", "d": "迪", "e": "伊",
+    "f": "艾弗", "g": "吉", "h": "艾尺", "i": "艾", "j": "杰",
+    "k": "开", "l": "艾勒", "m": "艾姆", "n": "恩", "o": "欧",
+    "p": "屁", "q": "扣", "r": "阿尔", "s": "艾斯", "t": "提",
+    "u": "优", "v": "维", "w": "达布留", "x": "艾克斯", "y": "歪",
+    "z": "贼德",
+}
