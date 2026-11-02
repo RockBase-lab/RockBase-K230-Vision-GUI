@@ -100,6 +100,8 @@ See `docs/pitfalls.md` for the full trap index.
 | `_cap_face_recognize.py` | Screen capture of the Recognize app with a match |
 | `_cap_recognize_empty.py` | Screen capture of the empty-database panel |
 | `_probe_back_out.py` | Layered CANCEL ladder on the real launcher, incl. page restore |
+| `_probe_liveness_model.py` | Liveness output index, and both crop modes on the same frame |
+| `_probe_liveness_app.py` | Liveness app end to end: verdict, presets, freeze, fps |
 | `_cap_run.py` | Run a display probe as a subprocess, capture raw output |
 | `_start_launcher.py` | Start the on-board GUI with a single exec |
 

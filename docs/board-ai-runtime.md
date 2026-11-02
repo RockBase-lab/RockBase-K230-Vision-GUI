@@ -351,6 +351,40 @@ renamed into place, so a power cut cannot leave a truncated 2048-byte feature.
 `os.mkdir` builds one level only, so the app creates `/data/face` before
 `/data/face/recognize`.
 
+## Face liveness (spoof detection)
+
+Model: `face_liveness_rgb.kmodel` (380096 B, 112x112 input). It runs after the
+detector, on a crop of the largest face.
+
+```python
+score = outputs[0].flatten()[0]      # shape [1, 2], softmax summing to 1.0
+```
+
+- **Index 0 is the live probability.** Reading index 1 reports every face as
+  spoof, because the two values are complementary.
+- The pipeline is crop (the box as-is) -> resize -> pad with mid grey `[128,128,128]`.
+
+Three preprocessing choices were measured against the same input, a face photo
+replayed on a monitor, and only the last one rejects it:
+
+| Pipeline | Score | Verdict |
+|---|---|---|
+| crop -> pad (detector BGR mean) -> resize | 0.73-0.94 | REAL (wrong) |
+| crop -> resize -> pad, box expanded 224x192 | 0.9996-0.9999 | REAL (wrong) |
+| crop -> resize -> pad, box as-is | **0.11-0.33** | **SPOOF (correct)** |
+
+So the crop must **not** be expanded even though a head-and-shoulders margin is
+the intuitive choice: the extra background makes the model confident that a
+photograph is a person. Op order matters as much as the pad colour.
+
+Measured: run 1.36 ms (constant, so cost is in the ai2d crop/build), model load
+78 ms, detector load 198 ms. The app holds 25.4 fps with a face in view.
+
+Score spread over 24 frames of a replayed photo: min 0.1105, p25 0.1674, median
+0.2007, p75 0.2615, max 0.3259. A **live subject has not been measured** on this
+pipeline, so the threshold is exposed as three presets on the board instead of
+being fixed; recalibrate when a person can be compared with the photo.
+
 ## Memory discipline
 
 With the GUI home screen resident, the MicroPython heap has only about 2.3 MB
