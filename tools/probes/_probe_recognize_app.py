@@ -89,9 +89,9 @@ else:
     else:
         feat = app._pending_feat
         print("E10 enrolling as 'probe'")
-        ok = app._db_add("probe", feat)
-        print("E11 db_add={} faces={} next={}".format(
-            ok, len(app.db_names), app._db_next))
+        n = app._db_append("probe", feat, "live")
+        print("E11 sample={} faces={} next={}".format(
+            n, len(app.db_names), app._db_next))
         print("E12 entries: {}".format(sorted(os.listdir(DIR))))
         try:
             f = open(DIR + "/db.json", "r")
@@ -112,13 +112,14 @@ else:
         # Reload through a fresh app instance's loader.
         app.db_names = []
         app.db_feats = []
+        app.db_srcs = []
         app._db_load()
         print("E15 reloaded faces={} names={}".format(
             len(app.db_names), app.db_names))
 
         name, score = app._db_match(feat)
         print("E16 match self: name={} score={:.4f} (expect >= {})".format(
-            name, score, 0.90))
+            name, score, 0.85))
 
         # An unrelated vector must land below the threshold. _db_match takes
         # ulab arrays, so build one rather than a Python list.
@@ -127,10 +128,10 @@ else:
         norm = float(np.dot(rnd_arr, rnd_arr)) ** 0.5
         rnd_arr = rnd_arr / norm
         name2, score2 = app._db_match(rnd_arr)
-        print("E17 match synthetic: name={} score={:.4f} (expect < 0.90)".format(
+        print("E17 match synthetic: name={} score={:.4f} (expect < 0.85)".format(
             name2, score2))
 
-        app._db_delete(0)
+        app._db_delete_name("probe")
         print("E18 after delete: faces={} entries={}".format(
             len(app.db_names), sorted(os.listdir(DIR))))
 

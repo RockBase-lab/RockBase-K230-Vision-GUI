@@ -384,6 +384,33 @@ Verified on board: with the switch on a `photo` entry matches (score 1.000 for
 its own feature); with it off the same feature returns no match while a `live`
 entry still matches. The `src` tag and the flag both survive a reload.
 
+### Multi-angle samples
+
+One identity owns up to **3** feature vectors, one per viewing angle, and the
+match takes the best score over all of them. Names therefore repeat in the
+index: `db_names`, `db_feats` and `db_srcs` stay flat, and duplicate names are
+the entire mechanism. `_db_match` needs no extra branch, because the global
+maximum over that flat list is already the maximum over every angle of every
+identity. An index written before this feature loads unchanged, since each old
+entry is simply an identity with one sample.
+
+Enrollment types the name once. Each further OK press during the session saves
+another angle, tagged with the same `src` as the first sample; the session ends
+at 3 samples or after 20 s without a new one. Typing an existing name drops that
+identity's old samples first, so re-enrolling rebuilds it from the new angles
+instead of mixing stale and fresh vectors.
+
+Cost: 3 samples per identity = 3 dot products, about 0.03 ms on a 39 ms frame.
+`MAX_ENROLL` is 200 feature vectors, i.e. 66 identities at 3 samples each.
+
+**The threshold has to be re-measured for a multi-sample database.** Three
+samples raise the score for the right person, but they also give an impostor
+three chances, so the 0.7054 single-sample impostor ceiling measured between
+different enrolled subjects no longer bounds the impostor distribution. The
+value in `ENROLL_MATCH` was measured with one sample per identity; a database
+enrolled at three angles needs its own cross-angle matrix before the value can
+be trusted.
+
 ## Face liveness (spoof detection)
 
 Model: `face_liveness_rgb.kmodel` (380096 B, 112x112 input). It runs after the

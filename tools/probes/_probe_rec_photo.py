@@ -72,8 +72,8 @@ feat_a = np.zeros(512, dtype=np.float)
 feat_a[0] = 1.0
 feat_b = np.zeros(512, dtype=np.float)
 feat_b[1] = 1.0
-app._db_add("ZZphoto", feat_a, "photo")
-app._db_add("ZZlive", feat_b, "live")
+app._db_append("ZZphoto", feat_a, "photo")
+app._db_append("ZZlive", feat_b, "live")
 print("A3a srcs={} {}".format(app.db_srcs[-2], app.db_srcs[-1]))
 
 app.photos_allowed = True
@@ -83,6 +83,23 @@ n2, s2 = app._db_match(feat_a)
 n3, s3 = app._db_match(feat_b)
 print("A3b photo_on={} score={:.3f} | photo_off={} | live={}".format(
     n1, s1, n2, n3))
+
+# A3d: multi-angle samples. Two more angles of ZZlive, then the match must
+# still name the identity and the sample count must reflect all three.
+ang2 = np.zeros(512, dtype=np.float)
+ang2[1] = 0.8
+ang2[2] = 0.6
+ang3 = np.zeros(512, dtype=np.float)
+ang3[1] = 0.6
+ang3[2] = 0.8
+app._db_append("ZZlive", app._normalise(ang2), "live")
+app._db_append("ZZlive", app._normalise(ang3), "live")
+print("A3d count={} people={} unique={}".format(
+    app._db_count("ZZlive"), len(app._db_names_unique()),
+    app._db_names_unique()))
+app.photos_allowed = True
+n4, s4 = app._db_match(app._normalise(ang3))
+print("A3e angle3_match={} score={:.3f}".format(n4, s4))
 
 # Reload from disk to confirm src persisted.
 app.db_names = []
@@ -108,10 +125,10 @@ try:
 except BaseException as e:
     print("A4 liveness probe failed:", e)
 
-# Cleanup: remove test entries, restore the switch value.
+# Cleanup: remove test identities, restore the switch value.
 for nm in ("ZZphoto", "ZZlive"):
     if nm in app.db_names:
-        app._db_delete(app.db_names.index(nm))
+        app._db_delete_name(nm)
 app.photos_allowed = orig_allowed
 app._sync_switch()
 app._db_save_index()

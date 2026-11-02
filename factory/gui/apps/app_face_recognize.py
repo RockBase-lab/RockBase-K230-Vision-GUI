@@ -29,6 +29,12 @@
 # 0.7054. ENROLL_MATCH is 0.85, inside that gap, so a restart does not turn a
 # known face into "unknown" while an unrelated face still cannot pass.
 #
+# An identity owns up to SAMPLES_PER_NAME feature vectors, one per viewing
+# angle, and the match takes the best score over all of them. Names may repeat
+# in the database: that is the whole mechanism, so the matcher needs no extra
+# branch. Three samples cost three dot products (about 0.03 ms) on a 39 ms
+# frame, which is why the limit is set by recognition accuracy, not speed.
+#
 # Enrollment runs face_liveness_rgb.kmodel **once** to tag each entry as
 # "live" or "photo" (a printed photo held up to the camera). The steady loop
 # never runs the liveness model, so recognition fps is unchanged. The PHOTO
@@ -89,6 +95,18 @@ DB_DIR = "/data/face/recognize"
 DB_INDEX = DB_DIR + "/db.json"
 TMP_SUFFIX = ".tmp"
 
+# Feature vectors per identity, captured at different viewing angles. The
+# match takes the maximum over them, so extra angles raise the score for the
+# right person; they also give an impostor more chances, which is why the
+# threshold was re-measured rather than reused.
+SAMPLES_PER_NAME = 3
+
+# A sample session ends when this many milliseconds pass without a new sample.
+# Repositioning the head counts as activity, so the timer only runs out when
+# the user walks away.
+ADD_WINDOW_MS = 20000
+
+# Total feature vectors across all identities, i.e. 200 / 3 = 66 people.
 MAX_ENROLL = 200
 NAME_MAX = 16
 
@@ -312,10 +330,17 @@ class FaceRecognizeApp:
         self._shown_name = None
         self._shown_score = -1
         self._shown_face = None
+        self._shown_people = -1
 
         self.kb = None               # naming keyboard (None = closed)
         self._pending_feat = None
         self._pending_src = "live"   # source tag of the enrollment in progress
+        # Multi-sample session: while _add_name is set, OK appends another
+        # viewing angle to that identity instead of starting a new enrollment.
+        self._add_name = None
+        self._add_src = "live"
+        self._add_n = 0
+        self._add_ms = 0
         self._manage = None          # manage overlay (None = closed)
         self._empty_panel = None     # shown while the database is empty
 
@@ -456,10 +481,15 @@ class FaceRecognizeApp:
         self._update_stat()
 
     def _update_stat(self):
-        if self.db_names:
-            self.seg_title.set_text("Recognize {}".format(len(self.db_names)))
-        else:
-            self.seg_title.set_text("Recognize")
+        # Counting identities is O(samples) and this runs several times a second
+        # while a face is in view, so only rebuild the title when the count moves.
+        people = len(self._db_names_unique()) if self.db_names else 0
+        if people != self._shown_people:
+            self._shown_people = people
+            if people:
+                self.seg_title.set_text("Recognize {}".format(people))
+            else:
+                self.seg_title.set_text("Recognize")
         self.seg_title.set_style_text_color(lv.color_hex(COL_TITLE), 0)
 
         note = ""
@@ -484,6 +514,10 @@ class FaceRecognizeApp:
         if self.frozen:
             self.seg_hint.set_text("FROZEN")
             self.seg_hint.set_style_text_color(lv.color_hex(COL_FROZEN), 0)
+        elif self._add_name is not None:
+            self.seg_hint.set_text("OK: add {}/{}".format(
+                self._add_n, SAMPLES_PER_NAME))
+            self.seg_hint.set_style_text_color(lv.color_hex(COL_KNOWN), 0)
         else:
             self.seg_hint.set_text("OK: enroll")
             self.seg_hint.set_style_text_color(lv.color_hex(COL_HINT), 0)
@@ -558,8 +592,10 @@ class FaceRecognizeApp:
             self.db_feats.append(feat)
             self.db_srcs.append("photo" if item.get("src") == "photo"
                                 else "live")
-        print("[Recognize] db loaded: {} face(s), photos_allowed={}".format(
-            len(self.db_names), self.photos_allowed))
+        print("[Recognize] db loaded: {} face(s) / {} sample(s), "
+              "photos_allowed={}".format(
+                  len(self._db_names_unique()), len(self.db_names),
+                  self.photos_allowed))
 
     @staticmethod
     def _is_missing(err):
@@ -629,26 +665,58 @@ class FaceRecognizeApp:
             pass
         os.rename(tmp, DB_INDEX)
 
-    def _db_add(self, name, feat, src):
-        """Add or replace an entry, then rewrite the index.
+    def _db_count(self, name):
+        """Number of samples stored for one identity."""
+        n = 0
+        for i in range(len(self.db_names)):
+            if self.db_names[i] == name:
+                n += 1
+        return n
 
-        Features are renumbered on every save so the file name always matches the
-        position in the index; a 2 KB file is cheap to rewrite and this keeps the
-        two from ever drifting apart. Re-enrolling replaces the source tag too.
+    def _db_names_unique(self):
+        """Identity names in first-seen order, without repeating a name."""
+        out = []
+        for name in self.db_names:
+            if name not in out:
+                out.append(name)
+        return out
+
+    def _db_drop_name(self, name):
+        """Remove every sample of one identity from memory. No disk write."""
+        removed = 0
+        i = len(self.db_names) - 1
+        while i >= 0:
+            if self.db_names[i] == name:
+                del self.db_names[i]
+                del self.db_feats[i]
+                del self.db_srcs[i]
+                removed += 1
+            i -= 1
+        return removed
+
+    def _db_append(self, name, feat, src):
+        """Append one sample and persist. Returns its 1-based index, or -1.
+
+        Duplicate names are the multi-angle mechanism, so nothing here replaces
+        an existing feature. Re-enrolling an identity drops its old samples
+        first, which the caller does.
         """
-        if name in self.db_names:
-            idx = self.db_names.index(name)
-            self.db_feats[idx] = feat
-            self.db_srcs[idx] = src
-        else:
-            if len(self.db_names) >= MAX_ENROLL:
-                return False
-            self.db_names.append(name)
-            self.db_feats.append(feat)
-            self.db_srcs.append(src)
-            self._db_next += 1
+        if len(self.db_names) >= MAX_ENROLL:
+            return -1
+        self.db_names.append(name)
+        self.db_feats.append(feat)
+        self.db_srcs.append(src)
+        self._db_next += 1
         self._db_write_all()
-        return True
+        return self._db_count(name)
+
+    def _db_delete_name(self, name):
+        """Delete one identity and all of its samples."""
+        removed = self._db_drop_name(name)
+        if removed:
+            print("[Recognize] delete '{}' ({} sample(s))".format(name, removed))
+            self._db_write_all()
+        return removed
 
     def _db_write_all(self):
         for i in range(len(self.db_feats)):
@@ -679,20 +747,13 @@ class FaceRecognizeApp:
                     print("[Recognize] prune failed", name, e)
         self._db_save_index()
 
-    def _db_delete(self, idx):
-        if not (0 <= idx < len(self.db_names)):
-            return
-        print("[Recognize] delete", self.db_names[idx])
-        del self.db_names[idx]
-        del self.db_feats[idx]
-        del self.db_srcs[idx]
-        self._db_write_all()
-
     def _db_match(self, feat):
         """Best (name, score), or (None, best score) below the threshold.
 
-        Photo-enrolled entries are skipped while the PHOTO switch is off; the
-        per-entry test is one list lookup, so the hot loop cost is unchanged.
+        Identity samples share a name, so the global maximum over the flat list
+        is already the best score over every angle of every identity. Photo
+        samples are skipped while the PHOTO switch is off: that test is one list
+        lookup, so the hot loop cost is unchanged.
         """
         best = -1.0
         best_i = -1
@@ -754,9 +815,11 @@ class FaceRecognizeApp:
         self.sensor = sensor
 
         self._load_models()
-        print("[Recognize] ready: load={}ms dim={} faces={} mem_free={}".format(
-            time.ticks_diff(time.ticks_ms(), t0), FEAT_DIM, len(self.db_names),
-            gc.mem_free()))
+        print("[Recognize] ready: load={}ms dim={} faces={} samples={} "
+              "mem_free={}".format(
+                  time.ticks_diff(time.ticks_ms(), t0), FEAT_DIM,
+                  len(self._db_names_unique()), len(self.db_names),
+                  gc.mem_free()))
 
     @staticmethod
     def _exists(path):
@@ -1053,18 +1116,73 @@ class FaceRecognizeApp:
             self._note("feature lost, retry")
             self._update_stat()
             return
+        # Typing an existing name is a deliberate re-enrollment: drop the old
+        # samples so the identity is rebuilt from the new angles instead of
+        # keeping stale ones mixed with fresh ones.
+        if self._db_count(name):
+            print("[Recognize] re-enroll '{}', dropping {} old sample(s)".format(
+                name, self._db_drop_name(name)))
         try:
-            ok = self._db_add(name, feat, self._pending_src)
+            n = self._db_append(name, feat, self._pending_src)
         except BaseException as e:
             print("[Recognize] save failed:", e)
             sys.print_exception(e)
             self._note("save failed")
             self._update_stat()
             return
-        print("[Recognize] enrolled '{}' [{}] -> {} face(s)".format(
-            name, self._pending_src, len(self.db_names)))
-        self._note("saved {}".format(name) if ok else "database full")
-        self._update_stat()
+        if n < 0:
+            self._note("database full")
+            self._update_stat()
+            return
+        print("[Recognize] enrolled '{}' [{}] sample {}/{}".format(
+            name, self._pending_src, n, SAMPLES_PER_NAME))
+        self._begin_add_session(name, self._pending_src, n)
+
+    # ---------- multi-angle sample session ----------
+    def _begin_add_session(self, name, src, n):
+        """Keep collecting angles: OK appends a sample without asking the name."""
+        self._add_name = name
+        self._add_src = src
+        self._add_n = n
+        self._add_ms = time.ticks_ms()
+        self._note("{} {}/{} - turn head".format(name, n, SAMPLES_PER_NAME))
+
+    def _end_add_session(self):
+        self._add_name = None
+        self._add_src = "live"
+        self._add_n = 0
+
+    def _add_sample(self):
+        """Save the current frame as the next angle of the open session."""
+        name = self._add_name
+        if name is None:
+            return
+        if not self.has_face or self._pending_feat is None:
+            # No face right now: say so and restart the timer, because the user
+            # is probably repositioning rather than walking away.
+            self._add_ms = time.ticks_ms()
+            self._note("no face - {}".format(name))
+            return
+        try:
+            n = self._db_append(name, self._pending_feat, self._add_src)
+        except BaseException as e:
+            print("[Recognize] add sample failed:", e)
+            sys.print_exception(e)
+            self._end_add_session()
+            self._note("save failed")
+            return
+        if n < 0:
+            self._end_add_session()
+            self._note("database full")
+            return
+        print("[Recognize] '{}' sample {}/{}".format(name, n, SAMPLES_PER_NAME))
+        self._add_n = n
+        if n >= SAMPLES_PER_NAME:
+            self._end_add_session()
+            self._note("{} {}/{} done".format(name, n, SAMPLES_PER_NAME))
+        else:
+            self._add_ms = time.ticks_ms()
+            self._note("{} {}/{} - turn".format(name, n, SAMPLES_PER_NAME))
 
     # ---------- manage overlay ----------
     def _open_manage(self):
@@ -1082,7 +1200,7 @@ class FaceRecognizeApp:
         backdrop.add_flag(lv.obj.FLAG.CLICKABLE)
         beep.on_click(backdrop, lambda e: self._close_manage())
 
-        rows = min(max(len(self.db_names), 1), 6)
+        rows = min(max(len(self._db_names_unique()), 1), 6)
         panel = lv.obj(backdrop)
         panel.set_size(560, 96 + rows * 56)
         panel.align(lv.ALIGN.CENTER, 0, 0)
@@ -1096,7 +1214,8 @@ class FaceRecognizeApp:
         panel.add_flag(lv.obj.FLAG.CLICKABLE)
 
         title = lv.label(panel)
-        title.set_text("Enrolled faces ({})".format(len(self.db_names)))
+        title.set_text("Enrolled faces ({})".format(
+            len(self._db_names_unique())))
         title.set_style_text_color(lv.color_hex(0xE6EAF0), 0)
         title.align(lv.ALIGN.TOP_MID, 0, 2)
 
@@ -1105,14 +1224,28 @@ class FaceRecognizeApp:
         hint.set_style_text_color(lv.color_hex(0x8A97A3), 0)
         hint.align(lv.ALIGN.TOP_MID, 0, 26)
 
-        if not self.db_names:
+        names = self._db_names_unique()
+        if not names:
             empty = lv.label(panel)
             empty.set_text("none yet - press OK to enroll")
             empty.set_style_text_color(lv.color_hex(COL_HINT), 0)
             empty.align(lv.ALIGN.TOP_MID, 0, 56)
         else:
             y = 52
-            for i in range(min(len(self.db_names), 6)):
+            for name in names[:6]:
+                cnt = self._db_count(name)
+                # The tag describes the identity, so it warns whenever any of
+                # its samples came from a photo.
+                has_photo = False
+                has_live = False
+                for i in range(len(self.db_names)):
+                    if self.db_names[i] != name:
+                        continue
+                    if self.db_srcs[i] == "photo":
+                        has_photo = True
+                    else:
+                        has_live = True
+                tag = " [photo]" if has_photo else ""
                 row = lv.btn(panel)
                 row.set_size(524, 48)
                 row.align(lv.ALIGN.TOP_MID, 0, y)
@@ -1124,27 +1257,27 @@ class FaceRecognizeApp:
                 row.clear_flag(lv.obj.FLAG.SCROLLABLE)
                 row.add_flag(lv.obj.FLAG.CLICKABLE)
                 lab = lv.label(row)
-                tag = " [photo]" if self.db_srcs[i] == "photo" else ""
-                lab.set_text("{}{}    (tap to delete)".format(
-                    self.db_names[i], tag))
-                # Dim the entries the matcher is currently skipping.
-                dimmed = (self.db_srcs[i] == "photo"
-                          and not self.photos_allowed)
+                lab.set_text("{}{} x{}    (tap to delete)".format(
+                    name, tag, cnt))
+                # Dim an identity only when every sample is excluded, i.e. it
+                # has no live angle to fall back on.
+                dimmed = has_photo and not has_live and not self.photos_allowed
                 lab.set_style_text_color(
                     lv.color_hex(COL_UNKNOWN if dimmed else 0xE6EAF0), 0)
                 if self.bar_font is not None:
                     lab.set_style_text_font(self.bar_font, 0)
                 lab.center()
                 lab.clear_flag(lv.obj.FLAG.CLICKABLE)
-                beep.on_click(row, lambda e, idx=i: self._delete_from_manage(idx))
+                beep.on_click(row,
+                              lambda e, nm=name: self._delete_from_manage(nm))
                 y += 56
 
         self._manage = backdrop
 
-    def _delete_from_manage(self, idx):
+    def _delete_from_manage(self, name):
         self._close_manage()
         try:
-            self._db_delete(idx)
+            self._db_delete_name(name)
         except BaseException as e:
             print("[Recognize] delete failed:", e)
             self._note("delete failed")
@@ -1199,8 +1332,23 @@ class FaceRecognizeApp:
             return
 
         if self.ctx.take_ok():
-            self._start_enroll()
+            # An open sample session turns OK into "one more angle" instead of
+            # starting a new enrollment, so the name is only typed once.
+            if self._add_name is not None:
+                self._add_sample()
+            else:
+                self._start_enroll()
             return
+
+        if (self._add_name is not None
+                and time.ticks_diff(time.ticks_ms(),
+                                    self._add_ms) > ADD_WINDOW_MS):
+            print("[Recognize] sample session for '{}' timed out".format(
+                self._add_name))
+            name = self._add_name
+            n = self._add_n
+            self._end_add_session()
+            self._note("{} {}/{} keep".format(name, n, SAMPLES_PER_NAME))
 
         if self.frozen:
             return

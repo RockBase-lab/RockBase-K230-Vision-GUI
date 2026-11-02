@@ -54,7 +54,7 @@ for i in range(8):
 if app._pending_feat is None:
     print("C3 no feature, nothing to show")
 else:
-    app._db_add("probe", app._pending_feat)
+    app._db_append("probe", app._pending_feat, "live")
     print("C3 enrolled probe, faces={}".format(len(app.db_names)))
     for i in range(4):
         app.step()
