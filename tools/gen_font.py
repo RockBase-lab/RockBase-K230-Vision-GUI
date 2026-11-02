@@ -43,6 +43,14 @@ OUT_DIR = os.path.join(ROOT, "factory", "gui", "assets", "fonts")
 LV_KB_SYMBOLS = [0xF00C, 0xF00D, 0xF053, 0xF054, 0xF11C, 0xF55A]
 LV_KB_REMAPS = [(0xF3BE, 0xF8A2)]   # (source codepoint, target LVGL codepoint)
 
+# Every non-ASCII glyph the plate recogniser can emit, in the order its dictionary
+# lists them (38 province and prefix characters). The ASCII half of a plate comes
+# from the same font's 0x20-0x7E block, so one font covers a whole plate string.
+# Kept as text rather than codepoints so the list stays readable and a wrong glyph
+# is visible at a glance.
+PLATE_CJK = ("挂使领澳港澳皖沪津渝冀晋蒙辽吉黑苏浙京闽赣"
+             "鲁豫鄂湘粤桂琼川贵云藏陕甘青宁新警学")
+
 
 def _ranges(items):
     """Assemble range descriptions into lv_font_conv's -r argument list (one -r
@@ -116,6 +124,24 @@ SPECS = {
         "bpp": 4,
         "parts": [
             ("Nunito-Bold.ttf", [(0x20, 0x7E)]),
+        ],
+    },
+    # Plate labels: the recogniser returns Chinese province characters, which
+    # Nunito and the built-in montserrat have no glyphs for, so they render as
+    # boxes. Only the 38 characters the plate dictionary can produce are baked
+    # (~34KB at 30px bpp4) instead of a whole CJK font.
+    # 30px is one step up from the 24px first pass: the string is read from arm's
+    # length, and 24px measured hard to read on the 800x480 panel.
+    # Source is Source Han Sans (SIL OFL), which may be redistributed; a Windows
+    # system font may not, so do not substitute one here. The 8MB original is
+    # git-ignored: place it in tools/fontsrc/ before running this spec.
+    "plate30": {
+        "out": "plate_cjk_30.bin",
+        "size": 30,
+        "bpp": 4,
+        "parts": [
+            ("SourceHanSansCN-Regular.ttf",
+             [(0x20, 0x7E)] + [(ord(c), ord(c)) for c in PLATE_CJK]),
         ],
     },
 }

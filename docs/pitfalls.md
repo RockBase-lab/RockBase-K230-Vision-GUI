@@ -35,9 +35,11 @@ Recovery for every entry here is a power cycle. Programmatic resets do not help.
 | `kd_mpi_ai_set_pdm_clk failed:-1` | PDM input handle leaked | Close streams in `finally`; only a power cycle clears it |
 | `kd_mpi_ao_enable_chn failed:-1` | Audio output handle leaked, or the Vision app left mpp resources | Same; power cycle |
 | `kd_mpi_vdec_attach_vb_pool failed`, pool id reaching -1 | Decoder destroy raised before the VB pool was released | Repair the pool manually when channel destruction fails |
-| `OSError: sensor(N) is already inited` | A second `Sensor()` in the same VM | `machine.reset()`, not Ctrl-D |
+| `OSError: sensor(N) is already inited` | A second `Sensor()` in the same VM, or an earlier probe died before `destroy()` and left the first one claimed | `machine.reset()`, not Ctrl-D; and wrap probe bodies in `try/finally` so the camera is always released |
 | Touch completely dead | Deleted the LVGL active screen | Load another screen first |
 | Serial drops with `ClearCommError` / `OSError 995` | A KPU runtime tensor was never released | Release every tensor after `to_numpy()` |
+| Probe stops right after `load_kmodel`, then the serial link dies with `ClearCommError` / `PermissionError(13)` | Called `get_output_tensor()` before `kpu.run()`; the native call blocks with no exception and the board never returns | Call `get_output_tensor()` only after `run()`; to inspect a model, run it on a synthetic frame first |
+| Board wedges inside `aidemo.licence_det_postprocess` with no exception | Passed the raw `to_numpy()` array; the function wants the `AIBase` results **list** (`[ndarray]`), and a bare ndarray hangs the native layer | Pass `results` as a one-element list, or use `yolo_license_plate_det_postprocess` with the `yolo_license_plate_det` model |
 | Board unresponsive mid-probe | Created an `lv` widget without display initialisation | Run the probe with the `--lvgl` flag |
 
 ## B. Traps that fail silently
@@ -58,6 +60,17 @@ nothing points at the cause.
 | Large faces on the right half are invisible | Passed `rgb888p_size` as `[H, W]`, which is used as a clip rectangle | Pass `[W, H + y_off]` = `[800, 640]` for an 800x480 preview |
 | Face boxes have no score | RetinaFace post-processing returns four columns only | Do not index a fifth column |
 | The first image looks washed out or shifted | Image buffer handed to a widget without holding a reference | Keep the `Image` alive for as long as the widget shows it |
+| Plate boxes land ~160 px too low | The plate post-process leaves the letterbox top pad in y | Subtract `pad_top * preview_w / model_w` (160 for 800x480 into 640) |
+| Passing a different `display_size` to the plate post-process changes nothing | The argument is ignored by that routine; only its `rgb` argument has an effect, and changing that breaks x | Compensate in Python, do not look for the right display argument |
+| A wide plate loses its last character | The detector under-reads the box width by up to 21% at full-frame plate size | Accept it; do not force the box to the plate aspect, which breaks the province character far more often than it helps |
+| The province character decodes as a different province while every digit is right | Single-frame reading; a low-quality frame substitutes a whole character | Vote over the last few readings per plate instead of showing one frame's result |
+| The plate box is a rotated quad and the crop looks squeezed | The quad was collapsed to an axis-aligned rectangle | Pass the four detected corners through; `ocr_rec_preprocess` rectifies them |
+| `ocr_rec_preprocess` raises `expected ndarray` | Passed a Python list of lists | Pass a list of float ndarrays |
+| `ocr_rec_preprocess` raises `expected list` | Passed a single ndarray | Wrap the quads in a list |
+| `ocr_rec_preprocess` raises `invalid ndarray dtype or layout` | Passed an int16 or uint16 array | Use plain float arrays |
+| The crop contains the wrong part of the frame | The frame was passed as `(H, W, 3)` | Pass CHW `(3, H, W)`; `RGBP888` already gives that |
+| Recognition returns one unrelated character | The crop was built from a mis-scaled quad, not from the real plate | Compare the quad against a colour scan of a test photo before tuning the model |
+| A confidence threshold on the plate recogniser does nothing useful | Its output is logits, not probabilities, and a wrong character can score higher than a right one | Vote over several readings; a threshold cannot separate them |
 
 ### Image display
 
@@ -71,7 +84,6 @@ nothing points at the cause.
 | The rightmost image column is brighter by about 8 levels | 32 bpp rendering processes four pixels at a time | Make image width a multiple of 4 |
 | Shapes drawn on a grayscale frame do not show | Integer colours are interpreted as RGB, so `255` is blue with luminance 29 | Use `0xFFFFFF` for white |
 | Text renders as boxes | The font lacks those code points, often the LVGL private-use symbols | Use a font that carries them, or bake a bitmap |
-| The screen stays black although the board booted and the log is healthy | `Display.init()` brings up the panel and the frame pipeline but does not drive the backlight, which is a separate GPIO (25); LVGL renders normally and a snapshot still succeeds because it reads the LVGL buffer, not the panel | Drive GPIO25 as a 1 kHz PWM to 100% (or set the pin high) right after `Display.init()` |
 | Everything looks stale after a rebuild | Module bytecode cache survived the soft reset | `del sys.modules[name]` in the probe |
 
 ### Layout and widget behaviour

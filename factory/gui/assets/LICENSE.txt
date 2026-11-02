@@ -76,3 +76,18 @@ fonts/mono_dejavu_16.bin  <- 由 tools/gen_font.py 预烘的 16px 等宽位图�
 来源: matplotlib 发行包自带的 mpl-data/fonts/ttf/DejaVuSansMono.ttf。
 用途: IMU app 的 acc/gyro/temp 读数。等宽设计让每个数字/符号占同一
       字宽，配合固定符号位（{:+.4f}）后数值不会随位数变化横向抽动。
+
+----
+
+SourceHanSansCN-Regular.ttf  <- 思源黑体 CN Regular；源文件在 tools/fontsrc/
+                                （8.1MB，源字体本身不随仓库分发）
+fonts/plate_cjk_30.bin  <- 由 tools/gen_font.py 预烘的 30px 位图字体，只取
+                           车牌识别可能输出的 38 个省份/前缀汉字 + ASCII。
+
+字体: Source Han Sans / 思源黑体 (https://github.com/adobe-fonts/source-han-sans)
+授权: SIL Open Font License 1.1 (OFL) — 允许子集化、嵌入与再分发，
+      保留署名即可。OFL 全文见 https://openfontlicense.org
+用途: Plate app 的识别结果标签。Nunito 与内置 montserrat 都没有中日韩
+      字形，直接用会把车牌首字画成方框。
+注意: 不要换成 Windows 自带中文字体（微软雅黑/黑体等），那些授权不允许
+      随产品分发字体子集。

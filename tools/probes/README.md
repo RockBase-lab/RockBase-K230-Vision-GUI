@@ -33,6 +33,10 @@ after the script ends and is not suitable for this purpose.
    makes the serial guard's process cleanup match the parent shell.
 6. A host-side disconnect does not stop the on-board script; the port then
    opens but returns nothing.
+7. Never call `kpu.get_output_tensor()` before `kpu.run()`. It blocks in the
+   native layer with no exception and no output, and the serial link dies with
+   `ClearCommError`; only a power cycle recovers it. To learn a model's output
+   layout, run it once on a synthetic frame first.
 
 Two frame-synthesis traps, both hit while building the scan probe:
 
@@ -65,6 +69,25 @@ See `docs/pitfalls.md` for the full trap index.
 | `_cap_face_points.py` | Points app screen capture for host-side viewing |
 | `_probe_landmark_assets.py` | Landmark model files and the aidemo symbols that exist |
 | `_probe_landmark_dump.py` | Dumps the 106 landmark screen coordinates of one face |
+| `_probe_plate_assets.py` | Plate model files on board and the aidemo symbols that exist |
+| `_probe_plate_contract.py` | Plate model output dims, post-process layout, crop layout |
+| `_probe_plate_crop_args.py` | Quad argument form for `ocr_rec_preprocess` (list of float ndarrays) |
+| `_probe_plate_crop_layout.py` | Input layout the crop pre-process expects (CHW) |
+| `_probe_plate_rec_chain.py` | Crop channel count and the recognition kpu on a crop |
+| `_probe_plate_rec_input.py` | Colour vs grey crop: which reaches the right plate text |
+| `_probe_plate_channel_order.py` | Channel order of `to_numpy_ref()` on an RGB888 image |
+| `_probe_plate_det_domain.py` | Whether the plate post-process honours `display_size` (it does not) |
+| `_probe_plate_det_sig.py` | Argument semantics of both plate post-processes (LPD_640 hangs) |
+| `_probe_plate_geometry.py` | Colour-scan ground truth vs the detected quad, crop export |
+| `_probe_plate_app.py` | Plate app in the real launcher: known photos, vote logic, camera loop, teardown (needs `--lvgl`) |
+| `_probe_plate_stability.py` | Crop strategies per character confidence on degraded frames |
+| `_probe_plate_widen.py` | Symmetric widening vs the raw quad, on four plate sizes |
+| `_probe_plate_right_widen.py` | Right-edge-only widening; scores each strategy out of seven frames |
+| `_probe_plate_stability_run.py` | 20 s live run: raw reading distribution vs displayed label |
+| `_probe_plate_sensor_order.py` | Whether the RGBP888 plane order matches the RGB888 packed order |
+| `_probe_plate_font.py` | Baked CJK plate font loads and renders (needs `--lvgl`) |
+| `_probe_plate_caption_style.py` | Caption font size and ink colour (needs `--lvgl`) |
+| `_cap_plate.py` | Captures the caption region to a PNG for visual checks (needs `--lvgl`) |
 | `_probe_imu_tear.py` | Read tearing signature at exactly 256 LSB |
 | `_probe_imu_lock.py` | Locking sequence effect on peak-to-peak and outliers |
 | `_probe_imu_accuracy.py` | Noise, offset and magnitude for a static board |

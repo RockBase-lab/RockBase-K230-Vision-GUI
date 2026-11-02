@@ -364,8 +364,13 @@ FOLDER_MEMBERS = {
          "symbol": _sym("USER"), "module": "apps.app_placeholder"},
         {"id": "fall", "name": "Fall", "icon": "assets/icon_fall.png",
          "symbol": _sym("WARNING"), "module": "apps.app_placeholder"},
+        # Plate: detection -> crop -> recognition, so two models stay resident and
+        # the heap has to be clean before they load. release_home frees the home
+        # screen and the tile cache first, the same trade Detect and Pose make.
+        # Measured per frame: detection 57-59 ms plus recognition 3-5 ms.
         {"id": "plate", "name": "Plate", "icon": "assets/icon_plate.png",
-         "symbol": _sym("CARD"), "module": "apps.app_placeholder"},
+         "symbol": _sym("CARD"), "module": "apps.app_plate",
+         "immersive": True, "release_home": True},
         {"id": "cvlab", "name": "CV Lab", "icon": "assets/icon_cvlab.png",
          "symbol": _sym("FLASK_1"), "module": "apps.app_placeholder"},
         {"id": "ocr", "name": "OCR", "icon": "assets/icon_ocr.png",
@@ -1252,8 +1257,7 @@ def _backlight_on():
 
 def lvgl_setup():
     global disp_imgs, disp_drv, REFR_NOW
-    lv.init()
-    # LV_COLOR_DEPTH is 32: ARGB8888 <-> image.BGRA8888
+    lv.init()    # LV_COLOR_DEPTH is 32: ARGB8888 <-> image.BGRA8888
     disp_imgs = [image.Image(DISPLAY_WIDTH, DISPLAY_HEIGHT, image.BGRA8888) for _ in range(2)]
     disp_drv = lv.disp_create(DISPLAY_WIDTH, DISPLAY_HEIGHT)
     disp_drv.set_color_format(lv.COLOR_FORMAT.ARGB8888)

@@ -132,6 +132,33 @@ A small single-shot detector therefore fits comfortably; a yolov8n detection
 loop dominates the budget at 31 ms total and lands near 32 fps standalone,
 dropping to about 10 fps inside the GUI because the repaint stacks on top.
 
+### Plate chain (two models)
+
+Measured on a still frame, 800x480 into the 640 plate detector:
+
+| Stage | Cost |
+|---|---|
+| ai2d (640x640) | 3 ms |
+| detection kpu | 57-59 ms |
+| detection post-process | 0-4 ms |
+| `ocr_rec_preprocess` (1 plate) | 4-11 ms |
+| recognition ai2d + kpu (220x32) | 1 ms + 3-5 ms |
+| both kmodel loads | 978 ms, once (901 + 77) |
+
+About 65-80 ms per frame with one plate. The detector alone is twice the cost of
+yolov8n at 320, so this app is detection-bound and sits near 12-15 fps. Only one
+plate is recognised per frame (round-robin), which bounds the frame at that number
+instead of scaling with the plate count.
+
+Inside the real launcher, with one plate in front of the camera and recognition
+running every frame (3-15 ms), the loop measured **9.8 fps**: 39 frames in 4 s,
+worst single step 95.5 ms, zero errors. Recognition is not the limit; the 640x640
+detector is.
+
+A 20 s run over two plates in frame held **9.7 fps** (194 frames, zero errors),
+with recognition still only 6-15 ms per frame; the per-frame cost is 74-79 ms of
+which 70 ms is detection.
+
 ## QR detection
 
 Measured on one synthetic code (33 modules, 12 px per module), which is the only

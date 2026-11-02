@@ -60,6 +60,10 @@ ot.release()                    # mandatory
   so leaks native memory, which crashes the board and drops the USB serial
   link (`ClearCommError` / `PermissionError 22` / `OSError 995`). Recovery
   needs a physical reset.
+- **`get_output_tensor()` is only valid after `run()`.** Calling it on a loaded
+  but not yet executed model blocks inside the native layer with no exception
+  and no serial output; the link then dies with `ClearCommError`. To inspect a
+  model's output layout without a camera, run it once on a synthetic frame.
 - Tear down with `kpu.release()`, not `deinit`.
 
 ## Sensor capture
@@ -158,6 +162,161 @@ constraining axis, which reduces to `W / 2 - H / 2`. For an 800x480 preview it
 is always 160, independent of a 224 or 320 model input (both measured at 160).
 Still compute it from the formula rather than hard-coding, so a future preview
 size stays correct.
+
+## Licence plate detection and recognition
+
+Two models from the firmware image, chained: a plate detector and a CTC string
+recogniser. Both names come from the vendor and keep their spelling.
+
+| Model | Input | Output | Cost (800x480 frame) |
+| --- | --- | --- | --- |
+| `yolo_license_plate_det.kmodel` | 640x640 | `(1, 13, 8400)` | 57-59 ms kpu, 3 ms ai2d |
+| `licence_reco.kmodel` | 220x32 | `(55, 1, 74)` | 3-5 ms kpu |
+
+Load cost is 901 ms for the detector and 77 ms for the recogniser. A full frame
+with one plate measures about 65-80 ms.
+
+```python
+grid = raw[0].transpose().copy()          # (8400, 13); aidemo needs contiguous
+res = aidemo.yolo_license_plate_det_postprocess(
+    grid, [480, 800], [640, 640], [480, 800], 0.2, 0.2, 10)
+# res[0] = one 8-float array per plate: x0,y0, x1,y1, x2,y2, x3,y3
+```
+
+### the plate post-process ignores display_size
+
+Five different fourth arguments (`[480,800]`, `[800,480]`, `[640,640]`,
+`[800,640]`, `[480,640]`) returned byte-identical quads for the same frame. Only
+changing the second argument as well moved the numbers, and that change breaks x.
+So the display-size argument is not usable for compensation: treat the output as
+model-space and correct it in Python.
+
+### plate y carries the letterbox pad, x does not
+
+Measured on a frame whose plate really spans `(28,122)-(778,370)`: the quad came
+back as `x 47..636, y 273..540`. Subtracting `pad_top * 800 / 640 = 160` from y
+gives `113..380`, which matches; x needs no scaling. This is the same pad leak the
+COCO detection family has, and the same `y_off` constant applies.
+
+### do not widen the box: use the detected quad as-is
+
+The detector under-reads the horizontal extent, and the shortfall grows with the
+plate's size in frame:
+
+| Plate width in frame | True rect | Detected rect | Aspect | Raw-quad crop |
+| --- | --- | --- | --- | --- |
+| 374 px | 214,180-588,304 | 219,175-595,312 | 2.74 | decodes correctly |
+| 750 px | 28,122-778,370 | 47,113-636,380 | 2.20 | drops the last character |
+
+It is tempting to fix the wide case by forcing the box to a plate's real 3.14:1
+aspect. **Measured, that is worse.** Forcing the aspect moves the left edge into
+background, and the province character is the first thing that breaks:
+
+| Strategy | Frames correct (7 test frames) |
+| --- | --- |
+| quad as detected, no widening | **6 / 7** |
+| axis-aligned rect widened to 3.14:1, 1.08 margin | 2 / 7 |
+| widen right edge only, 1.00 / 1.06 / 1.12 | 1 / 7, 0 / 7, 0 / 7 |
+
+Failure mode of every widening variant: `渝` decodes as `豫`, `川` or `新` while
+every digit stays correct. The left edge is the part that matters, and widening
+moves it.
+
+Two further reasons to pass the corners through untouched:
+
+- The detected corners are a **rotated quad**, and `ocr_rec_preprocess` rectifies
+  it. Collapsing to an axis-aligned rect throws that away and, on a plate with a
+  few degrees of tilt, squeezes the characters.
+- Only the extreme case (a plate filling 95% of the frame width) suffers from the
+  under-read; at the width a camera usually sees, the raw quad already covers the
+  whole plate.
+
+So the app subtracts `y_off` and clamps, and does nothing else to the geometry.
+The province character is instead stabilised in the **time domain**: see the
+voting note below.
+
+### the province character needs voting, not a better crop
+
+With a plate a little far away or slightly defocused, the recogniser returns a
+wrong province character while every digit is right. Measured over 7 frames:
+
+| Frame | Raw-quad reading |
+| --- | --- |
+| clean, small, tiny, blurred, left-clipped, shifted | `渝A999U9` |
+| plate filling 95% of the frame width | `赣A999U` (last character missing) |
+
+Because the error is a whole-character substitution, the confidence does not
+separate it: the output is **logits, not probabilities** (top1 values measured at
+-0.02 to -1.02, so a 0-1 threshold is meaningless), and a wrong province
+character measured a *higher* margin than a correct one on some frames.
+
+Voting on the decoded string works where a threshold does not. The app keeps the
+last 5 readings per plate and displays a string only when it has 3 votes. A
+deliberately wrong reading fed twice after five correct ones did not change the
+label (measured on board).
+
+Measured over a 20 s live run with the plate held in view: 107 raw readings, all
+`渝A999U9`, and the label was painted after the third reading and never changed
+again.
+
+### filter detections on geometry, not just confidence
+
+The confidence threshold has to stay at 0.2 to catch a distant plate, which also
+lets background edges through. On a cluttered scene the post-process returned
+four boxes and three were 144x48 or 151x61 clutter that decoded as random strings
+(`京AL8888`, `黑N88888`).
+
+Rejecting boxes outside a plate's proportions removes them without costing a real
+detection: every true plate measured 2.2-3.9 : 1, while the allowed band is
+2.0-4.6 : 1 with a 34 px height floor. After the gate, a 20 s run over two plates
+in frame produced **194 readings and exactly 2 distinct strings**, one per plate.
+
+The band is wider than the plate's real 3.14:1 on purpose: a plate seen at an
+angle foreshortens, and a tight band would drop it.
+
+### ocr_rec_preprocess contract
+
+```python
+crops = aidemo.ocr_rec_preprocess(frame_chw, [480, 800], [quad])
+imgs, boxes = crops[0], crops[1]
+```
+
+- `frame_chw` must be `(3, H, W)`. A `(H, W, 3)` frame is read as one plane per
+  pixel: a `(200,120,40)` pixel came back as grey 135, which is that colour's
+  luminance, so the crop silently lands on the wrong content.
+- The quad argument must be a **list of float ndarrays**. A Python list of lists
+  raises `expected ndarray`; a bare ndarray raises `expected list`; int16 and
+  uint16 raise `invalid ndarray dtype or layout`.
+- Each crop comes back `(1, 1, H, W)`: single channel, so build the recognition
+  ai2d with one input channel. A three-channel build is accepted but only one
+  plane of data exists.
+- Time: 4-11 ms per plate.
+
+### the RGBP888 plane order matches RGB888
+
+The crop is greyscale, so a red/blue swap between the two camera channels would
+shift the luminance of a coloured plate without moving the box or raising
+anything. Measured by snapshotting both channels of one frame and comparing the
+same five positions: the packed `(H,W,3)` and planar `(3,H,W)` readings were
+**identical** (total absolute difference 0 across RGB, versus 444 for the swapped
+order, and a grey delta of 0.0). No plane reversal is needed between the sensor
+and a frame prepared as RGB888 from a file.
+
+### CTC decoding
+
+Output `(55, 1, 74)`; index 0 is the blank. Reshape to `(-1, 74)`, argmax per
+step, append a class only when it is non-zero and differs from the previous step.
+The 74-entry table covers 38 province characters, the digits, most letters and
+two punctuation marks.
+
+### plate labels need a baked CJK font
+
+Nunito and the built-in montserrat have no Chinese glyphs, so a decoded plate
+renders as boxes. `tools/gen_font.py` bakes a 30px subset of the 38 dictionary
+characters plus ASCII into `assets/fonts/plate_cjk_30.bin` (31 KB). Load it with
+the `A:` drive prefix. The 30px size is the readable one: at 24px the string was
+hard to read on the 800x480 panel from arm's length, which is where a plate label
+is normally read.
 
 ## Human pose (17 keypoints)
 

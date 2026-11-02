@@ -80,6 +80,10 @@ train/05_compile/*.kmodel
 # Keep the kmodels that ship with the repo:
 !models/kmodel/*.kmodel
 
+# Large CJK source fonts: the baked subset in factory/gui/assets/fonts/ is what
+# ships, the 8MB original stays local. See tools/gen_font.py for the spec.
+tools/fontsrc/SourceHanSansCN-Regular.ttf
+
 # Scratch scripts and experiment output
 tmp/
 

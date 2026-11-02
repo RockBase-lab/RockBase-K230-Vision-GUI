@@ -12,6 +12,17 @@ exact bytes two directories of the official CanMV firmware image carry:
 | `kmodel/face_detection_320.kmodel` | `/sdcard/examples/kmodel/` | RetinaFace 320 face detection |
 | `utils/prior_data_320.bin` | `/sdcard/examples/utils/` | Face-detection anchor data (4200 x 4 floats) |
 
+## Firmware-only models
+
+These are loaded by apps but are not committed here, because their bytes are
+larger and the firmware image always carries them. They are listed so the
+dependency list stays complete; the sizes are the ones measured on board.
+
+| File | Board path | Purpose |
+| --- | --- | --- |
+| `yolo_license_plate_det.kmodel` | `/sdcard/examples/kmodel/` | Plate detection, 640x640 input, 3.6 MB |
+| `licence_reco.kmodel` | `/sdcard/examples/kmodel/` | Plate character recognition (CTC), 220x32 input, 0.67 MB |
+
 ## Origin
 
 The CanMV build copies these from the K230 SDK source tree:
