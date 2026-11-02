@@ -536,6 +536,12 @@ class FaceRecognizeApp:
             self.seg_hint.set_text("OK: add {}/{}".format(
                 self._add_n, SAMPLES_PER_NAME))
             self.seg_hint.set_style_text_color(lv.color_hex(COL_KNOWN), 0)
+        elif not self.voice_on:
+            # The switch lives in the manage overlay, which is closed most of
+            # the time. Without a marker here, a greeting that never speaks
+            # looks like a broken app instead of a turned-off switch.
+            self.seg_hint.set_text("VOICE OFF")
+            self.seg_hint.set_style_text_color(lv.color_hex(COL_FROZEN), 0)
         else:
             self.seg_hint.set_text("OK: enroll")
             self.seg_hint.set_style_text_color(lv.color_hex(COL_HINT), 0)
