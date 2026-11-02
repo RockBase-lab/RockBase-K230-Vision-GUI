@@ -131,6 +131,48 @@ def main():
         out = os.path.join(ASSETS, "icon_status_{}.png".format(name))
         render(svg, w, h, out)
     gen_wifi_status()
+    gen_battery_status()
+
+
+# ---- battery charge variants ----
+# The Lucide battery-full icon carries three inner bars, which can only express four
+# states if one of them doubles as "full" and leaves a coarse top step. The status bar
+# needs one cell per 25% (measured charge buckets), so the three bars are replaced by
+# four evenly spaced ones and the unlit cells keep the same grey track the wifi
+# variants use. Geometry comes from the icon itself: body x=2..18 with a 2px stroke
+# leaves 3..17, so four 2px bars need 5 gaps of 1.2 units.
+BATTERY_BARS = (5.2, 8.4, 11.6, 14.8)
+BATTERY_COL = (
+    (0xFF, 0x6B, 0x6B),   # 0: <= 25%
+    (0xFF, 0xC8, 0x57),   # 1: 25-50%
+    (0x4C, 0xD9, 0x7B),   # 2: 50-75%
+    (0x4C, 0xD9, 0x7B),   # 3: 75-100%
+)
+BATTERY_TRACK = (0x4A, 0x53, 0x5E)
+
+
+def _bars_svg(src, lit):
+    """Battery SVG whose first `lit` inner cells are drawn and the rest omitted."""
+    body = "\n  ".join('<path d="M{} 10v4" />'.format(x) for x in BATTERY_BARS[:lit])
+    head = re.sub(r'\s*<path d="M\d+(?:\.\d+)? 10v4" />', "", src)
+    return re.sub(r"<rect ", body + "\n  <rect ", head, count=1)
+
+
+def gen_battery_status():
+    """Bake icon_status_battery_0..3.png, one per 25% bucket."""
+    w, h = ICONS["battery"][1], ICONS["battery"][2]
+    svg_path = fetch_svg(ICONS["battery"][0])
+    src = open(svg_path, encoding="utf-8").read()
+    # Crop box from the full four-cell icon so every level keeps the same size and
+    # placement; cropping an empty cell count's own ink would rescale it.
+    box, _full = _render_svg(_bars_svg(src, 4), w, h, (255, 255, 255),
+                             shared_box=None)
+    for lit in range(4):
+        _, lit_img = _render_svg(_bars_svg(src, lit), w, h, BATTERY_COL[lit], box)
+        _, track = _render_svg(_bars_svg(src, 4), w, h, BATTERY_TRACK, box)
+        out = os.path.join(ASSETS, "icon_status_battery_{}.png".format(lit))
+        _composite(track, lit_img).save(out)
+        print("saved icon_status_battery_{}.png".format(lit))
 # Variants derive directly from the original Lucide wifi SVG: dropping the outer
 # arc paths lights fewer arcs, changing the stroke colour encodes signal strength,
 # and the disconnected state lights all three arcs red plus an overlay slash path.

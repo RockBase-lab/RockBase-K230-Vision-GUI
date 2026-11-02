@@ -412,6 +412,9 @@ if _gui_dir not in sys.path:
 # second time and build a second Launcher.
 from ui import paging
 from net import service as net_mgr
+# Shared ADC5 access: the status bar and the Battery app hold one channel handle, so
+# the app never opens a second one.
+import batt
 # Signal that an app cannot run (camera missing, ...): the app raises AppUnavailable
 # and this file shows the notice panel.
 from apps.error import AppUnavailable
@@ -653,8 +656,20 @@ def bake_all_tiles(splash_parent):
         hits, baked, time.ticks_diff(time.ticks_ms(), t0), _mem_str()))
 
 
-STATUS_ICONS = {}  # status-bar PNG icon cache: home / wifi / battery
+STATUS_ICONS = {}  # status-bar PNG icon cache: home / wifi_* / battery_*
 CLOCK_IMGS = {}    # clock digit bitmap cache: '0'..'9' / ':'
+
+
+def _battery_level():
+    """Charge cell count 0-3 for the status bar, 0 when the pack cannot be read."""
+    try:
+        state = batt.status()
+    except BaseException as error:
+        print("[GUI] battery read failed: {}".format(error))
+        return 0
+    if state is None:
+        return 0
+    return state[2]
 
 
 def _status_icon(name):
@@ -1313,6 +1328,8 @@ class Launcher:
         self.home_clock_imgs = None  # home clock widgets (overwritten by an app; restored on return)
         self.wifi_img = None   # wifi icon widget of the current screen (None = no status bar)
         self.home_wifi_img = None  # home wifi icon (overwritten by an app; restored on return)
+        self.batt_img = None   # battery icon widget of the current screen (None = no status bar)
+        self.home_batt_img = None  # home battery icon (same hand-over as wifi)
         self._wifi_key = None  # last wifi variant applied, avoids re-calling set_src every second
         self.splash = None     # boot splash screen, deleted once home is up (never delete an active screen)
         self.folder = None     # open folder flyout {"meta":..,"obj":..} (lives on the home screen only)
@@ -1420,14 +1437,22 @@ class Launcher:
             self.clock_imgs = widgets
             self._update_clock()
 
-        # Status icons on the right: battery hugs the edge, wifi sits to its left
-        batt_src = _status_icon("battery")
+        # Status icons on the right: battery hugs the edge, wifi sits to its left.
+        # The battery icon carries four charge cells and is replaced on the 1s tick
+        # from batt.status(), the same way wifi swaps its signal variant.
         batt_w = STATUS_BATT_W
+        batt_icon = None
+        batt_src = _status_icon("battery_" + str(_battery_level()))
         if batt_src is not None:
-            batt = lv.img(status)
-            batt.set_src(batt_src)
-            batt.align(lv.ALIGN.RIGHT_MID, -14, 0)
-            _no_hit(batt)
+            batt_icon = lv.img(status)
+            batt_icon.set_src(batt_src)
+            batt_icon.align(lv.ALIGN.RIGHT_MID, -14, 0)
+            _no_hit(batt_icon)
+            self.batt_img = batt_icon
+            self._battery_key = None
+            self._update_battery_icon()
+        else:
+            self.batt_img = None
         wifi_src = _status_icon("wifi")
         if wifi_src is not None:
             wifi_icon = lv.img(status)
@@ -1453,11 +1478,11 @@ class Launcher:
             right = lv.label(status)
             parts = []
             wifi = _sym("WIFI")
-            batt = _sym("BATTERY_FULL", "BATTERY_3")
+            batt_sym = _sym("BATTERY_FULL", "BATTERY_3")
             if wifi:
                 parts.append(wifi)
-            if batt:
-                parts.append(batt)
+            if batt_sym:
+                parts.append(batt_sym)
             right.set_text(" ".join(parts))
             right.set_style_text_color(lv.color_hex(COL_TEXT), 0)
             right.align(lv.ALIGN.RIGHT_MID, -14, 0)
@@ -1501,6 +1526,8 @@ class Launcher:
         self.clock_imgs = None
         self.home_wifi_img = None
         self.wifi_img = None
+        self.home_batt_img = None
+        self.batt_img = None
         self.dots = []
         self.pager = None
         BAKED_TILES.clear()
@@ -1529,10 +1556,12 @@ class Launcher:
             lv.scr_load(self.home_scr)
             self.clock_imgs = self.home_clock_imgs
             self.wifi_img = self.home_wifi_img
+            self.batt_img = self.home_batt_img
             # Back on the home widget: its src is frozen at whatever it was before the
             # app started (during the app, the per-second refresh went to the app
             # screen's widget). Clearing the key forces a fresh set_src on the next tick.
             self._wifi_key = None
+            self._battery_key = None
             return
         # Coming back from an app that used release_home: the tile bitmaps were dropped,
         # so reload them from the SD cache first
@@ -1684,6 +1713,7 @@ class Launcher:
         # _update_wifi_icon idles silently and the icon freezes at its boot value (hit on
         # board: the icon stayed stale after switching SSID and coming back).
         self.home_wifi_img = self.wifi_img
+        self.home_batt_img = self.batt_img
 
     def _set_dot_style(self, dot, active):
         if active:
@@ -2022,6 +2052,27 @@ class Launcher:
                 self._wifi_key = key
             except BaseException as error:
                 print("[GUI] wifi icon error: {}".format(error))
+
+    def _update_battery_icon(self):
+        """Refresh the status-bar battery icon from the shared ADC cache.
+
+        Immersive apps have no status bar, so this is skipped when batt_img is None.
+        batt.status() is cached for 20s inside the module, so the 1s tick only costs a
+        compare and a set_src when the charge cell actually changes.
+        """
+        img = getattr(self, "batt_img", None)
+        if img is None:
+            return
+        key = _battery_level()
+        if key == getattr(self, "_battery_key", None):
+            return
+        src = _status_icon("battery_" + str(key))
+        if src is not None:
+            try:
+                img.set_src(src)
+                self._battery_key = key
+            except BaseException as error:
+                print("[GUI] battery icon error: {}".format(error))
 
     def _update_clock(self):
         """Refresh the status-bar clock bitmaps. Only the home screen builds a clock;
@@ -2388,6 +2439,7 @@ class Launcher:
             if time.ticks_diff(now, last_clock_update) >= 1000:
                 self._update_clock()
                 self._update_wifi_icon()
+                self._update_battery_icon()
                 last_clock_update = now
             # Frame boost: while active (touching / just released) force an immediate
             # repaint every frame to break LVGL's LV_DEF_REFR_PERIOD(30ms) ceiling. Frames

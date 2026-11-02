@@ -15,8 +15,9 @@
 import time
 
 import lvgl as lv
-from machine import ADC, FPIOA, Pin
+from machine import FPIOA, Pin
 
+import batt
 from apps.error import AppUnavailable
 
 BATTERY_UNAVAILABLE = ("Battery ADC does not respond.\n"
@@ -29,19 +30,18 @@ BATTERY_UNAVAILABLE = ("Battery ADC does not respond.\n"
 # 3s settle). It is still driven here so the pin is never left floating; do not rely
 # on it to save power.
 ENABLE_PIN = 69             # nominally the divider switch, measured ineffective
-ADC_CHANNEL = 5             # only channel whose reading matches a divider tap
-
-# 12-bit conversion, 1.8V reference: measured raw=3417 next to read_uv()=1501mV,
-# and 1501 * 4095 / 1800 = 3414, so the two agree to within a couple of LSB.
-ADC_FULL_CODE = 4095
-ADC_FULL_MV = 1800000
+ADC_CHANNEL = batt.ADC_CHANNEL   # only channel whose reading matches a divider tap
 
 # ---- conversion ----
-DIV_NUM = 5                 # 1.5k + 1k divider, tap at 1k: pack = tap * 5/2
-DIV_DEN = 2
-VREF_FIX_NUM = 47           # 1880/1800 in lowest terms, avoids a 32-bit overflow
-VREF_FIX_DEN = 45
-MAX_INPUT_UV = 2200000      # anything above this is not a real tap voltage
+# One source for the whole chain: the status bar reads the same pack, so the
+# constants live in batt.py rather than being duplicated here.
+DIV_NUM = batt.DIV_NUM      # 1.5k + 1k divider, tap at 1k: pack = tap * 5/2
+DIV_DEN = batt.DIV_DEN
+VREF_FIX_NUM = batt.VREF_FIX_NUM
+VREF_FIX_DEN = batt.VREF_FIX_DEN
+ADC_FULL_CODE = batt.ADC_FULL_CODE
+ADC_FULL_MV = batt.ADC_FULL_MV
+MAX_INPUT_UV = batt.MAX_INPUT_UV
 
 # ---- sampling ----
 # Measured with the board idle: 31 samples at 10ms hold the peak-to-peak span at
@@ -52,19 +52,13 @@ SAMPLE_COUNT = 31           # odd count: the median is an actual sample
 SAMPLE_GAP_MS = 10
 REFRESH_MS = 1000
 SPAN_LIMIT_MV = 100         # peak-to-peak above this means an unstable input
-ABSENT_MAX_MV = 100         # a disconnected pack leaves the tap near ground
+ABSENT_MAX_MV = batt.ABSENT_MAX_MV
 PRESENT_MIN_MV = 3000
 PRESENT_MAX_MV = 4200
 FAIL_LIMIT = 20             # consecutive ADC exceptions = the channel is gone
 
-# Resting open-circuit voltage per 10% step of a single Li-ion cell. Values are
-# typical, not measured: the pack in this product is a 1S cell.
-OCV_CURVE = (
-    (4200, 100), (4150, 97), (4100, 93), (4050, 89), (4000, 84),
-    (3950, 79), (3900, 73), (3850, 66), (3800, 58), (3750, 49),
-    (3700, 39), (3650, 29), (3600, 20), (3550, 13), (3500, 8),
-    (3450, 4), (3400, 2), (3300, 0),
-)
+# Resting OCV table shared with the status bar (one source for both).
+OCV_CURVE = batt.OCV_CURVE
 
 # ---- UI ----
 COL_TEXT = 0xE6EAF0
@@ -126,15 +120,8 @@ def _font(*names):
 
 
 def _percent(mv):
-    """Map a pack voltage to a 0-100 estimate with linear interpolation."""
-    if mv >= OCV_CURVE[0][0]:
-        return 100
-    for i in range(1, len(OCV_CURVE)):
-        hi_mv, hi_pct = OCV_CURVE[i - 1]
-        lo_mv, lo_pct = OCV_CURVE[i]
-        if mv >= lo_mv:
-            return lo_pct + (mv - lo_mv) * (hi_pct - lo_pct) // (hi_mv - lo_mv)
-    return 0
+    """Map a pack voltage to a 0-100 estimate (shared OCV curve)."""
+    return batt.percent(mv)
 
 
 def _level_color(pct):
@@ -239,13 +226,15 @@ class BatteryApp(object):
             fpioa.set_function(ENABLE_PIN, FPIOA.GPIO0 + ENABLE_PIN)
             self.enable = Pin(ENABLE_PIN, Pin.OUT, pull=Pin.PULL_NONE, drive=7)
             self.enable.value(1)
-            self.adc = ADC(ADC_CHANNEL)
+            self.adc = batt.adc()
         except BaseException as error:
             print("[Battery] open failed: {}".format(error))
             self._release()
             raise AppUnavailable(BATTERY_UNAVAILABLE)
 
     def _release(self):
+        # The ADC handle belongs to the shared module, so it is not deinit'd here: the
+        # status bar still reads the same channel. Only the enable pin is dropped.
         pin = self.enable
         self.enable = None
         if pin is not None:
@@ -253,13 +242,7 @@ class BatteryApp(object):
                 pin.value(0)
             except BaseException:
                 pass
-        adc = self.adc
         self.adc = None
-        if adc is not None:
-            try:
-                adc.deinit()
-            except BaseException:
-                pass
 
     # ---------- UI ----------
     def _build_ui(self, content):

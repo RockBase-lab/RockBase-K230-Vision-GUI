@@ -170,6 +170,9 @@ gyro LSB is 15.6 mdps with 0.2-0.5 dps noise, so one decimal suffices.
 - The percentage shown by the app comes from a resting Li-ion open-circuit
   curve, so it over-reads while charging and under load. It is an estimate,
   not a fuel gauge.
+- The status bar uses the same curve to pick one of four battery icons, one
+  cell per 25 %. Both the bar and the Battery app read through `batt.py`, which
+  owns the single ADC5 handle; opening the channel twice is untested.
 - Reading the ADC while another app owns the camera or KPU produced an
   alternating two-value pattern (raw 3837/3297, a false 2.4 V span) that did
   not reproduce on an idle board. Confirm the board is idle before diagnosing
