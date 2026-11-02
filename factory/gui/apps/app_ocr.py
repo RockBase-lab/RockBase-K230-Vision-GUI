@@ -4,9 +4,11 @@
 # ocr_rec_int16 (512x32) -> CTC decode against examples/utils/dict.txt (6549
 # entries, ASCII + common Chinese, so one model covers both languages).
 #
-# Snapshot UX, not live: det kpu measures 221-231 ms and rec 66-68 ms per box
+# Snapshot UX, not live: det kpu measures 221-294 ms and rec 66-68 ms per box
 # (board), so a full pass costs ~0.3 s + boxes x 0.07 s. OK/tap freezes the
-# preview and runs one pass; OK again returns to live preview.
+# preview and runs one pass; OK again returns to live preview. The result replaces
+# the frame with a full-screen translucent mask holding one line per region, in
+# reading order.
 #
 # chn1 is 800x480 like the preview: ocr_post_process reports coordinates in the
 # ai2d input space, so with input == widget size the boxes map to the screen
@@ -48,7 +50,7 @@ REC_IN = [512, 32]
 # below do the real filtering.
 MASK_THR = 0.25
 BOX_THR = 0.3
-MAX_BOXES = 8                 # recognitions per pass (rec costs ~70 ms each)
+MAX_BOXES = 16                # recognitions per pass (rec costs ~70 ms each)
 MIN_BOX_H = 10                # noise boxes measured 6-14 px tall on a desk scene
 MIN_BOX_W = 16
 
@@ -68,8 +70,11 @@ COL_ERROR = 0xFF6B6B
 COL_BOX = 0x5CE8C0            # text box outline: same mint as the plate boxes
 
 BOX_LINE_W = 2
-PANEL_PAD = 10
+MASK_PAD_X = 28               # side margin so a full poem line does not touch
+MASK_PAD_Y = 20
+MASK_GAP = 6                  # row gap; shrinks when a frame holds many lines
 LINE_H = 22                   # 16px font line height plus leading
+COL_RESULT = 0xF2F5F7         # near white: readable over the 80% black mask
 
 MODEL_MISSING = ("OCR models missing on SD card.\n"
                  "Expected:\n"
@@ -77,12 +82,13 @@ MODEL_MISSING = ("OCR models missing on SD card.\n"
                  "  " + REC_MODEL + "\n"
                  "  " + DICT_PATH)
 
-# The CJK font covers the 3743 GB2312 level-1 glyphs the dict can emit
-# (tools/ocr_charset.txt). lv.font_load costs ~1.2 ms per glyph and is not
-# cached by the loader, so glyph count is the only lever: this 3743-glyph bpp2
-# build loads in 4.6 s, the full 6547-glyph dict in 8.3 s. It is cached at module
-# level (one process pays it once) and loaded at open, folded into the existing
-# open cost so a scan stays ~1 s.
+# The CJK font covers every character the dict can emit except the rare hanzi
+# outside GB2312 level-1: 4036 glyphs = 3743 common hanzi + 292 punctuation and
+# symbol characters + a space (tools/ocr_charset.txt). Omitting the punctuation
+# renders every comma and full stop as a box. lv.font_load costs ~1.2 ms per
+# glyph and is not cached by the loader, so glyph count is the only lever: this
+# build loads in 4.9 s, the full 6547-glyph dict in 8.3 s. Cached at module level
+# and loaded at open, folded into the existing open cost so a scan stays ~1.4 s.
 FONT_FILE = "ocr_cjk_16.bin"
 _OCR_FONT = None
 
@@ -127,6 +133,14 @@ def _ocr_font():
         except BaseException as error:
             print("[OCR] font load failed: {}".format(error))
     return _font("font_montserrat_16", "font_montserrat_14")
+
+
+def _reading_key(item):
+    """Sort key for reading order: top-to-bottom, then left-to-right."""
+    coords = item[0]
+    ys = (coords[1], coords[3], coords[5], coords[7])
+    xs = (coords[0], coords[2], coords[4], coords[6])
+    return (min(ys), min(xs))
 
 
 def _chw2hwc(features):
@@ -182,28 +196,44 @@ class OcrApp:
         # ---- result panel: one numbered line per recognised region ----
         # A panel instead of per-box captions because OCR strings are long and
         # text regions overlap; captions would collide.
-        self.panel = lv.obj(content)
-        self.panel.set_style_pad_all(PANEL_PAD, 0)
-        self.panel.set_style_bg_color(lv.color_hex(0x000000), 0)
-        self.panel.set_style_bg_opa(lv.OPA._70, 0)
-        self.panel.set_style_radius(8, 0)
-        self.panel.set_style_border_width(0, 0)
-        self.panel.clear_flag(lv.obj.FLAG.SCROLLABLE)
-        self.panel.set_width(self.img_w - 2 * TOPBAR_LEFT)
-        self.panel.set_flex_flow(lv.FLEX_FLOW.COLUMN)
-        self.panel.add_flag(lv.obj.FLAG.HIDDEN)
+        # Full-screen translucent mask over the frozen frame: one line of
+        # recognised text per row, in reading order. Created before the top bar
+        # so the bar keeps its z-order and stays readable above the mask.
+        self.mask = lv.obj(content)
+        self.mask.set_size(self.img_w, self.img_h)
+        self.mask.align(lv.ALIGN.CENTER, 0, 0)
+        self.mask.set_style_pad_all(0, 0)
+        self.mask.set_style_pad_row(MASK_GAP, 0)
+        self.mask.set_style_pad_left(MASK_PAD_X, 0)
+        self.mask.set_style_pad_right(MASK_PAD_X, 0)
+        self.mask.set_style_pad_top(TOPBAR_Y + TOPBAR_H + 10, 0)
+        self.mask.set_style_pad_bottom(MASK_PAD_Y, 0)
+        self.mask.set_style_bg_color(lv.color_hex(0x000000), 0)
+        self.mask.set_style_bg_opa(lv.OPA._80, 0)
+        self.mask.set_style_border_width(0, 0)
+        self.mask.set_style_radius(0, 0)
+        self.mask.clear_flag(lv.obj.FLAG.SCROLLABLE)
+        self.mask.add_flag(lv.obj.FLAG.CLICKABLE)
+        self.mask.add_flag(lv.obj.FLAG.HIDDEN)
+        # Tap anywhere on the mask to resume the live preview.
+        beep.on_click(self.mask, lambda e: self._toggle_scan())
+        self.mask.set_flex_flow(lv.FLEX_FLOW.COLUMN)
+        self.mask.set_flex_align(lv.FLEX_ALIGN.CENTER, lv.FLEX_ALIGN.CENTER,
+                                 lv.FLEX_ALIGN.CENTER)
         self.panel_labels = []
-        # Load the CJK font here (open phase), not on first scan: the ~4.5 s
-        # load is paid once per process (module cache) and folded into the
-        # open_app loading the user already waits through, so a scan stays fast.
+        # Load the CJK font here (open phase), not on first scan: the load is
+        # paid once per process (module cache) and folded into the open_app
+        # wait, so a scan stays fast.
         panel_font = _ocr_font()
         for _ in range(MAX_BOXES):
-            lab = lv.label(self.panel)
+            lab = lv.label(self.mask)
             lab.set_text("")
-            lab.set_width(lv.SIZE_CONTENT)
-            lab.set_style_text_color(lv.color_hex(0xFFFFFF), 0)
+            lab.set_width(lv.pct(100))
+            lab.set_style_text_align(lv.TEXT_ALIGN.CENTER, 0)
+            lab.set_style_text_color(lv.color_hex(COL_RESULT), 0)
             if panel_font is not None:
                 lab.set_style_text_font(panel_font, 0)
+            lab.clear_flag(lv.obj.FLAG.CLICKABLE)
             lab.add_flag(lv.obj.FLAG.HIDDEN)
             self.panel_labels.append(lab)
 
@@ -468,46 +498,50 @@ class OcrApp:
             if text:
                 self.texts.append((box[1], text))
             gc.collect()
-        self._show_results(boxes)
+        self._show_results()
         self._update_stat()
 
     # ---------------- drawing ----------------
-    def _show_results(self, boxes):
-        shown = 0
+    def _show_results(self):
+        # Reading order, not detection order: the post-process emits boxes in
+        # mask scan order, which splits a column of text unpredictably.
+        order = sorted(self.texts, key=_reading_key)
+        n = len(order) if len(order) < MAX_BOXES else MAX_BOXES
+
+        # Shrink the row gap when many lines have to fit under the top bar.
+        avail = self.img_h - (TOPBAR_Y + TOPBAR_H + 10) - MASK_PAD_Y
+        gap = MASK_GAP
+        if n > 1:
+            gap = (avail - n * LINE_H) // (n - 1)
+            if gap < 0:
+                gap = 0
+            elif gap > MASK_GAP:
+                gap = MASK_GAP
+        self.mask.set_style_pad_row(gap, 0)
+
         for i in range(MAX_BOXES):
-            outline = self.boxes[i]
             lab = self.panel_labels[i]
-            if i >= len(boxes):
-                outline.add_flag(lv.obj.FLAG.HIDDEN)
+            if i >= n:
                 lab.add_flag(lv.obj.FLAG.HIDDEN)
                 continue
-            coords = boxes[i][1]
-            pts = []
-            for k in range(4):
-                pts.append({"x": int(coords[k * 2]), "y": int(coords[k * 2 + 1])})
-            pts.append(pts[0])
-            outline.set_points(pts, 5)
-            outline.clear_flag(lv.obj.FLAG.HIDDEN)
-
-        for i in range(len(self.texts) if len(self.texts) < MAX_BOXES else MAX_BOXES):
-            coords, text = self.texts[i]
-            lab = self.panel_labels[i]
-            lab.set_text("{}. {}".format(i + 1, text))
+            lab.set_text(order[i][1])
             lab.clear_flag(lv.obj.FLAG.HIDDEN)
-            shown += 1
 
-        if shown:
-            self.panel.clear_flag(lv.obj.FLAG.HIDDEN)
-            self.panel.align(lv.ALIGN.BOTTOM_MID, 0, -TOPBAR_LEFT)
+        # The mask covers them; hide so a redraw cannot leak an outline through.
+        for outline in self.boxes:
+            outline.add_flag(lv.obj.FLAG.HIDDEN)
+
+        if n:
+            self.mask.clear_flag(lv.obj.FLAG.HIDDEN)
         else:
-            self.panel.add_flag(lv.obj.FLAG.HIDDEN)
+            self.mask.add_flag(lv.obj.FLAG.HIDDEN)
 
     def _clear_overlays(self):
         for outline in self.boxes:
             outline.add_flag(lv.obj.FLAG.HIDDEN)
         for lab in self.panel_labels:
             lab.add_flag(lv.obj.FLAG.HIDDEN)
-        self.panel.add_flag(lv.obj.FLAG.HIDDEN)
+        self.mask.add_flag(lv.obj.FLAG.HIDDEN)
 
     def _update_stat(self):
         n = len(self.texts)
@@ -560,6 +594,9 @@ class OcrApp:
                     pass
                 self._scan()
                 self.state = "RESULT"
+                # _scan updated the bar while still BUSY ("READING..."); repaint
+                # it now so the hint tells the user the result can be dismissed.
+                self._update_stat()
             return
 
         try:

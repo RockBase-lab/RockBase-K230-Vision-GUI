@@ -22,7 +22,10 @@ after the script ends and is not suitable for this purpose.
 
 1. Soft reset (Ctrl-D) after deploying a `.py`, and delete the module from
    `sys.modules` inside a probe that re-imports changed code. Bytecode caches
-   survive soft resets in practice.
+   survive soft resets in practice. A stale cached module shows the **old
+   constants**, so a deployed one-line fix looks like it did nothing: purge
+   `apps.app_<name>`, `apps`, `apps.error`, `ui.beep`, `launcher` and
+   `camera_fov` before importing anything under `factory/gui`.
 2. Wrap audio and camera teardown in `try`/`finally`. A leaked PDM or AO handle
    cannot be cleared by any reset short of a power cycle. See
    `docs/reset-matrix.md`.
@@ -149,6 +152,10 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_liveness_model.py` | Liveness output index, and both crop modes on the same frame |
 | `_probe_liveness_app.py` | Liveness app end to end: verdict, presets, freeze, fps |
 | `_probe_ocr_app.py` | OCR app in the real launcher: open cost incl. font, scan time, lines, teardown (needs `--lvgl`) |
+| `_probe_ocr_poem.py` | Dictionary character inventory and a multi-line scan in reading order (needs `--lvgl`, camera on text) |
+| `_probe_ocr_boxes.py` | Raw `ocr_post_process` box count vs the app's size filter and cap |
+| `_probe_ocr_charset.py` | Prints, as base64, the dict characters outside the GB2312 level-1 range |
+| `_cap_ocr_result.py` | Result view geometry (12 labels, reading order, no overlap) plus a band capture (needs `--lvgl`) |
 | `_cap_run.py` | Run a display probe as a subprocess, capture raw output |
 | `_start_launcher.py` | Start the on-board GUI with a single exec |
 

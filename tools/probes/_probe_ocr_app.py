@@ -56,19 +56,21 @@ else:
         frames += 1
     print("L5 preview frames={} mem_free={}".format(frames, gc.mem_free()))
 
-    # one full scan pass (blocking by design; the font already loaded at open)
+    # one full scan pass through the real state machine (blocking by design;
+    # the font already loaded at open)
+    app._toggle_scan()
     t0 = time.ticks_ms()
-    app._scan()
+    app.step()
     scan_ms = time.ticks_diff(time.ticks_ms(), t0)
-    print("L6 scan {}ms lines={} mem_free={}".format(
-        scan_ms, len(app.texts), gc.mem_free()))
+    print("L6 scan {}ms lines={} state={} hint={!r} mem_free={}".format(
+        scan_ms, len(app.texts), app.state, app.stat_hint.get_text(),
+        gc.mem_free()))
     for i, (coords, text) in enumerate(app.texts):
         print("L6.{} {!r} box=({},{})-({},{})".format(
             i, text, int(coords[0]), int(coords[1]),
             int(coords[4]), int(coords[5])))
 
     # RESULT state: step must not touch the sensor
-    app.state = "RESULT"
     app.step()
     print("L7 RESULT step ok mem_free={}".format(gc.mem_free()))
 

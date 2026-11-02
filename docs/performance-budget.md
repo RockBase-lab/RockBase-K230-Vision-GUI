@@ -202,19 +202,21 @@ runs one blocking detect+recognize pass. Measured inside the real launcher
 
 | Stage | Cost |
 |---|---|
-| det kmodel + rec kmodel load | 1958 ms, once at open |
-| CJK font load (3743 glyphs) | 4595 ms, once at open |
-| app open total (incl. font + models) | 6989 ms |
-| detection (ai2d 640x640 + kpu + `ocr_post_process`) | ~230 ms |
+| det kmodel + rec kmodel load | 1776 ms, once at open |
+| CJK font load (4036 glyphs) | 4908 ms, once at open |
+| app open total (incl. font + models) | 6946 ms |
+| detection (ai2d 640x640 + kpu + `ocr_post_process`) | ~230-294 ms |
 | recognition per box (rec ai2d 512x32 + kpu + CTC) | ~70 ms |
-| one scan pass, 8 boxes | 993 ms |
+| one scan pass, 12 lines | 1377 ms |
 
 The font dominates open, so it loads there (folded into the existing open cost)
 and is module-cached, making a second open instant. The glyph count is the only
 font-load lever: measured ~1.2 ms per glyph, independent of file size or range
-count. The shipped subset is 3743 GB2312 level-1 glyphs; the full 6547-glyph
-dict costs 8276 ms and was rejected. Scan stays under a second because the
-640x640 detector runs once and recognition scales with the box count.
+count. The shipped subset is 4036 glyphs: the 3743 GB2312 level-1 hanzi the
+dictionary uses, plus the 292 punctuation and symbol characters it can emit and
+a space. Dropping the punctuation renders every comma and full stop as a box;
+dropping the rare hanzi instead costs almost nothing. The full 6547-glyph dict
+costs 8276 ms and was rejected.
 
 ## QR detection
 
