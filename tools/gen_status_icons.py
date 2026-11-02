@@ -159,7 +159,13 @@ def _bars_svg(src, lit):
 
 
 def gen_battery_status():
-    """Bake icon_status_battery_0..3.png, one per 25% bucket."""
+    """Bake icon_status_battery_0..3.png, one per 25% bucket.
+
+    The index is the quarter the charge falls in, not the lit-cell count: bucket 0 is
+    0-25% and shows one cell, bucket 3 is 75-100% and shows all four. Mapping the index
+    straight to the cell count left a full pack looking three-quarters full (measured
+    in a snapshot at 100%: three lit cells and one grey).
+    """
     w, h = ICONS["battery"][1], ICONS["battery"][2]
     svg_path = fetch_svg(ICONS["battery"][0])
     src = open(svg_path, encoding="utf-8").read()
@@ -167,12 +173,14 @@ def gen_battery_status():
     # placement; cropping an empty cell count's own ink would rescale it.
     box, _full = _render_svg(_bars_svg(src, 4), w, h, (255, 255, 255),
                              shared_box=None)
-    for lit in range(4):
-        _, lit_img = _render_svg(_bars_svg(src, lit), w, h, BATTERY_COL[lit], box)
+    for level in range(4):
+        cells = level + 1
+        _, lit_img = _render_svg(_bars_svg(src, cells), w, h,
+                                 BATTERY_COL[level], box)
         _, track = _render_svg(_bars_svg(src, 4), w, h, BATTERY_TRACK, box)
-        out = os.path.join(ASSETS, "icon_status_battery_{}.png".format(lit))
+        out = os.path.join(ASSETS, "icon_status_battery_{}.png".format(level))
         _composite(track, lit_img).save(out)
-        print("saved icon_status_battery_{}.png".format(lit))
+        print("saved icon_status_battery_{}.png ({} cell(s))".format(level, cells))
 # Variants derive directly from the original Lucide wifi SVG: dropping the outer
 # arc paths lights fewer arcs, changing the stroke colour encodes signal strength,
 # and the disconnected state lights all three arcs red plus an overlay slash path.
