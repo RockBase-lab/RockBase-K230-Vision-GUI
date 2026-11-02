@@ -148,6 +148,33 @@ gyro LSB is 15.6 mdps with 0.2-0.5 dps noise, so one decimal suffices.
   measurement, not a universal constant, and must be re-measured when the board
   revision or batch changes.
 
+### Measured on board (charging pack, one pack)
+
+- ADC5 is the only channel whose value matches a divider tap: 1440-1530 mV raw,
+  1501-1531 mV after the Vref correction, pack 3766-3830 mV, rising slowly
+  while the charger is connected.
+- `read_u16()` and `read_uv()` describe the same 12-bit conversion with a
+  1.8 V full scale: `raw = 3417` pairs with `1501 mV`, and
+  `1501 * 4095 / 1800 = 3414`. Either one alone is usable and they may be read
+  back to back — measured 14 consecutive pairs at 10 ms spacing with no
+  saturated value.
+- With 31 samples 10 ms apart the peak-to-peak span is 3-40 mV, which is why
+  the app's instability threshold is 100 mV.
+- **GPIO69 does not gate this divider.** The reading is unchanged with the pin
+  high, low, or after a 3 s settle, and `Pin.value(1)` reads back 0. Drive it
+  low on exit so it is never left floating, but do not count on it to save
+  power.
+- `ADC(4)` is not usable: opening it wedges the board and drops the serial
+  link. Channels 0-3 read steady 0.34-0.90 V values and are unrelated to the
+  pack.
+- The percentage shown by the app comes from a resting Li-ion open-circuit
+  curve, so it over-reads while charging and under load. It is an estimate,
+  not a fuel gauge.
+- Reading the ADC while another app owns the camera or KPU produced an
+  alternating two-value pattern (raw 3837/3297, a false 2.4 V span) that did
+  not reproduce on an idle board. Confirm the board is idle before diagnosing
+  the sampling code.
+
 ## Digital microphone (PDM/DMIC)
 
 - `input_device_index=1` is mandatory when opening the stream; `dev=0` fails

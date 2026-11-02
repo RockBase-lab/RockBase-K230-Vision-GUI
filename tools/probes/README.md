@@ -78,6 +78,7 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_motion_50hz_verify.py` | Five-second frame-rate statistics |
 | `_probe_motion_slowframe.py` | History-row fill under a slow loop |
 | `_probe_acc_cal.py` | Six-face calibration maths and file round-trip |
+| `_probe_battery_adc.py` | ADC5 divider: read method agreement, pair-read corruption, enable-pin effect |
 | `_cap_acc_cal.py` | Calibration dialog states, snapshotted |
 | `_probe_chart_perf.py` | Chart cost against point count |
 | `_probe_chart_dir.py` | Chart method and constant inventory |
@@ -91,6 +92,9 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_fov_channels.py` | Shared window on both channels, per-format snapshot cost |
 | `_probe_scan_detect_cost.py` | `find_qrcodes` at 640x480 against 800x480 |
 | `_probe_vision_fps.py` | Vision app in the real launcher: frame rate and box count |
+| `_probe_pose_kp.py` | Pose models on board, post-process layout, keypoint offset, skeleton draw cost |
+| `_probe_pose_app.py` | Pose app in the real launcher: frame rate, views, person filter |
+| `_cap_pose.py` | Pose app screen capture for host-side viewing |
 | `_probe_recognize_assets.py` | Recognition models, the feature database directory, aidemo symbols |
 | `_probe_storage_persist.py` | Free space on `/sdcard` vs `/data` and whether a marker survives a reset |
 | `_probe_storage_api.py` | `os.rename`/`remove`/nested `mkdir`, json, float32 round-trip |

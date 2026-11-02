@@ -230,6 +230,13 @@ corrupts behaviour. Each one links to the measured explanation.
     databases — goes to `/data/<app>/...` so it survives a re-flash of the
     deploy partition and cannot fill it. `/data` is the ~28.6 GB eMMC
     partition. See `docs/board-hardware.md`.
+12. **Never open ADC channel 4.** It wedges the board and drops the serial
+    link with no exception. Channels 0-3 and 5 are safe. See
+    `docs/board-hardware.md`.
+13. **Diagnose an unstable ADC reading on an idle board.** Sampling ADC5
+    while another app owns the camera or KPU produced an alternating two-value
+    pattern and a false 2.4 V span that did not reproduce once the board was
+    idle. See `docs/pitfalls.md`.
 
 The complete list of traps, including the ones that fail silently instead
 of hanging the board, is `docs/pitfalls.md`. Read it before writing a new

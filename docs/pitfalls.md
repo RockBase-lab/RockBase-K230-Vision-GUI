@@ -7,11 +7,11 @@ This file exists because the traps span the framework, the silicon and the
 workflow, so no single source file can own them. Detail lives in the topic
 documents; this is the checklist you scan before writing code.
 
-- `docs/board-ai-runtime.md` — ai2d, KPU, post-processing
-- `docs/lvgl-binding.md` — the LVGL binding, layout, touch
-- `docs/board-hardware.md` — sensors, audio, camera, video
-- `docs/performance-budget.md` — costs and the 20 ms budget
-- `docs/reset-matrix.md` — which reset clears which failure
+- `docs/board-ai-runtime.md` 鈥?ai2d, KPU, post-processing
+- `docs/lvgl-binding.md` 鈥?the LVGL binding, layout, touch
+- `docs/board-hardware.md` 鈥?sensors, audio, camera, video
+- `docs/performance-budget.md` 鈥?costs and the 20 ms budget
+- `docs/reset-matrix.md` 鈥?which reset clears which failure
 
 ---
 
@@ -109,6 +109,14 @@ nothing points at the cause.
 | Probe reports 9-24 fps for an app that runs at 50 | Sparse `step()` calls are throttled by the cadence gate | Measure through a real launcher loop |
 | A widget reports width 0 | Layout has not resolved yet | Read the context or the snapshot instead |
 
+### ADC and battery
+
+| Symptom | Cause | Do instead |
+|---|---|---|
+| The battery span reads about 2.4 V of noise and the raw code alternates between two values (3837 / 3297) | The ADC was sampled while another app owned the camera or KPU; the pattern did not reproduce on an idle board | Confirm the board is idle before diagnosing the sampling code; 31 samples at 10 ms on an idle board hold 3-40 mV |
+| Toggling the divider enable pin changes nothing | On this board GPIO69 does not gate the ADC5 divider, and `Pin.value(1)` reads back 0 | Do not rely on it to save power; the divider is permanently powered |
+| The board wedges and the serial link drops while probing ADC channels | `ADC(4)` hangs this board | Never open channel 4; channels 0-3 and 5 are safe |
+
 ### Assets and deployment
 
 | Symptom | Cause | Do instead |
@@ -120,7 +128,7 @@ nothing points at the cause.
 | `SyntaxError` on line 1 of an uploaded file | The file carries a UTF-8 BOM | Strip it before upload |
 | Every later probe fails with an empty `UnicodeError` on line 2 | A crashed probe left the transfer temp file locked | Use unique temp names; only a power cycle clears an already-locked file |
 | `OSError: [Errno 28]` or a deploy that suddenly cannot write | Runtime data was written to `/sdcard` and filled the 76 MB deploy partition | Every runtime file goes under `/data/<app>/`; `/sdcard` is written only by the deploy tools |
-| A `/data` file that was just written reports `ENOENT` | **This firmware has no `os.sync()`**: a reset or power cut soon after the write can lose it. Measured: 4 of 8 freshly written WAVs were gone after a restart | Read the file back before reporting success, and treat generated assets as a rebuildable cache — the owner must be able to regenerate one on demand rather than retrying forever |
+| A `/data` file that was just written reports `ENOENT` | **This firmware has no `os.sync()`**: a reset or power cut soon after the write can lose it. Measured: 4 of 8 freshly written WAVs were gone after a restart | Read the file back before reporting success, and treat generated assets as a rebuildable cache 鈥?the owner must be able to regenerate one on demand rather than retrying forever |
 
 ### Network
 
@@ -159,8 +167,8 @@ muscle memory.
 ### Is it the WiFi password or the association
 
 Run two connects: one with the stored password, one with a deliberately wrong
-password. If both behave identically — same `run connect failed.` from the C
-layer, the same roughly 15.5 s block, `isconnected()` false throughout — the
+password. If both behave identically 鈥?same `run connect failed.` from the C
+layer, the same roughly 15.5 s block, `isconnected()` false throughout 鈥?the
 failure happens before password validation, so it is not a password problem.
 
 Then check whether the AP appears in a scan, cross-check with the official

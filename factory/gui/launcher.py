@@ -256,7 +256,7 @@ def _clean(o):
 # member picker layer (_open_folder) instead of an app. Members live in FOLDER_MEMBERS
 # and use the same meta shape as top-level entries, so flags such as
 # immersive/release_home still apply.
-# The top level stays at 13 entries = two pages of a 4x2 grid, which keeps paging
+# The top level stays at 15 entries = two pages of a 4x2 grid, which keeps paging
 # meaningful. Placeholder entries point at apps.app_placeholder; swap in apps.app_xxx
 # once the real app exists.
 APPS = [
@@ -309,9 +309,14 @@ APPS = [
     {"id": "imu", "name": "IMU", "icon": "assets/icon_imu.png",
      "symbol": _sym("MOVE"), "module": "apps.app_imu",
      "immersive": True},
-    # System: chip info / memory / sensor state, with battery folded in as a tab.
+    # System: chip info / memory / sensor state.
     {"id": "system", "name": "System", "icon": "assets/icon_system.png",
      "symbol": _sym("INFORMATION"), "module": "apps.app_placeholder"},
+    # Battery: single-cell pack voltage through the ADC5 divider. Sampling runs
+    # inside step() one reading at a time so the UI never blocks.
+    {"id": "battery", "name": "Battery", "icon": "assets/icon_battery.png",
+     "symbol": _sym("BATTERY_FULL", "BATTERY_3", "BATTERY_2"),
+     "module": "apps.app_battery"},
 ]
 
 # Folder member table: folder id -> list of member meta (same shape as APPS entries).
@@ -434,7 +439,7 @@ def _load_png(path):
 # bitmaps; a full-screen repaint during a swipe then costs a few blits, about 0ms.
 # The first boot bakes at ~1.3s per tile (a one-off tiny_ttf cost) and stores the
 # result on SD; later boots read the cache and come up almost instantly.
-BAKE_VER = 6                       # +1 when tile layout/fonts change, dropping old caches
+BAKE_VER = 7                       # +1 when tile layout/fonts change, dropping old caches
                                    # v2: added the Gallery tile (APPS order changed, re-bake all)
                                    # v3: placeholders replaced by 10 new app icon tiles (bake all)
                                    # v4: palette A (tile fill/border and per-app icon tint)
