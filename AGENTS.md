@@ -172,6 +172,23 @@ the important part is that a message contains no non-ASCII characters.
 
 ## Board operations
 
+**Before debugging why a change does not show on the board, run the doctor:**
+
+```powershell
+python tools/_doctor.py              # or: python tools/_doctor.py COM56
+```
+
+It checks, in the order that isolates the cause, every trap that has silently
+hidden a deployed change on this card: `/sdcard/main.py` being a stale launcher
+copy, empty `ui/` / `net/` / `audio/` package directories left from the
+pre-split layout, missing APPS modules or icons, a `BAKE_VER` mismatch, stale
+tile caches, and unresolvable imports. One line per check, non-zero exit on
+failure.
+
+**Never pipe a deploy through a line filter.** `deploy_board.py` redraws its
+progress with `\r`, which `Select-String`, `grep` and `Select-Object` buffer
+until the process exits, so the run looks frozen at `[PLAN]`. Run it bare.
+
 Deploying to the K230 SD card, verifying files on board, and running
 one-off scripts over USB serial are documented in
 `.github/skills/rockbase-board-deploy/SKILL.md` when that local skill is

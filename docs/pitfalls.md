@@ -126,6 +126,7 @@ nothing points at the cause.
 | The board still shows old bitmaps | Colour or size constants changed without re-baking | Re-run the matching generator and increment `BAKE_VER` |
 | A re-baked asset is skipped as "already identical" | Incremental deploy compares size only above 256 KB | Deploy that file with `--force` |
 | The board boots an old UI while probes see new code | `launcher.py` was copied wholesale to `/sdcard/main.py` | Autostart must be the 112-byte three-line launcher stub |
+| A new app never appears, although its module, icon and tile cache are all on the card | The card predates the package split: `ui/`, `net/` and `audio/` exist as empty directories while the old flat modules (`paging.py`, `beep.py`, `net_mgr.py`, `gui.py`) sit at the GUI root. The current `launcher.py` fails on `from ui import paging`, and a stale `main.py` copy hid it because that copy used the flat layout | Run a full `deploy_board.py --gui-only` and check `os.listdir('/sdcard/factory/gui/ui')` is non-empty |
 | Code changes have no effect | No soft reset after deploying a `.py` | Ctrl-D |
 | `SyntaxError` on line 1 of an uploaded file | The file carries a UTF-8 BOM | Strip it before upload |
 | Every later probe fails with an empty `UnicodeError` on line 2 | A crashed probe left the transfer temp file locked | Use unique temp names; only a power cycle clears an already-locked file |
