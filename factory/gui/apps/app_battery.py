@@ -54,7 +54,13 @@ REFRESH_MS = 1000
 SPAN_LIMIT_MV = 100         # peak-to-peak above this means an unstable input
 ABSENT_MAX_MV = batt.ABSENT_MAX_MV
 PRESENT_MIN_MV = 3000
-PRESENT_MAX_MV = 4200
+# A resting full pack sits at 4.2V, but while charging the charger holds the rail
+# above it: measured 4363mV on this board with the cable connected. Anything in the
+# charging band is a normal state, not a fault, so it gets its own verdict instead of
+# tripping the range check.
+CHARGE_MIN_MV = 4250
+# Sanity bound only: above this the divider ratio or the Vref constant is wrong.
+PRESENT_MAX_MV = 4600
 FAIL_LIMIT = 20             # consecutive ADC exceptions = the channel is gone
 
 # Resting OCV table shared with the status bar (one source for both).
@@ -99,10 +105,11 @@ SPARK_Y = 282
 SPARK_W = RIGHT_W - 32
 SPARK_H = 68
 SPARK_MIN_MV = 3300
-SPARK_MAX_MV = 4250
+SPARK_MAX_MV = 4400     # covers the charging plateau, not just a resting pack
 
 STATUS_MEASURING = "MEASURING"
 STATUS_OK = "BATTERY PRESENT"
+STATUS_CHARGING = "CHARGING"
 STATUS_ABSENT = "NO BATTERY"
 STATUS_UNSTABLE = "UNSTABLE INPUT"
 STATUS_RANGE = "OUT OF RANGE"
@@ -111,6 +118,7 @@ STATUS_ERROR = "ADC ERROR"
 STATUS_COLOR = {
     STATUS_MEASURING: COL_MUTED,
     STATUS_OK: COL_OK,
+    STATUS_CHARGING: COL_ACCENT,
     STATUS_ABSENT: COL_MUTED,
     STATUS_UNSTABLE: COL_WARN,
     STATUS_RANGE: COL_ERR,
@@ -149,7 +157,14 @@ def _classify(mv, span, rejected, sampled):
         return STATUS_UNSTABLE, None
     if mv <= ABSENT_MAX_MV:
         return STATUS_ABSENT, None
-    if mv < PRESENT_MIN_MV or mv > PRESENT_MAX_MV:
+    # Charging comes before the range check: the charger legitimately lifts the rail
+    # above a resting full pack, so rejecting that as "out of range" would flag a
+    # healthy board on every charge.
+    if mv >= CHARGE_MIN_MV:
+        if mv > PRESENT_MAX_MV:
+            return STATUS_RANGE, None
+        return STATUS_CHARGING, 100
+    if mv < PRESENT_MIN_MV:
         return STATUS_RANGE, None
     return STATUS_OK, _percent(mv)
 
@@ -273,8 +288,8 @@ class BatteryApp(object):
         self.status_label = _label(left, STATUS_MEASURING, 0, 330, LEFT_W,
                                    COL_MUTED, self._mid_font,
                                    lv.TEXT_ALIGN.CENTER)
-        _label(left, "resting-voltage estimate", 0, 360, LEFT_W, COL_MUTED,
-               self._small, lv.TEXT_ALIGN.CENTER)
+        _label(left, "voltage estimate, not a fuel gauge", 0, 360, LEFT_W,
+               COL_MUTED, self._small, lv.TEXT_ALIGN.CENTER)
 
         body = _plain(left, GAUGE_X, GAUGE_Y, GAUGE_W, GAUGE_H)
         body.set_style_border_width(GAUGE_BORDER, 0)

@@ -161,6 +161,13 @@ gyro LSB is 15.6 mdps with 0.2-0.5 dps noise, so one decimal suffices.
 - ADC5 is the only channel whose value matches a divider tap: 1440-1530 mV raw,
   1501-1531 mV after the Vref correction, pack 3766-3830 mV, rising slowly
   while the charger is connected.
+- **A charging pack reads above 4.2 V.** Measured 4363 mV with the cable
+  connected, against a resting full pack at about 4.2 V. This is the charger
+  holding the rail, not a divider error, so a reading in that band must be
+  reported as charging: treating anything over 4.2 V as "out of range" flags a
+  healthy board every time it is on charge. The app therefore reports
+  `CHARGING` from 4.25 V and keeps `OUT OF RANGE` for values above 4.6 V,
+  where the divider ratio or the Vref constant really would be wrong.
 - `read_u16()` and `read_uv()` describe the same 12-bit conversion with a
   1.8 V full scale: `raw = 3417` pairs with `1501 mV`, and
   `1501 * 4095 / 1800 = 3414`. Either one alone is usable and they may be read
