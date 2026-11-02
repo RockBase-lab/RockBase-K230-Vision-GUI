@@ -194,6 +194,28 @@ The same rate held at 10.1-10.2 fps over 202-204 frames with a single plate at
 reading distance (61x20 in frame) before the cadence change, so a small box does not
 make detection cheaper: the cost is the 640x640 inference regardless of the plate.
 
+### OCR chain (two models, one-shot scan)
+
+The OCR app is not a preview loop: it previews at full rate, then a Scan button
+runs one blocking detect+recognize pass. Measured inside the real launcher
+(`_probe_ocr_app.py`, 8 boxes in frame):
+
+| Stage | Cost |
+|---|---|
+| det kmodel + rec kmodel load | 1958 ms, once at open |
+| CJK font load (3743 glyphs) | 4595 ms, once at open |
+| app open total (incl. font + models) | 6989 ms |
+| detection (ai2d 640x640 + kpu + `ocr_post_process`) | ~230 ms |
+| recognition per box (rec ai2d 512x32 + kpu + CTC) | ~70 ms |
+| one scan pass, 8 boxes | 993 ms |
+
+The font dominates open, so it loads there (folded into the existing open cost)
+and is module-cached, making a second open instant. The glyph count is the only
+font-load lever: measured ~1.2 ms per glyph, independent of file size or range
+count. The shipped subset is 3743 GB2312 level-1 glyphs; the full 6547-glyph
+dict costs 8276 ms and was rejected. Scan stays under a second because the
+640x640 detector runs once and recognition scales with the box count.
+
 ## QR detection
 
 Measured on one synthetic code (33 modules, 12 px per module), which is the only

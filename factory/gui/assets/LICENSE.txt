@@ -105,3 +105,17 @@ fonts/plate_cjk_30.bin  <- 由 tools/gen_font.py 预烘的 30px 位图字体，�
       字形，直接用会把车牌首字画成方框。
 注意: 不要换成 Windows 自带中文字体（微软雅黑/黑体等），那些授权不允许
       随产品分发字体子集。
+
+----
+
+fonts/ocr_cjk_16.bin  <- 由 tools/gen_font.py 预烘的 16px bpp2 位图字体，取
+                         OCR 识别字典（examples/utils/dict.txt）与 GB2312 一级
+                         常用字的交集共 3743 字（ASCII + 常用汉字），字符集清单
+                         在 tools/ocr_charset.txt。字典里的罕见字不在子集内，
+                         会被画成方框（lv.font_load 每字形约 1.2ms，全字典 6547
+                         字加载要 8.3s，太慢）。
+
+字体: Source Han Sans / 思源黑体 (https://github.com/adobe-fonts/source-han-sans)
+授权: SIL Open Font License 1.1 (OFL) — 允许子集化、嵌入与再分发，
+      保留署名即可。OFL 全文见 https://openfontlicense.org
+用途: OCR app 的识别结果文本。识别字典含中文，内置字体无 CJK 字形。

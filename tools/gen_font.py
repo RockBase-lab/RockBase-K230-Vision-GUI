@@ -144,18 +144,50 @@ SPECS = {
              [(0x20, 0x7E)] + [(ord(c), ord(c)) for c in PLATE_CJK]),
         ],
     },
+    # OCR result labels: the ocr_rec dictionary can emit 6547 characters, but
+    # lv.font_load costs ~1.2 ms per glyph (measured: 6547 glyphs = 8.3 s, and
+    # it is not cached, so a reload costs the same). The full set is too slow to
+    # load on first scan, so the font covers the GB2312 level-1 common characters
+    # that intersect the dictionary (3743 glyphs, ~4.5 s). A rare character the
+    # subset omits renders as a box; the recognised text is still readable.
+    # The exact set lives in tools/ocr_charset.txt (generated from the dictionary
+    # intersected with GB2312 level-1, minus the CTC blank) so font and model
+    # cannot drift apart. bpp2 halves file size but not load time (glyph count
+    # dominates), it is kept small for SD footprint.
+    "ocr16": {
+        "out": "ocr_cjk_16.bin",
+        "size": 16,
+        "bpp": 2,
+        "charset": "ocr_charset.txt",
+        "parts": [
+            ("SourceHanSansCN-Regular.ttf", None),
+        ],
+    },
 }
 
 
 def gen(name, spec):
     out = os.path.join(OUT_DIR, spec["out"])
     cmd = ["node", LVFC]
+    charset = None
+    if spec.get("charset"):
+        cpath = os.path.join(ROOT, "tools", spec["charset"])
+        if not os.path.isfile(cpath):
+            print("[FAIL] missing charset file: %s" % cpath)
+            return False
+        charset = open(cpath, encoding="utf-8").read()
     for font_file, ranges in spec["parts"]:
         src = os.path.join(FONTSRC, font_file)
         if not os.path.isfile(src):
             print("[FAIL] missing source font: %s" % src)
             return False
         cmd += ["--font", src]
+        if ranges is None:
+            # Whole-dictionary CJK set: pass the characters literally. A huge
+            # -r list is unwieldy and --symbols is the intended path; note
+            # --symbols takes the characters themselves, not a file path.
+            cmd += ["--symbols", charset]
+            continue
         for r in _ranges(ranges):
             cmd += ["-r", r]
     cmd += ["--size", str(spec["size"]), "--format", "bin",

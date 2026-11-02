@@ -2,8 +2,12 @@
 from typing import Any, Tuple
 
 
-def ALIGN_UP(x: int, align: int) -> int:
-    """Round up to the next multiple of align."""
+def letterbox_pad_param(input_size, model_input_size) -> Tuple[int, int, int, int, float]:
+    """Letterbox pad (top,bottom,left,right,scale) from input to model size.
+
+    Measured on board: libs.Utils exports this but NOT ALIGN_UP (that lives in
+    media.media); importing ALIGN_UP from here raises ImportError.
+    """
     ...
 
 

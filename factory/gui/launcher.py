@@ -374,7 +374,12 @@ FOLDER_MEMBERS = {
         {"id": "cvlab", "name": "CV Lab", "icon": "assets/icon_cvlab.png",
          "symbol": _sym("FLASK_1"), "module": "apps.app_placeholder"},
         {"id": "ocr", "name": "OCR", "icon": "assets/icon_ocr.png",
-         "symbol": _sym("TYPE"), "module": "apps.app_placeholder"},
+         # Snapshot text scan: preview runs live, OK/tap freezes and runs one
+         # det+rec pass (det 230 ms + ~70 ms per box, measured). release_home:
+         # both kpUs plus the 256 KB CJK font need the contiguous heap the tile
+         # cache occupies.
+         "symbol": _sym("TYPE"), "module": "apps.app_ocr",
+         "immersive": True, "release_home": True},
     ],
     "face": [
         # The display name is Faces rather than Detect: the Vision group already has a

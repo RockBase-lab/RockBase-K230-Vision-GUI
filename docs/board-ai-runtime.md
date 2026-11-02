@@ -370,6 +370,48 @@ the `A:` drive prefix. The 30px size is the readable one: at 24px the string was
 hard to read on the 800x480 panel from arm's length, which is where a plate label
 is normally read.
 
+## General OCR (print text, CN + EN)
+
+The `ocr` app recognises arbitrary printed text with two int16 kpmodels, not the
+plate chain. Both ship at `/sdcard/examples/kmodel/`.
+
+| Model | Input | Output shape | Notes |
+|---|---|---|---|
+| `ocr_det_int16.kmodel` | 640x640 | `(1, 640, 640, 2)` NHWC | channel 0 is the text mask |
+| `ocr_rec_int16.kmodel` | 512x32 | `(128, 1, 6549)` seq-first | CTC over `dict.txt` (6549) |
+
+```python
+boxes = aicube.ocr_post_process(raw[:, :, :, 0].reshape(-1), hwc.reshape(-1),
+                                [640, 640], [800, 480], mask_thr, box_thr)
+```
+
+`raw[:, :, :, 0]` indexes the 4-D NHWC tensor directly to pull the mask channel;
+the official example writes the same. Each returned box is
+`[crop(1,h,w,3 HWC), [8 corner coords]]`, and the coords are already in the
+ai2d input space (= screen when input == display).
+
+### the rec output is sequence-first, not the plate layout
+
+The plate CTC model emits `(steps, classes)`-style output where the class axis is
+last after a reshape; this OCR model emits `(128, 1, 6549)`, so the class axis is
+index 2 and the step axis is index 0. Decode with
+`argmax(axis=len(shape)-1).reshape(-1)` then CTC-dedup, treating
+`blank = len(dict) - 1` (the last entry), not index 0. Copying the plate
+`argmax(axis=1)` mislabels every step.
+
+### the dict already covers Chinese and English
+
+`dict.txt` is 94 ASCII plus 6455 CJK entries, so one rec model reads both
+scripts; no second model or language switch is needed.
+
+### the display font is the open-time cost, not the scan cost
+
+Rendering recognised text needs a baked CJK font (`ocr_cjk_16.bin`). `font_load`
+costs ~1.2 ms per glyph and is not cached by the loader, so glyph count is the
+only lever: 3743 GB2312 level-1 glyphs load in 4595 ms, the full 6547 in 8276 ms.
+Load it at app open (module-cached) so a scan stays ~1 s; see
+`docs/performance-budget.md`.
+
 ## Human pose (17 keypoints)
 
 | Model | Output shape | kpu cost | Post-process |
