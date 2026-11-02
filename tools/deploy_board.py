@@ -421,17 +421,27 @@ def main():
         ).rstrip())
 
         # ---------- 9) sweep leftover probe temp files from the /sdcard root ----------
-        # A probe run drops a _probe*.py under /sdcard and leaves it behind when
-        # interrupted.
+        # A probe drops a _probe*.py under /sdcard and leaves it behind when
+        # interrupted, and probes that write their results to a file (to dodge
+        # terminal echo) leave _*.txt behind the same way. Both are covered by
+        # "starts with an underscore", which no product file does. Directories
+        # are skipped: only files at the root are probe artefacts.
         out = run(
             "import os, gc\n"
             "gc.collect()\n"
             "gone = []\n"
             "for n in os.listdir('/sdcard'):\n"
-            "    if not n.startswith('_probe'):\n"
+            "    if not n.startswith('_'):\n"
+            "        continue\n"
+            "    p = '/sdcard/' + n\n"
+            "    try:\n"
+            "        st = os.stat(p)\n"
+            "        if (st[0] & 0x4000) != 0:\n"
+            "            continue\n"
+            "    except Exception:\n"
             "        continue\n"
             "    try:\n"
-            "        os.remove('/sdcard/' + n)\n"
+            "        os.remove(p)\n"
             "        gone.append(n)\n"
             "    except Exception:\n"
             "        pass\n"

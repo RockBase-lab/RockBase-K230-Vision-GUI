@@ -41,14 +41,69 @@ MAP_PATH = "/sdcard/examples/utils/phone_map.txt"
 
 OUT_RATE = 24000
 # The codec saturates near 390 mV and 48%FS is the 350 mV red line measured for
-# this board (see the amplifier calibration in device.py). The model's own peak
-# is only about 57% of full scale, so the clip is **normalised** to this value
-# rather than multiplied by it: multiplying left the greeting at 27.5%FS, which
-# measured far quieter than the recorded audio path.
+# this board (see the amplifier calibration in device.py).
 PEAK_FS = 0.48
 # Decoder input is a fixed 600-frame window; longer utterances clamp per-phoneme
 # durations down until they fit (that is the model's own scheme).
 MAX_DEC_FRAMES = 600
+
+# Loudness. Normalising the peak alone is not enough: raw TTS measures 5.7-10.0
+# %FS RMS at a 48%FS peak (crest factor 4.8-8.4) and sounds 8-12 dB quieter than
+# the recorded audio path, which sits at 24.3%FS RMS with crest 1.98.
+#
+# The recording path compresses blocks down to COMP_TARGET_FRAC (0.5) of the
+# global peak and then scales the result back to the red line, so mid-level
+# blocks gain 1/frac while the loudest stay at 48%FS. 0.5 lifts them only 2x,
+# which is enough for a source whose own crest is about 3 but not for TTS: its
+# plosives and pauses put the crest at 5.8-8.4 and most blocks never reach the
+# threshold. A lower threshold is therefore used for TTS only, leaving the
+# recording calibration untouched.
+TTS_COMP_FRAC = 0.30
+def _peak_of(arr):
+    """Largest magnitude. ulab has no abs(), so this is max and min."""
+    hi = float(np.max(arr))
+    lo = float(np.min(arr))
+    return hi if hi > -lo else -lo
+
+
+def _compress(x, block, frac, release, floor):
+    """Compress peak blocks down to `frac` of the global peak, in place.
+
+    x is expected to peak at 1.0. Gain falls instantly and rises rate-limited,
+    interpolated across each block, so there is no boundary click. This is the
+    recording finaliser's scheme; see the compression note in device.py.
+    """
+    n = len(x)
+    target = frac
+    rel = release / 256.0
+    low = floor / 256.0
+    ramp = np.array([k / float(block) for k in range(block)], dtype=np.float)
+    g_prev = 1.0
+    i = 0
+    while i < n:
+        end = i + block
+        if end > n:
+            end = n
+        seg = x[i:end]
+        bp = _peak_of(seg)
+        if bp > target and bp > 0.0:
+            need = target / bp
+            if need < low:
+                need = low
+        else:
+            need = 1.0
+        g = need
+        if g > g_prev:
+            g = g_prev + rel
+            if g > 1.0:
+                g = 1.0
+        if end - i == block:
+            x[i:end] = seg * (g_prev + (g - g_prev) * ramp)
+        else:
+            x[i:end] = seg * g
+        g_prev = g
+        i = end
+    return x
 
 
 def ensure_dir(path):
@@ -184,14 +239,23 @@ class Synth:
         if dur_sum <= 0 or not mel:
             return 0
         clip = np.clip(np.array(mel[:dur_sum * 256], dtype=np.float), -1.0, 1.0)
-        # Normalise to the red line. The vocoder's own peak is well below full
-        # scale, so a flat multiply by PEAK_FS would keep it quiet. ulab has no
-        # abs(), so the peak comes from the two extremes.
-        hi = float(np.max(clip))
-        lo = float(np.min(clip))
-        peak = hi if hi > -lo else -lo
-        gain = (PEAK_FS / peak) if peak > 1e-6 else 0.0
-        pcm = np.array(clip * (32767.0 * gain), dtype=np.int16).tobytes()
+        peak = _peak_of(clip)
+        if peak <= 1e-6:
+            return 0
+        # Work with unity peak so the compression threshold is unambiguous,
+        # compress like the recording path, then land the result on the red line.
+        x = clip / peak
+        from audio import device
+        try:
+            use_comp = device.COMP_ENABLED
+        except BaseException:
+            use_comp = False
+        if use_comp:
+            x = _compress(x, device.COMP_BLOCK, TTS_COMP_FRAC,
+                          device.COMP_RELEASE, device.COMP_MIN_GAIN)
+        peak2 = _peak_of(x)
+        gain = (PEAK_FS / peak2) if peak2 > 1e-6 else 0.0
+        pcm = np.array(x * (32767.0 * gain), dtype=np.int16).tobytes()
         ensure_dir(path.rsplit("/", 1)[0])
         tmp = path + ".tmp"
         wf = wave.open(tmp, "wb")

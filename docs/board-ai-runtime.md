@@ -473,9 +473,30 @@ silent name before it.
 
 Output level: the vocoder's own peak is about **57% of full scale**, so the clip
 is **normalised** to `PEAK_FS` rather than multiplied by it. Multiplying left the
-greeting at 27.5%FS and audible RMS at 4.0%FS; normalising gives 48.0%FS and
-8.2-10.0%FS, about 6 dB louder, while staying exactly on the amplifier's red
-line. `ulab.numpy` has no `abs()`, so the peak comes from `np.max` and `np.min`.
+greeting at 27.5%FS and audible RMS at 4.0%FS; normalising gives 48.0%FS peak,
+but only 8.2%FS RMS because the source is peaky (crest factor 5.8-8.4).
+`ulab.numpy` has no `abs()`, so the peak comes from `np.max` and `np.min`.
+
+Normalising the peak is not the same as being loud. The recorded audio path
+reaches **24.3%FS RMS at the same 48%FS peak** (crest 1.98) because its finaliser
+compresses first and scales afterwards, so mid-level blocks gain `1/frac` while
+the loudest stay on the red line. The TTS path applies the same block compressor
+with its own threshold, because the recording value is tuned for a source whose
+crest is already about 3:
+
+| Compression | Peak | RMS | Crest |
+| --- | --- | --- | --- |
+| none (normalise only) | 48.0%FS | 8.2%FS | 5.84 |
+| `frac` 0.50 (recording value) | 48.0%FS | 9.8%FS | 4.90 |
+| **`frac` 0.30 (TTS value)** | **48.0%FS** | **10.7%FS** | **4.50** |
+| `frac` 0.25 / 0.18 | 48.0%FS | 10.6 / 10.2%FS | 4.5 / 4.7 |
+| gain floor 64 → 16 | 48.0%FS | 10.7%FS | 4.50 |
+
+`frac` 0.30 is the plateau: lowering it further, or lowering the gain floor to
+16, changes nothing, because block compression cannot push a speech waveform's
+crest below about 4.5. Going louder needs a look-ahead limiter that smooths the
+envelope instead of only cutting blocks, which is a different algorithm and not
+implemented. The +2.5 dB is what this compressor gives.
 
 Greeting files are a **cache, not a record**: this firmware has no `os.sync()`,
 and a reset soon after a write can lose it (measured: four of eight freshly

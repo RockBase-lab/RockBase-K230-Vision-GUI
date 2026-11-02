@@ -103,6 +103,9 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_tts_level.py` | Greeting peak/RMS and envelope, to see whether a name is voiced at all |
 | `_probe_tts_pinyin.py` | Which text forms the frontend speaks: Latin, plain pinyin, tone marks, Han |
 | `_probe_tts_names.py` | Rebuild all greetings and assert every name segment carries audio |
+| `_probe_loudness.py` | Peak/RMS/crest of the recorded audio against the greetings |
+| `_probe_tts_frac.py` | Compression threshold sweep: which value actually raises the RMS |
+| `_probe_tts_floor.py` | Gain-floor sweep, to show the compressor has plateaued |
 | `_probe_greet.py` | Greeting trigger matrix, playback completion, stream cleanup |
 | `_probe_greet_bench.py` | Per-block cost split: stereo conversion, WAV read, blocking write |
 | `_cap_face_recognize.py` | Screen capture of the Recognize app with a match |
