@@ -337,11 +337,23 @@ y 53.65 / 53.11 against the canonical 51.70 / 51.50, and the nose at 71.15
 against 71.74, so the transform and the `y_off` subtraction are both right.
 
 Threshold: same-subject pairs over 12 frames measured min **0.9827**, median
-0.9905, sd 0.0025 (66 pairs). The app uses **0.90**, i.e. 32 sd below the worst
-genuine pair. A synthetic unrelated vector scores 0.52, confirming the scale is
-`cos/2 + 0.5`. The impostor distribution of real faces has **not** been
-measured, because only one subject was available; revisit the threshold when a
-second identity can be enrolled.
+0.9905, sd 0.0025 (66 pairs) **within one session**. That is the easy case. Two
+other measurements set the real bound:
+
+| Comparison | Score |
+| --- | --- |
+| same subject, photo-enrolled, matched after a cold restart | **0.936-0.961** |
+| different enrolled real subjects | at most **0.7054** |
+| synthetic unrelated vector | 0.52 |
+
+A cold restart moves the same face's feature because the camera starts from
+different auto-exposure and white-balance defaults than the enrollment session
+did, so the session-to-session minimum is about 0.94, not 0.98. The app uses
+**0.85**: above the 0.7054 impostor ceiling with a 0.14 margin, and below the
+0.936 restart floor with a 0.09 margin. A threshold of 0.90 sat too close to
+the restart floor and turned known faces into `unknown` after a reboot while the
+score was still displayed. The score scale is `cos/2 + 0.5`, confirmed by the
+synthetic vector.
 
 Storage: features live in `/data/face/recognize`, one `f<NNN>.bin` of 512
 float32 (2048 B) per identity plus a `db.json` index holding the display names.

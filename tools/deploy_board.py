@@ -85,7 +85,14 @@ def resolve_port(name):
             if "蓝牙" not in (p.description or "")
             and "Bluetooth" not in (p.description or "")]
     if not cand:
-        cand = ports
+        # Never fall back to the full list: a Bluetooth virtual port accepts the
+        # open but never answers the raw-REPL handshake, so the deploy hangs
+        # instead of failing. Make the user pick a port explicitly.
+        raise SystemExit(
+            "[FAIL] no non-Bluetooth serial port found. Available: %s\n"
+            "       Pass the board port explicitly, e.g. "
+            "python tools/deploy_board.py --gui-only COM9"
+            % ", ".join("%s (%s)" % (p.device, p.description) for p in ports))
     print("[INFO] auto-selected port: %s (%s)" % (cand[0].device, cand[0].description))
     return cand[0].device
 

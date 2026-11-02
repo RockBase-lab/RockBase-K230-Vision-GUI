@@ -22,10 +22,12 @@
 #      2 px of the canonical row and within 0.5 px of each other; without it
 #      every crop is shifted and the scores collapse.
 #
-# Threshold: same-subject pairs measured min 0.9827, median 0.9905, sd 0.0025
-# over 66 pairs. ENROLL_MATCH is 0.90, which is 32 sd below the worst genuine
-# pair. The impostor distribution could not be measured with one subject
-# available; revisit when a second person can be enrolled.
+# Threshold: the same subject frames apart measured min 0.9827 in one session,
+# but a photo-enrolled face matched after a cold restart measures 0.936-0.961,
+# because the camera's auto exposure and white balance start from different
+# defaults than in the enrollment session. Different real subjects top out at
+# 0.7054. ENROLL_MATCH is 0.85, inside that gap, so a restart does not turn a
+# known face into "unknown" while an unrelated face still cannot pass.
 #
 # Enrollment runs face_liveness_rgb.kmodel **once** to tag each entry as
 # "live" or "photo" (a printed photo held up to the camera). The steady loop
@@ -67,9 +69,9 @@ FEAT_DIM = 512
 DET_CONF = 0.50
 NMS_TH = 0.2
 
-# Same-subject minimum measured at 0.9827; 0.90 keeps a wide margin while still
-# rejecting an unrelated face, whose score sits near 0.5-0.7.
-ENROLL_MATCH = 0.90
+# Same-subject scores fall to 0.936 after a cold restart, while different
+# enrolled subjects measured at most 0.7054. 0.85 sits in that gap.
+ENROLL_MATCH = 0.85
 
 # Enrollment-time liveness gate. Index 1 of the model output is the live
 # probability: a live face measured 0.9989-0.9997, a screen photo 0.0001-0.0004,
