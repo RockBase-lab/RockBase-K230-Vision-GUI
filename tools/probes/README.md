@@ -97,6 +97,7 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_ulab_feature.py` | Vectorised vs Python-loop normalise and dot on 512 floats |
 | `_probe_recognize_model.py` | Verification chain: memory, shape, timing, same-subject scores |
 | `_probe_recognize_app.py` | Recognize app end to end: enroll, reload, match, delete, fps |
+| `_probe_rec_photo.py` | Photo enrollment: PHOTO switch, src tagging, match filter, persistence |
 | `_cap_face_recognize.py` | Screen capture of the Recognize app with a match |
 | `_cap_recognize_empty.py` | Screen capture of the empty-database panel |
 | `_probe_back_out.py` | Layered CANCEL ladder on the real launcher, incl. page restore |

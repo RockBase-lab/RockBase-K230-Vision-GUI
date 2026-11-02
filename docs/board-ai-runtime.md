@@ -351,6 +351,27 @@ renamed into place, so a power cut cannot leave a truncated 2048-byte feature.
 `os.mkdir` builds one level only, so the app creates `/data/face` before
 `/data/face/recognize`.
 
+### Photo enrollment and the PHOTO gate
+
+Each index entry carries `"src": "live"` or `"src": "photo"`, and the index
+carries a top-level `"photos_allowed"` flag. An index written before this
+feature has neither key: `src` defaults to `live` and `photos_allowed` to
+`true`, so upgrading never silently narrows an existing database.
+
+At enrollment the app runs `face_liveness_rgb.kmodel` **once** on the current
+frame to choose the tag; the steady recognition loop never runs it, so the
+25 fps is unchanged. A face scoring below 0.50 (a printed photo held to the
+camera) is tagged `photo`. While `photos_allowed` is false such an enrollment
+is refused, and while it is false the matcher skips every `photo` entry — one
+list lookup per compare, so the hot loop cost is unchanged. The top-bar PHOTO
+switch flips the flag and persists it to the index immediately, because the
+setting is user intent that must survive a restart even with no later
+enrollment.
+
+Verified on board: with the switch on a `photo` entry matches (score 1.000 for
+its own feature); with it off the same feature returns no match while a `live`
+entry still matches. The `src` tag and the flag both survive a reload.
+
 ## Face liveness (spoof detection)
 
 Model: `face_liveness_rgb.kmodel` (380096 B, 112x112 input). It runs after the

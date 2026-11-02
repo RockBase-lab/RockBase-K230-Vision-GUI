@@ -26,6 +26,12 @@
 # over 66 pairs. ENROLL_MATCH is 0.90, which is 32 sd below the worst genuine
 # pair. The impostor distribution could not be measured with one subject
 # available; revisit when a second person can be enrolled.
+#
+# Enrollment runs face_liveness_rgb.kmodel **once** to tag each entry as
+# "live" or "photo" (a printed photo held up to the camera). The steady loop
+# never runs the liveness model, so recognition fps is unchanged. The PHOTO
+# switch in the top bar decides whether photo-tagged entries take part in
+# matching; the setting persists in the database index.
 
 import gc
 import json
@@ -50,9 +56,11 @@ PREVIEW_H = 480
 
 DET_MODEL = "/sdcard/examples/kmodel/face_detection_320.kmodel"
 REG_MODEL = "/sdcard/examples/kmodel/face_recognition_mobile.kmodel"
+LIVE_MODEL = "/sdcard/examples/kmodel/face_liveness_rgb.kmodel"
 ANCHOR_PATH = "/sdcard/examples/utils/prior_data_320.bin"
 DET_IN = [320, 320]
 REG_IN = 112
+LIVE_IN = 112
 ANCHOR_N = 4200
 FEAT_DIM = 512
 
@@ -62,6 +70,15 @@ NMS_TH = 0.2
 # Same-subject minimum measured at 0.9827; 0.90 keeps a wide margin while still
 # rejecting an unrelated face, whose score sits near 0.5-0.7.
 ENROLL_MATCH = 0.90
+
+# Enrollment-time liveness gate. Index 1 of the model output is the live
+# probability: a live face measured 0.9989-0.9997, a screen photo 0.0001-0.0004,
+# so 0.50 sits in an empty band. The crop must be **expanded** before the
+# resize; a tight crop leaves live and photo scores indistinguishable.
+CROP_PAD_W = 224
+CROP_PAD_H = 192
+PAD_GREY = [128, 128, 128]
+LIVE_REAL = 0.50
 
 # The feature database lives on /data, not /sdcard: the SD card holds the
 # deployed product content and has about 76 MB free, while /data has 28 GB. The
@@ -106,6 +123,7 @@ MODEL_MISSING = ("Face model missing on SD card.\n"
                  "Expected:\n"
                  "  /sdcard/examples/kmodel/face_detection_320.kmodel\n"
                  "  /sdcard/examples/kmodel/face_recognition_mobile.kmodel\n"
+                 "  /sdcard/examples/kmodel/face_liveness_rgb.kmodel\n"
                  "  /sdcard/examples/utils/prior_data_320.bin")
 
 
@@ -126,6 +144,42 @@ def y_pad_offset():
 def rgb_param():
     """[W, H + y_off]: the post-process uses it as the clip rectangle as well."""
     return [PREVIEW_W, PREVIEW_H + y_pad_offset()]
+
+
+def pad_param(src_w, src_h, dst_w, dst_h):
+    """Centre a src rectangle in dst: (top, bottom, left, right, scale)."""
+    ratio = min(float(dst_w) / src_w, float(dst_h) / src_h)
+    new_w = int(src_w * ratio)
+    new_h = int(src_h * ratio)
+    pad_w = (dst_w - new_w) // 2
+    pad_h = (dst_h - new_h) // 2
+    return pad_h, dst_h - new_h - pad_h, pad_w, dst_w - new_w - pad_w, ratio
+
+
+def expand_box(box):
+    """Grow the box by the crop padding, clamped to the frame.
+
+    Clamping matters at the borders: a crop rectangle reading past the buffer
+    is rejected by ai2d or produces garbage.
+    """
+    x, y, w, h = box
+    cw = w + CROP_PAD_W
+    ch = h + CROP_PAD_H
+    cx = x - (cw - w) // 2
+    cy = y - (ch - h) // 2
+    if cx < 0:
+        cw += cx
+        cx = 0
+    if cy < 0:
+        ch += cy
+        cy = 0
+    if cx + cw > PREVIEW_W:
+        cw = PREVIEW_W - cx
+    if cy + ch > PREVIEW_H:
+        ch = PREVIEW_H - cy
+    if cw <= 1 or ch <= 1:
+        return None
+    return cx, cy, cw, ch
 
 
 def svd22(a):
@@ -230,8 +284,10 @@ class FaceRecognizeApp:
         self.sensor = None
         self.kpu_det = None
         self.kpu_reg = None
+        self.kpu_live = None
         self.a2d_det = None
         self.a2d_reg = None
+        self.a2d_live = None
         self.anchors = None
 
         self.frozen = False
@@ -244,6 +300,7 @@ class FaceRecognizeApp:
 
         self.has_face = False
         self._last_feat = None       # normalised 512-d feature of the last frame
+        self._last_box = None        # screen-space box of the last detection
         self._name = None            # matched name, None = unknown
         self._score = 0.0
         self._enroll_note = ""
@@ -256,14 +313,21 @@ class FaceRecognizeApp:
 
         self.kb = None               # naming keyboard (None = closed)
         self._pending_feat = None
+        self._pending_src = "live"   # source tag of the enrollment in progress
         self._manage = None          # manage overlay (None = closed)
         self._empty_panel = None     # shown while the database is empty
 
         # Database: names and features loaded once, features normalised on load so
-        # the per-frame compare is a plain dot product.
+        # the per-frame compare is a plain dot product. db_srcs[i] is "live" or
+        # "photo", parallel to db_names / db_feats.
         self.db_names = []
         self.db_feats = []
+        self.db_srcs = []
         self._db_next = 1
+        # When False, entries enrolled from a photo are skipped by the matcher.
+        # Persisted in the index so the choice survives a restart.
+        self.photos_allowed = True
+        self._switch = None       # top-bar PHOTO switch (None = not built)
 
         self.img_w = ctx.width
         self.img_h = ctx.height
@@ -294,6 +358,8 @@ class FaceRecognizeApp:
         # Load the database before the models so the start-up log reports the real
         # face count, and so a broken index surfaces before 370 ms of kmodel load.
         self._db_load()
+        # The index may carry photos_allowed=False; re-drive the switch from it.
+        self._sync_switch()
         self._init_ai()
         self._update_stat()
         if not self.db_names:
@@ -341,7 +407,51 @@ class FaceRecognizeApp:
         self.seg_name = seg("-", COL_UNKNOWN)
         self.seg_sep2 = seg("|", COL_SEP)
         self.seg_fps = seg("FPS -", COL_FPS)
+
+        # PHOTO switch: whether photo-enrolled entries take part in matching.
+        # The switch is clickable itself, so a tap here does not fall through to
+        # stat_btn and open the manage overlay.
+        self.seg_photo = seg("PHOTO", COL_HINT)
+        self._switch = lv.switch(self.stat_btn)
+        self._switch.set_size(46, 24)
+        self._switch.clear_flag(lv.obj.FLAG.SCROLLABLE)
+        # CHECKABLE makes LVGL toggle the state itself on click; the callback
+        # then mirrors that into photos_allowed.
+        self._switch.add_flag(lv.obj.FLAG.CHECKABLE)
+        self._switch.set_style_bg_color(lv.color_hex(0x1E262E), 0)
+        beep.on_click(self._switch, lambda e: self._toggle_photos())
+
         self.seg_hint = seg("OK: enroll", COL_HINT)
+        self._sync_switch()
+
+    def _sync_switch(self):
+        """Push photos_allowed onto the switch and its label colour."""
+        if self._switch is None:
+            return
+        if self.photos_allowed:
+            self._switch.add_state(lv.STATE.CHECKED)
+            self.seg_photo.set_style_text_color(lv.color_hex(COL_KNOWN), 0)
+        else:
+            self._switch.clear_state(lv.STATE.CHECKED)
+            self.seg_photo.set_style_text_color(lv.color_hex(COL_UNKNOWN), 0)
+
+    def _toggle_photos(self):
+        # CHECKABLE already flipped the widget state on click, so read it back
+        # rather than inverting the old value (inverting would undo it).
+        # has_state verified present on this binding.
+        self.photos_allowed = bool(self._switch.has_state(lv.STATE.CHECKED))
+        self._sync_switch()
+        # Persist immediately: the setting is user intent and must survive a
+        # restart even if no enrollment happens afterwards.
+        try:
+            self._db_save_index()
+        except BaseException as e:
+            print("[Recognize] toggle save failed:", e)
+        self._note("photos {}".format("allowed" if self.photos_allowed
+                                      else "excluded"))
+        # The next match pass re-runs with the new filter; a name that just got
+        # excluded drops out on the following frame.
+        self._update_stat()
 
     def _update_stat(self):
         if self.db_names:
@@ -429,8 +539,12 @@ class FaceRecognizeApp:
             data = {"next": len(items) + 1, "items": items}
 
         self._db_next = int(data.get("next", 1))
+        # An index written before the photo feature has no key: default on, so
+        # upgrading never silently narrows an existing database.
+        self.photos_allowed = bool(data.get("photos_allowed", True))
         self.db_names = []
         self.db_feats = []
+        self.db_srcs = []
         items = data.get("items", [])
         for item in items:
             path = DB_DIR + "/" + item["file"]
@@ -440,7 +554,10 @@ class FaceRecognizeApp:
                 continue
             self.db_names.append(item.get("name", "?"))
             self.db_feats.append(feat)
-        print("[Recognize] db loaded: {} face(s)".format(len(self.db_names)))
+            self.db_srcs.append("photo" if item.get("src") == "photo"
+                                else "live")
+        print("[Recognize] db loaded: {} face(s), photos_allowed={}".format(
+            len(self.db_names), self.photos_allowed))
 
     @staticmethod
     def _is_missing(err):
@@ -493,8 +610,10 @@ class FaceRecognizeApp:
         items = []
         for i in range(len(self.db_names)):
             items.append({"file": "f{:03d}.bin".format(i + 1),
-                          "name": self.db_names[i]})
-        out = {"next": self._db_next, "items": items}
+                          "name": self.db_names[i],
+                          "src": self.db_srcs[i]})
+        out = {"next": self._db_next, "items": items,
+               "photos_allowed": self.photos_allowed}
         text = json.dumps(out)
         tmp = DB_INDEX + TMP_SUFFIX
         f = open(tmp, "w")
@@ -508,21 +627,23 @@ class FaceRecognizeApp:
             pass
         os.rename(tmp, DB_INDEX)
 
-    def _db_add(self, name, feat):
+    def _db_add(self, name, feat, src):
         """Add or replace an entry, then rewrite the index.
 
         Features are renumbered on every save so the file name always matches the
         position in the index; a 2 KB file is cheap to rewrite and this keeps the
-        two from ever drifting apart.
+        two from ever drifting apart. Re-enrolling replaces the source tag too.
         """
         if name in self.db_names:
             idx = self.db_names.index(name)
             self.db_feats[idx] = feat
+            self.db_srcs[idx] = src
         else:
             if len(self.db_names) >= MAX_ENROLL:
                 return False
             self.db_names.append(name)
             self.db_feats.append(feat)
+            self.db_srcs.append(src)
             self._db_next += 1
         self._db_write_all()
         return True
@@ -562,13 +683,20 @@ class FaceRecognizeApp:
         print("[Recognize] delete", self.db_names[idx])
         del self.db_names[idx]
         del self.db_feats[idx]
+        del self.db_srcs[idx]
         self._db_write_all()
 
     def _db_match(self, feat):
-        """Best (name, score), or (None, best score) below the threshold."""
+        """Best (name, score), or (None, best score) below the threshold.
+
+        Photo-enrolled entries are skipped while the PHOTO switch is off; the
+        per-entry test is one list lookup, so the hot loop cost is unchanged.
+        """
         best = -1.0
         best_i = -1
         for i in range(len(self.db_feats)):
+            if (not self.photos_allowed and self.db_srcs[i] == "photo"):
+                continue
             score = float(np.dot(feat, self.db_feats[i])) / 2.0 + 0.5
             if score > best:
                 best = score
@@ -659,8 +787,26 @@ class FaceRecognizeApp:
         self.a2d_reg.set_ai2d_dtype(nn.ai2d_format.NCHW_FMT,
                                     nn.ai2d_format.NCHW_FMT, np.uint8, np.uint8)
 
+        # The liveness model only runs once per enrollment, never in the steady
+        # loop. It is optional: without it every enrollment is tagged "live" and
+        # the photo gate simply reports real.
+        if self._exists(LIVE_MODEL):
+            try:
+                kpu = nn.kpu()
+                kpu.load_kmodel(LIVE_MODEL)
+                self.kpu_live = kpu
+                self.a2d_live = Ai2d()
+                self.a2d_live.set_ai2d_dtype(nn.ai2d_format.NCHW_FMT,
+                                             nn.ai2d_format.NCHW_FMT,
+                                             np.uint8, np.uint8)
+            except BaseException as error:
+                print("[Recognize] liveness model load failed:", error)
+                self.kpu_live = None
+        else:
+            print("[Recognize] liveness kmodel absent, enroll tags all live")
+
     def _release_models(self):
-        for name in ("kpu_det", "kpu_reg"):
+        for name in ("kpu_det", "kpu_reg", "kpu_live"):
             kpu = getattr(self, name)
             if kpu is not None:
                 try:
@@ -668,7 +814,7 @@ class FaceRecognizeApp:
                 except BaseException as e:
                     print("[Recognize]   {}.release error: {}".format(name, e))
                 setattr(self, name, None)
-        for name in ("a2d_det", "a2d_reg"):
+        for name in ("a2d_det", "a2d_reg", "a2d_live"):
             a2d = getattr(self, name)
             if a2d is not None:
                 try:
@@ -750,6 +896,45 @@ class FaceRecognizeApp:
         del flat, out
         return feat
 
+    def _liveness(self, img, box):
+        """One-shot live probability for enrollment tagging, or None on failure.
+
+        Order follows the model contract: crop the expanded box, resize, then
+        pad with mid grey. Padding before the resize changes the scores.
+        Index 1 of the [1, 2] softmax output is the live class.
+        """
+        if self.kpu_live is None or self.a2d_live is None:
+            return None
+        crop = expand_box(box)
+        if crop is None:
+            return None
+        cx, cy, cw, ch = crop
+        top, bottom, left, right, _scale = pad_param(cw, ch, LIVE_IN, LIVE_IN)
+        self.a2d_live.crop(cx, cy, cw, ch)
+        self.a2d_live.resize(nn.interp_method.tf_bilinear,
+                             nn.interp_mode.half_pixel)
+        self.a2d_live.pad([0, 0, 0, 0, top, bottom, left, right], 0, PAD_GREY)
+        self.a2d_live.build([1, 3, PREVIEW_H, PREVIEW_W],
+                            [1, 3, LIVE_IN, LIVE_IN])
+        tin = self.a2d_live.run(img.to_numpy_ref())
+        self.kpu_live.set_input_tensor(0, tin)
+        self.kpu_live.run()
+        flat = None
+        for i in range(self.kpu_live.outputs_size()):
+            ot = self.kpu_live.get_output_tensor(i)
+            try:
+                arr = ot.to_numpy()
+                if flat is None:
+                    flat = arr.flatten()
+            finally:
+                ot.release()
+        del tin
+        if flat is None or len(flat) == 0:
+            return None
+        score = float(flat[1]) if len(flat) > 1 else float(flat[0])
+        del flat
+        return score
+
     # ---------- empty-database panel ----------
     def _show_empty_panel(self):
         """Blocking hint shown while nothing is enrolled: enroll before recognizing."""
@@ -820,6 +1005,23 @@ class FaceRecognizeApp:
         if len(self.db_names) >= MAX_ENROLL:
             self._note("database full")
             return
+        # One-shot liveness on the current frame decides the source tag. A face
+        # that fails it is a printed photo held to the camera: allowed and
+        # tagged "photo" while the switch is on, refused while it is off.
+        self._pending_src = "live"
+        try:
+            ai_img = self.sensor.snapshot(chn=CAM_CHN_ID_1)
+            score = self._liveness(ai_img, self._last_box)
+        except BaseException as error:
+            print("[Recognize] liveness check failed:", error)
+            score = None
+        if score is not None and score < LIVE_REAL:
+            if not self.photos_allowed:
+                self._note("photo blocked: enable PHOTO")
+                self._update_stat()
+                return
+            self._pending_src = "photo"
+            self._note("photo face detected")
         self._close_manage()
         self.frozen = True
         self._update_stat()
@@ -850,15 +1052,15 @@ class FaceRecognizeApp:
             self._update_stat()
             return
         try:
-            ok = self._db_add(name, feat)
+            ok = self._db_add(name, feat, self._pending_src)
         except BaseException as e:
             print("[Recognize] save failed:", e)
             sys.print_exception(e)
             self._note("save failed")
             self._update_stat()
             return
-        print("[Recognize] enrolled '{}' -> {} face(s)".format(
-            name, len(self.db_names)))
+        print("[Recognize] enrolled '{}' [{}] -> {} face(s)".format(
+            name, self._pending_src, len(self.db_names)))
         self._note("saved {}".format(name) if ok else "database full")
         self._update_stat()
 
@@ -920,8 +1122,14 @@ class FaceRecognizeApp:
                 row.clear_flag(lv.obj.FLAG.SCROLLABLE)
                 row.add_flag(lv.obj.FLAG.CLICKABLE)
                 lab = lv.label(row)
-                lab.set_text("{}    (tap to delete)".format(self.db_names[i]))
-                lab.set_style_text_color(lv.color_hex(0xE6EAF0), 0)
+                tag = " [photo]" if self.db_srcs[i] == "photo" else ""
+                lab.set_text("{}{}    (tap to delete)".format(
+                    self.db_names[i], tag))
+                # Dim the entries the matcher is currently skipping.
+                dimmed = (self.db_srcs[i] == "photo"
+                          and not self.photos_allowed)
+                lab.set_style_text_color(
+                    lv.color_hex(COL_UNKNOWN if dimmed else 0xE6EAF0), 0)
                 if self.bar_font is not None:
                     lab.set_style_text_font(self.bar_font, 0)
                 lab.center()
@@ -1015,6 +1223,7 @@ class FaceRecognizeApp:
             sys.print_exception(error)
 
         self.has_face = box is not None
+        self._last_box = box
         feat = None
         # Compute the feature whenever a face is present, not only when the
         # database has entries: the very first enrollment needs one too, and
