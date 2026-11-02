@@ -48,6 +48,10 @@ Two frame-synthesis traps, both hit while building the scan probe:
   `0xFFFFFF`.
 - On the host side, `qrcode.get_matrix()` returns `True` for **dark** modules.
   Inverting the polarity makes `find_qrcodes` fail to see the code.
+- Classic CV at 400x240: use `find_line_segments`, not `find_lines` (infinite,
+  clipped, noisy). `find_circles` is nondeterministic here and `find_corners` is
+  absent. A self-built `lv.obj` used as the app content needs
+  `set_style_pad_all(0, 0)` or every overlay is offset by ~22 px in snapshots.
 
 See `docs/pitfalls.md` for the full trap index.
 
@@ -58,6 +62,8 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_sensor_release.py` | Sensor singleton state and whether stop/deinit frees it |
 | `_probe_vision_exit.py` | Vision exit path without a snapshot |
 | `_cap_vision_full.py` | Immersive screen has no status bar; content is full screen |
+| `_probe_cvlab_app.py` | CV Lab: every detector on synthetic frames, overlay geometry, picker, capture (needs `--lvgl`) |
+| `_probe_cvlab_algos.py` | Which `image` detectors exist and their cost on synthetic and live 400x240 frames |
 | `_probe_cam_unavailable.py` | Missing-camera panel through the real launcher |
 | `_probe_cam_apps_all.py` | Camera apps under constructor failure and runtime drop |
 | `_probe_scan_app.py` | QR detection with a synthetic frame |

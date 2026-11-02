@@ -73,6 +73,8 @@ nothing points at the cause.
 | The crop contains the wrong part of the frame | The frame was passed as `(H, W, 3)` | Pass CHW `(3, H, W)`; `RGBP888` already gives that |
 | Recognition returns one unrelated character | The crop was built from a mis-scaled quad, not from the real plate | Compare the quad against a colour scan of a test photo before tuning the model |
 | A confidence threshold on the plate recogniser does nothing useful | Its output is logits, not probabilities, and a wrong character can score higher than a right one | Vote over several readings; a threshold cannot separate them |
+| `find_lines` reports many candidates that do not follow the visible object | It returns infinite Hough lines clipped to the frame, not segments; the drawn line was absent while corner-to-corner diagonals were returned | Use `find_line_segments(merge_distance=10, max_theta_diff=15)`; measured 4 finite segments on the same frame in 45 ms |
+| `find_circles` returns different centres and radii for identical input, at 70-168 ms per frame | The accumulator is not deterministic in this binding (same synthetic ring, two runs, different results) | Do not build an overlay on it; use blobs, segments or quads |
 
 ### Image display
 

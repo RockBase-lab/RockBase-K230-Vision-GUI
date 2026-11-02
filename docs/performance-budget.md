@@ -234,6 +234,27 @@ viewfinder could see. The app's dual-scale fallback (`mean_pool(2, 2)`) adds
 about 22 ms when the first pass finds nothing, which is why the detection
 throttle is 60 ms.
 
+## Classic CV (CV Lab)
+
+No neural network: a 400x240 grayscale channel feeds the OpenMV-style `image`
+detectors while an 800x480 RGB888 channel draws the preview. Both channels use
+the same 5:3 crop window, so results scale onto the screen by a factor of two.
+Detection is throttled to 90 ms (250 ms for quads, 120 ms for motion), so the
+preview keeps the full frame rate.
+
+| Mode | Detector | Cost at 400x240 |
+|---|---|---|
+| Blobs Dark / Bright | `find_blobs` | 11-12 ms |
+| Segments | `find_line_segments` | 20-45 ms |
+| Rects | `find_rects` | 41-353 ms (scene dependent) |
+| Motion | `binary` x2 + `b_xor` + `find_blobs` | 14 ms |
+
+`find_lines` was rejected: it returns infinite lines clipped to the frame, 16
+candidates on a live scene where `find_line_segments` returns 4. `find_circles`
+was rejected too: 70-168 ms per frame, and identical synthetic input produced
+different centres and radii on different runs. `find_corners` is not present in
+this binding.
+
 ## Blocking calls that cannot be hidden
 
 These run in C and hold the GIL, so no Python code — including worker threads
