@@ -204,6 +204,8 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_face_parse.py` | face_parse contract: output shape, A/B coordinate conventions, cost |
 | `_probe_face_parse_write.py` | Whether `face_parse_post_process` writes pixels and clears the buffer |
 | `_probe_mask_app.py` | Mask app end to end: fps, parsed faces, and non-zero alpha in the mask |
+| `_probe_hand_kp.py` | handkp_det contract: load cost, (1,42) output, crop/decode, angle-rule gesture |
+| `_probe_17_resident.py` | handkp_det as a 17th resident kpu on top of the boot set, then infer |
 
 Snapshot probes print a run-length encoded frame plus base64 blocks. Pipe that
 output through a file, then decode it with
