@@ -6,12 +6,13 @@
 # widget stacked over the preview, so the mask tints the picture without being
 # drawn into the sensor frame (which would corrupt the next capture).
 #
-# Preview runs at 640x384, not the 800x480 the other camera apps use. The masks
-# buffer is display-sized ARGB (W*H*4): at 800x480 it is 1.5 MB, which exceeds
-# the ~1.38 MB free after release_home (measured in the anchor-detector apps),
-# so the allocation fails. 640x384 keeps it at 983 KB with headroom for the
-# model output tensor. preview == widget == mask size, since as_lvgl_img_src
-# attaches without scaling and lv.img.set_size crops rather than scales.
+# Preview runs at the full 800x480 like the other camera apps. The masks buffer
+# is display-sized ARGB (W*H*4 = 1.5 MB at this size). That looked too big for
+# the ~1.38 MB gc.mem_free() reported after release_home, but a board test with
+# the model resident allocated 1.5 MB fine: the GC arena grows on demand and
+# mem_free only counts arenas that already exist (see docs/pitfalls.md). preview
+# == widget == mask size, since as_lvgl_img_src attaches without scaling and
+# lv.img.set_size crops rather than scales.
 #
 # Output tensor: (1,116,2100) = [4 box + 1 score + 80 cls + 31 mask-coeffs] per
 # anchor. segment_postprocess takes the results list in this native layout --
@@ -42,8 +43,8 @@ from apps.error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
 from camera_fov import set_preview
 import model_pool
 
-PREVIEW_W = 640
-PREVIEW_H = 384
+PREVIEW_W = 800
+PREVIEW_H = 480
 MAX_BOXES = 12
 BOX_POOL = MAX_BOXES
 TOPBAR_H = 56
@@ -222,7 +223,7 @@ class SegmentApp:
         # masks buffer: display-sized ARGB, reused every frame; aidemo fills it.
         # A bytearray backs it so one persistent lv.img_dsc_t can point straight
         # at the pixels (as_lvgl_img_src rejects ARGB, and a dsc built per frame
-        # would copy 983 KB). The numpy view is what aidemo writes through; both
+        # would copy 1.5 MB). The numpy view is what aidemo writes through; both
         # share the same memory, and the buffer is never resized so the dsc's
         # data pointer stays valid across frames (measured: frombuffer view is
         # writable and a bytearray is accepted as dsc "data", an ndarray is not).
