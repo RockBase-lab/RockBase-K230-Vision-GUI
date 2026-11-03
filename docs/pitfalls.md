@@ -41,7 +41,7 @@ Recovery for every entry here is a power cycle. Programmatic resets do not help.
 | Probe stops right after `load_kmodel`, then the serial link dies with `ClearCommError` / `PermissionError(13)` | Called `get_output_tensor()` before `kpu.run()`; the native call blocks with no exception and the board never returns | Call `get_output_tensor()` only after `run()`; to inspect a model, run it on a synthetic frame first |
 | Board wedges inside `aidemo.licence_det_postprocess` with no exception | Passed the raw `to_numpy()` array; the function wants the `AIBase` results **list** (`[ndarray]`), and a bare ndarray hangs the native layer | Pass `results` as a one-element list, or use `yolo_license_plate_det_postprocess` with the `yolo_license_plate_det` model |
 | Board unresponsive mid-probe | Created an `lv` widget without display initialisation | Run the probe with the `--lvgl` flag |
-| Board wedges while loading the 9th kmodel, no exception, serial dies with `PermissionError(13)` | Too many `nn.kpu` instances resident at once. Ten GUI models coexist and still infer (measured: 32.8 MB, heap +1 KB), but adding the three Detect alternates wedges the board at 21.7 MB, so the limit is not the byte total | Keep the resident set at the ten models that were verified. Load alternates on demand, inside the app, one at a time |
+| Board wedges while loading the 9th kmodel, no exception, serial dies with `PermissionError(13)` | Reported once with the three Detect alternates loaded out of registry order; **did not reproduce**: all 16 GUI kmodels now load resident and each still infers (measured: heap within 1 KB across the whole set, every inference 27-109 ms, `tools/probes/_probe_pool16.py` / `_probe_pool16_infer.py`) | Load models in registry order through `model_pool`; if a wedge ever returns, bisect the load order before blaming the count |
 
 ## B. Traps that fail silently
 
@@ -80,6 +80,9 @@ nothing points at the cause.
 | Symptom | Cause | Do instead |
 |---|---|---|
 | `ValueError: only support RGB565/RGB888 image` | A JPEG-decoded `Image` was passed to a widget | Convert to RGB888 after scaling |
+| ARGB overlay cannot be shown at all | `as_lvgl_img_src` rejects ARGB8888 with "only support RGB565/RGB888" | Build `lv.img_dsc_t({"header": {"cf": lv.COLOR_FORMAT.ARGB8888, "w": W, "h": H}, "data_size": len(buf), "data": buf})` and pass it to `set_src` |
+| `ValueError: Value 'ndarray' must be an integer!` | The dsc `data` field was given a ulab ndarray | Give it a `bytearray`; keep an `np.frombuffer` view of the same bytearray for whatever writes pixels into it |
+| The overlay widget is visible but shows nothing | The pixels were written into a copy instead of the array the dsc points at, or the previous frame was never cleared | Keep one bytearray for the session and write through a `frombuffer` view (it shares memory on this build), then zero the view with `*= 0` each frame because the post-process leaves everything outside the mask untouched |
 | Colours are off by a channel | `image` stores R, G, B but the LVGL format reads B, G, R | `swap_rb()` before use |
 | Entire image hue occasionally flips (yellow to blue), next run is fine | Handing cached pixels to LVGL through the helper function; its colour-format handling is unreliable | Build an explicit `lv.img_dsc_t` with `cf = RGB888`; the desktop tiles take that path and never shifted |
 | Image looks like a few wrapped bands | The pixel buffer was not the same size as the widget | Match the frame size to the widget, or resize with `copy(x_scale=, y_scale=)` |

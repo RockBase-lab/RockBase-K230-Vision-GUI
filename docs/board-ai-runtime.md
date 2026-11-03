@@ -551,6 +551,67 @@ Opening an audio output stream after this chain still works, so the RetinaFace
 single-model path does not reproduce the audio contamination seen with the
 full Vision chain. See `reset-matrix.md`.
 
+## Face parsing (19 classes)
+
+Files: `face_parse.kmodel` (7382960 B, 320x320 input) plus the RetinaFace
+detector above. One output, `(1, 320, 320, 19)`, a per-pixel class map.
+
+Chain per face: crop the detected box with an affine transform, run the model,
+then map the class map back into a display-sized ARGB buffer.
+
+```python
+factor = 2.7                       # margin around the box the model was trained with
+scale = 320 * 2.0 / (factor * max(w, h))
+m = [scale, 0, 160 - scale * (x + w / 2),
+     0, scale, 160 - scale * (y + h / 2)]
+ai2d.affine(nn.interp_method.cv2_bilinear, 0, 0, 127, 1, m)
+ai2d.build([1, 3, prev_h, prev_w], [1, 3, 320, 320])
+```
+
+`aidemo.face_parse_post_process(buf, rgb_size, display_size, model_w, det, parse_out)`
+writes into `buf`, which must be an `(H, W, 4)` uint8 array.
+
+### the detection box passed in must already be y-corrected
+
+`face_parse_post_process` rebuilds the same affine matrix internally from `det`,
+so the x component cancels out between the two candidate conventions and only
+**y** distinguishes them. Measured on one centred face:
+
+| convention | rgb_size | mask rows |
+| --- | --- | --- |
+| corrected det | `[800, 480]` | 24..272 (centre 148) |
+| raw det (pad included) | `[800, 640]` | 114..300 (centre 207) |
+
+The expected centre is 162, and only the first row's x/y expansion ratio is
+self-consistent (248/210 against 194/149). Pass the **corrected** box and the
+**plain preview size**, not `[W, H + y_off]`: `y_off` belongs to the detector's
+argument, not this one. When the preview is also the mask size the mapping is
+the identity, which is why the Mask app runs a 640x384 preview.
+
+### it writes only inside the mask
+
+The class map is painted over the buffer; every pixel outside the mask keeps
+whatever it held before. A buffer reused across frames therefore smears the
+previous mask whenever the face moves. Either allocate a fresh zeroed array per
+frame or clear the shared one (`buf *= 0`, measured 10 ms for 640x384;
+`np.zeros` is cheaper still but the display path needs a `bytearray`, which has
+no `fill`).
+
+This is **not** how `segment_postprocess` behaves: it overwrites the whole
+buffer (a planted alpha value is gone after one call, and 95% of the pixels end
+up non-zero), so the Segment app can reuse its buffer without clearing.
+Verified by `tools/probes/_probe_seg_clear.py` and
+`tools/probes/_probe_face_parse_write.py`.
+
+### measured cost
+
+Per face: affine + build are outside the timing, `ai2d.run` + `kpu.run` +
+`to_numpy` = **110 ms** on a warm model (110 ms on two consecutive iterations,
+so it is the steady-state cost, not a first-call artefact), post-process 16 ms,
+buffer clear 10 ms. Detection adds 9 ms. With a full-screen ARGB overlay blended
+each frame, one step measures **205 ms (4.9 fps)**. The cost is per face, so
+parsing two faces roughly doubles it.
+
 ## Face landmark (106 points)
 
 Files: `face_landmark.kmodel` (1409104 B, 192x192 input) plus the RetinaFace

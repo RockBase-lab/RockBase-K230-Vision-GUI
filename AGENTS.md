@@ -270,12 +270,11 @@ corrupts behaviour. Each one links to the measured explanation.
     while another app owns the camera or KPU produced an alternating two-value
     pattern and a false 2.4 V span that did not reproduce once the board was
     idle. See `docs/pitfalls.md`.
-14. **Keep the number of simultaneously resident `nn.kpu` instances at
-    ten at most.** Ten GUI models coexist and still infer (measured 32.8 MB
-    of weights, Python heap unchanged within 1 KB), but adding the three
-    Detect alternates wedges the board while loading the ninth, with no
-    exception and a dead serial link. The limit is not the byte total, so
-    do not probe upward. Load alternates on demand, one at a time. See
+14. **Sixteen resident `nn.kpu` instances are safe; do not probe higher
+    without a fresh measurement.** All 16 GUI kmodels load and each still
+    infers in one process (measured: heap within 1 KB across the whole
+    set, every inference 27-109 ms). An earlier wedge at nine instances
+    did not reproduce once the models were loaded in registry order. See
     `docs/pitfalls.md`.
 15. **Never call `release()` on a kpu obtained from `model_pool`.** The
     pool owns every kpu it hands out and shares one instance across apps;

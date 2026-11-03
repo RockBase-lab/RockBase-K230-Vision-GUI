@@ -132,8 +132,8 @@ BOOT_WIFI_TIMEOUT_MS = 15000
 KMODEL_DIR = "/sdcard/examples/kmodel"
 
 # Every model any app can load, minus the three Detect alternates, with its measured
-# load cost. Ten is the ceiling: adding the alternates wedges the board while loading
-# the ninth (no exception, dead serial link). Alternates stay on demand in app_vision.
+# load cost. Sixteen resident kpus are verified safe (load + one inference each);
+# the alternates stay on demand in app_vision because nineteen is unmeasured.
 # The per-item costs are what keep the bar honest: the OCR pair alone is 1409 ms, so
 # advancing one tenth per model would stall the bar for over a second at a time.
 BOOT_MODELS = [
@@ -147,6 +147,12 @@ BOOT_MODELS = [
     ("licence_reco.kmodel", 75),
     ("ocr_det_int16.kmodel", 599),
     ("ocr_rec_int16.kmodel", 810),
+    ("person_detect_yolov5n.kmodel", 376),
+    ("yolov5n-falldown.kmodel", 366),
+    ("hand_det.kmodel", 496),
+    ("yolo11n-obb.kmodel", 834),
+    ("yolov8n_seg_320.kmodel", 676),
+    ("face_parse.kmodel", 515),
 ]
 
 # Every baked bitmap font, cheap to expensive with its measured load cost. 7469 of the
@@ -394,18 +400,29 @@ FOLDER_MEMBERS = {
         {"id": "pose", "name": "Pose", "icon": "assets/icon_pose.png",
          "symbol": _sym("USER"), "module": "apps.app_pose",
          "immersive": True, "release_home": True},
+        # Segment: instance masks tinted over the preview from an ARGB buffer.
+        # Runs at 640x384 preview: the display-sized masks buffer (W*H*4) is
+        # 1.5MB at 800x480 and does not fit the heap after release_home.
         {"id": "segment", "name": "Segment", "icon": "assets/icon_segment.png",
-         "symbol": _sym("CROP"), "module": "apps.app_placeholder"},
+         "symbol": _sym("CROP"), "module": "apps.app_segment",
+         "immersive": True, "release_home": True},
+        # Orient: rotated boxes (yolo11n-obb), drawn as closed lv.line quads.
         {"id": "orient", "name": "Orient", "icon": "assets/icon_orient.png",
-         "symbol": _sym("ROTATE_RIGHT"), "module": "apps.app_placeholder"},
+         "symbol": _sym("ROTATE_RIGHT"), "module": "apps.app_orient",
+         "immersive": True, "release_home": True},
+        # Person / Fall / Gesture: the three yolov5 anchor-based detectors share
+        # apps/anchor_det.py (3-output decode via aicube.anchorbasedet_post_process).
         {"id": "person", "name": "Person", "icon": "assets/icon_person.png",
-         "symbol": _sym("USER"), "module": "apps.app_placeholder"},
+         "symbol": _sym("USER"), "module": "apps.app_person",
+         "immersive": True, "release_home": True},
         {"id": "fall", "name": "Fall", "icon": "assets/icon_fall.png",
-         "symbol": _sym("WARNING"), "module": "apps.app_placeholder"},
+         "symbol": _sym("WARNING"), "module": "apps.app_fall",
+         "immersive": True, "release_home": True},
         # Gesture: a single-model hand task, so it belongs with the other
         # one-model detection entries rather than on the desktop.
         {"id": "gesture", "name": "Gesture", "icon": "assets/icon_gesture.png",
-         "symbol": _sym("HAND"), "module": "apps.app_placeholder"},
+         "symbol": _sym("HAND"), "module": "apps.app_gesture",
+         "immersive": True, "release_home": True},
         # Plate: detection -> crop -> recognition, so two models stay resident and
         # the heap has to be clean before they load. release_home frees the home
         # screen and the tile cache first, the same trade Detect and Pose make.
@@ -448,7 +465,8 @@ FOLDER_MEMBERS = {
          "symbol": _sym("EYE_OPEN"), "module": "apps.app_face_liveness",
          "immersive": True, "release_home": True},
         {"id": "mask", "name": "Mask", "icon": "assets/icon_mask.png",
-         "symbol": _sym("SHIELD"), "module": "apps.app_placeholder"},
+         "symbol": _sym("SHIELD"), "module": "apps.app_mask",
+         "immersive": True, "release_home": True},
     ],
 }
 

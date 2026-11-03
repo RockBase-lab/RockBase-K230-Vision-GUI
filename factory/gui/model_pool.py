@@ -9,10 +9,10 @@
 # only release_all() does, and it exists for shutdown. An app's destroy() only
 # deinits its own ai2d, which is per-app because the input geometry differs.
 #
-# Measured on board: ten resident models cost about 1 KB of Python heap, because
-# load_kmodel places the weights and KPU arenas outside the GC heap. Do not exceed
-# ten: adding the three Detect alternates wedges the board while loading the ninth,
-# with no exception and a dead serial link.
+# Measured on board: sixteen resident models cost about 1 KB of Python heap in
+# total, because load_kmodel places the weights and KPU arenas outside the GC
+# heap. All sixteen load and each still infers (27-109 ms). An earlier report
+# of a wedge at nine instances did not reproduce with registry-order loads.
 
 import gc
 import time

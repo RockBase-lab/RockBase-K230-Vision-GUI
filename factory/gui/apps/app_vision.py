@@ -341,9 +341,9 @@ class VisionApp:
         """Release the ai2d, and the kpu only when this app owns it.
 
         The default model comes from the shared pool and must not be released. The
-        three alternates are loaded here instead of in the pool: pooling them too
-        would put thirteen kpus resident, and the measured ceiling is ten (the board
-        wedges while loading the ninth of the extra set, with no exception)."""
+        three alternates are loaded here instead of in the pool: sixteen resident
+        kpus are verified, nineteen are not, so pooling the alternates is untested
+        territory."""
         if self.kpu is not None and self._owns_kpu:
             try:
                 self.kpu.release()
