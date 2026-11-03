@@ -314,9 +314,9 @@ def _clean(o):
 # member picker layer (_open_folder) instead of an app. Members live in FOLDER_MEMBERS
 # and use the same meta shape as top-level entries, so flags such as
 # immersive/release_home still apply.
-# The top level stays at 15 entries = two pages of a 4x2 grid, which keeps paging
-# meaningful. Placeholder entries point at apps.app_placeholder; swap in apps.app_xxx
-# once the real app exists.
+# The top level holds 14 entries = two pages of a 4x2 grid (8 + 6), which keeps
+# paging meaningful. Placeholder entries point at apps.app_placeholder; swap in
+# apps.app_xxx once the real app exists.
 APPS = [
     {"id": "camera", "name": "Camera", "icon": "assets/icon_camera.png",
      "symbol": _sym("CAMERA", "VIDEO"), "module": "apps.app_camera",
@@ -349,8 +349,6 @@ APPS = [
     # face database, so it stands alone as a group.
     {"id": "face", "name": "Face", "icon": "assets/icon_face.png",
      "symbol": _sym("USER"), "folder": True},
-    {"id": "gesture", "name": "Gesture", "icon": "assets/icon_gesture.png",
-     "symbol": _sym("HAND"), "module": "apps.app_placeholder"},
     # Voice group: KWS wake word plus TTS output (speech in and speech out as a pair).
     {"id": "voice", "name": "Voice", "icon": "assets/icon_voice.png",
      "symbol": _sym("MIC", "MICROPHONE"), "folder": True},
@@ -410,6 +408,10 @@ FOLDER_MEMBERS = {
          "symbol": _sym("USER"), "module": "apps.app_placeholder"},
         {"id": "fall", "name": "Fall", "icon": "assets/icon_fall.png",
          "symbol": _sym("WARNING"), "module": "apps.app_placeholder"},
+        # Gesture: a single-model hand task, so it belongs with the other
+        # one-model detection entries rather than on the desktop.
+        {"id": "gesture", "name": "Gesture", "icon": "assets/icon_gesture.png",
+         "symbol": _sym("HAND"), "module": "apps.app_placeholder"},
         # Plate: detection -> crop -> recognition, so two models stay resident and
         # the heap has to be clean before they load. release_home frees the home
         # screen and the tile cache first, the same trade Detect and Pose make.
