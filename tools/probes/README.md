@@ -182,6 +182,7 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_settings_shot.py` | Settings app screen capture for layout review (needs `--lvgl`) |
 | `_probe_memory_view.py` | What memory Python can report: GC heap size, and the absence of any system/MMZ query |
 | `_probe_heap_growth.py` | Whether the GC arena grows on demand, and how large a contiguous block still fits |
+| `_probe_desktop_pages.py` | Desktop page 1, page 2 and a folder flyout in one run, with member icons checked on disk (needs `--lvgl`) |
 
 Snapshot probes print a run-length encoded frame plus base64 blocks. Pipe that
 output through a file, then decode it with

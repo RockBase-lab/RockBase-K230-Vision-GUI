@@ -193,18 +193,14 @@ APP_ACCENTS = {
     "gallery":  0x9C92C9,
     "audio":    0x6FB8A4,
     "vision":   0xC990A8,
-    "system":   0x94A3B8,
     "battery":  0xC9AE7A,
     "imu":      0x7FA6CC,
     "network":  0x74B5AC,
     "settings": 0x9CA3AF,
     "video":    0xCC8A92,
-    "voice":    0xA992C7,
-    "talk":     0x79AFCF,
     "scan":     0xA9BE7C,
     "face":     0xD9A76A,
     "gesture":  0x8FBF9F,
-    "tracker":  0x9AA8E0,
     # Second-level flyout members (placeholders inside the vision / face folders)
     "pose":     0xC990A8,
     "segment":  0xB79FC9,
@@ -314,7 +310,7 @@ def _clean(o):
 # member picker layer (_open_folder) instead of an app. Members live in FOLDER_MEMBERS
 # and use the same meta shape as top-level entries, so flags such as
 # immersive/release_home still apply.
-# The top level holds 13 entries = two pages of a 4x2 grid (8 + 5), which keeps
+# The top level holds 11 entries = two pages of a 4x2 grid (8 + 3), which keeps
 # paging meaningful. Placeholder entries point at apps.app_placeholder; swap in
 # apps.app_xxx once the real app exists. Board facts (firmware, heap, model
 # count) live in the Settings app rather than a separate System tile.
@@ -350,11 +346,6 @@ APPS = [
     # face database, so it stands alone as a group.
     {"id": "face", "name": "Face", "icon": "assets/icon_face.png",
      "symbol": _sym("USER"), "folder": True},
-    # Voice group: KWS wake word plus TTS output (speech in and speech out as a pair).
-    {"id": "voice", "name": "Voice", "icon": "assets/icon_voice.png",
-     "symbol": _sym("MIC", "MICROPHONE"), "folder": True},
-    {"id": "tracker", "name": "Tracker", "icon": "assets/icon_tracker.png",
-     "symbol": _sym("TARGET"), "module": "apps.app_placeholder"},
     # IMU: on-board QMI8658A six-axis inertial sensor (I2C3 / GPIO44-45).
     # Three pages: driving dashboard / raw data curves / attitude-angle curves,
     # switched by swiping.
@@ -455,12 +446,6 @@ FOLDER_MEMBERS = {
          "immersive": True, "release_home": True},
         {"id": "mask", "name": "Mask", "icon": "assets/icon_mask.png",
          "symbol": _sym("SHIELD"), "module": "apps.app_placeholder"},
-    ],
-    "voice": [
-        {"id": "kws", "name": "Wake", "icon": "assets/icon_voice.png",
-         "symbol": _sym("MIC"), "module": "apps.app_placeholder"},
-        {"id": "tts", "name": "Talk", "icon": "assets/icon_talk.png",
-         "symbol": _sym("VOLUME_HIGH"), "module": "apps.app_placeholder"},
     ],
 }
 

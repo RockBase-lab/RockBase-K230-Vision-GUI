@@ -68,27 +68,23 @@ SUPERSAMPLE = 4               # render multiplier (times 2 as svglib's upscale b
 INK_THRESHOLD = 24            # brightness threshold for "has ink" on black
 
 # Output name -> Lucide icon file name (https://lucide.dev/icons)
-# The last 10 are planned new apps (K230 chip features plus RockBase board
-# features); only the icons ship for now, and their module still points at
-# apps.app_placeholder.
+# One row per icon the product ships: every top-level app, plus every folder
+# member. An id that is not in the launcher registry yet (currently "video")
+# ships its icon ahead of the app.
 ICONS = {
     "touch": "hand",
     "camera": "camera",
     "audio": "mic",
     "gallery": "image",
     "vision": "brain-circuit",     # KPU / AI inference page
-    "system": "cpu",               # system info (chip id / temp / memory / RTC / storage)
     "battery": "battery-medium",   # battery ADC level page
     "imu": "rotate-3d",           # on-board QMI8658A IMU (three-axis rotation)
     "network": "wifi",             # WiFi / HTTP / NTP
     "settings": "settings",        # brightness / volume / key mapping settings
     "video": "video",              # camera recording (MJPEG/MP4)
-    "voice": "mic-vocal",          # KWS offline voice wake word
-    "talk": "audio-lines",         # TTS / sound box
     "scan": "qr-code",             # QR code / barcode scanning
     "face": "scan-face",           # face group (detect / features / recognise)
     "gesture": "hand-metal",       # gesture recognition
-    "tracker": "crosshair",        # object tracking / line crossing counter
     # ---- secondary popup (folder) member icons ----
     # This firmware's lv.SYMBOL exposes only 62 entries; USER/CROP/CPU/FLASK_1 and
     # friends are all missing, so placeholder members could only draw a circular badge
