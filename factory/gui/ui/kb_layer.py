@@ -54,6 +54,15 @@ _KB_FONT_BIN = "kb_nunito_bold_28.bin"
 _KB_FONT_CACHE = None   # font_load allocates memory; a module-level cache avoids reloading per overlay
 
 
+def _gui_root():
+    """GUI root that holds assets/: this module sits in factory/gui/ui/, so the
+    asset directory is one level above the module's own directory."""
+    try:
+        return __file__.rsplit("/", 2)[0]
+    except (NameError, AttributeError):
+        return "/sdcard/factory/gui"
+
+
 def load_kb_font():
     """Keyboard font: load the 28px bin bitmap font at runtime, falling back to the
     built-in montserrat_16.
@@ -66,11 +75,7 @@ def load_kb_font():
         return _fallback_font()
     if _KB_FONT_CACHE is not None:
         return _KB_FONT_CACHE
-    try:
-        d = __file__.rsplit("/", 1)[0]
-    except NameError:
-        d = "/sdcard/factory/gui"
-    path = "A:" + d + "/assets/fonts/" + _KB_FONT_BIN
+    path = "A:" + _gui_root() + "/assets/fonts/" + _KB_FONT_BIN
     try:
         font = lv.font_load(path)
     except Exception:
@@ -105,11 +110,7 @@ def _load_png(path):
 
 
 def _asset(name):
-    try:
-        d = __file__.rsplit("/", 1)[0]
-    except NameError:
-        d = "/sdcard/factory/gui"
-    return d + "/assets/" + name
+    return _gui_root() + "/assets/" + name
 
 
 def mode_consts():
