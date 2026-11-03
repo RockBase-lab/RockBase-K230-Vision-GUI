@@ -58,6 +58,10 @@ _ADC = None
 _last = None                # (tick_ms, mv, percent, level)
 _primed = False
 
+# Counts the resample bursts status() runs every CACHE_MS. The Battery app shares this
+# channel, so a trace can tell whether a batch overlapped one. Read-only for consumers.
+STATUS_SAMPLES = 0
+
 
 def adc():
     """Open the shared ADC5 handle once and keep it. Raises on failure."""
@@ -147,11 +151,12 @@ def status(force=False):
 
     Returns None when the channel cannot be read; callers keep their last icon.
     """
-    global _last, _primed
+    global _last, _primed, STATUS_SAMPLES
     now = time.ticks_ms()
     if not force and _last is not None:
         if time.ticks_diff(now, _last[0]) < CACHE_MS:
             return _last[1], _last[2], _last[3]
+    STATUS_SAMPLES += 1
     try:
         if not _primed:
             # The first conversion after ADC() is created returns 0 on this board.

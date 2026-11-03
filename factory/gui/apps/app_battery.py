@@ -1,8 +1,11 @@
 # Battery app: pack voltage through the on-board divider on ADC5.
 #
-# Sampling: 31 samples 10 ms apart, median taken, so a single full-scale spike
-# cannot move the reading. One sample per step() call keeps the main loop
-# responsive -- the settle time is a deadline, never a sleep.
+# Sampling: one conversion per step() call, median taken, so a single full-scale
+# spike cannot move the reading. The batch is closed on elapsed time, not on a
+# sample count, because step() runs once per panel frame (measured 33 ms with the
+# desktop up) and a count would stretch the window -- and the span with it. One
+# sample per call keeps the main loop responsive: every wait here is a deadline,
+# never a sleep.
 #
 # Voltage chain, measured on this board:
 #   read_uv() assumes a 1.80 V reference but the rail measures 1.88 V, so raw
@@ -18,6 +21,7 @@ import lvgl as lv
 from machine import FPIOA, Pin
 
 import batt
+from apps.batt_trace import open_session
 from apps.error import AppUnavailable
 
 BATTERY_UNAVAILABLE = ("Battery ADC does not respond.\n"
@@ -42,12 +46,16 @@ ADC_FULL_MV = batt.ADC_FULL_MV
 MAX_INPUT_UV = batt.MAX_INPUT_UV
 
 # ---- sampling ----
-# Measured with the board idle: 31 samples at 10ms hold the peak-to-peak span at
-# 3-40mV, so the reference implementation's 10ms cadence is safe. A 100mV limit
-# leaves room for a real load step.
+# A batch is a window of elapsed time, not a count: step() is called once per panel
+# refresh (measured ~33 ms with the desktop up), so a count would let the loop's own
+# period decide the window -- and span grows with the window. Closing on time keeps
+# the 100 mV threshold meaning the same thing at any loop rate. Measured on an idle
+# board over such a window: peak-to-peak span 3-40 mV.
 SETTLE_MS = 500             # settle time after the divider enable pin is driven
-SAMPLE_COUNT = 31           # odd count: the median is an actual sample
-SAMPLE_GAP_MS = 10
+SAMPLE_WINDOW_MS = 320      # batch length; span is only comparable over a fixed window
+SAMPLE_MIN_COUNT = 5        # a stalled loop must not close a two-sample batch
+SAMPLE_COUNT = 31           # hard cap on conversions per batch
+SAMPLE_GAP_MS = 10          # enforced only when the loop runs faster than this
 REFRESH_MS = 1000
 SPAN_LIMIT_MV = 100         # peak-to-peak above this means an unstable input
 ABSENT_MAX_MV = batt.ABSENT_MAX_MV
@@ -60,6 +68,9 @@ CHARGE_MIN_MV = 4250
 # Sanity bound only: above this the divider ratio or the Vref constant is wrong.
 PRESENT_MAX_MV = 4600
 FAIL_LIMIT = 20             # consecutive ADC exceptions = the channel is gone
+# Every Nth traced batch skips its repaint. A smaller span there means this app's own
+# redraw is the load being measured; an unchanged span means the load is elsewhere.
+TRACE_QUIET_EVERY = 8
 
 # ---- UI ----
 COL_TEXT = 0xE6EAF0
@@ -233,6 +244,7 @@ class BatteryApp(object):
         self._sampled = 0
         self._span = 0
         self._raws_median = 0
+        self._batch_ms = None   # first conversion of the current batch
         self._next_ms = None
         self._history = []
         self._history_dirty = False
@@ -241,8 +253,21 @@ class BatteryApp(object):
         self._mv = None
         self._primed = False
 
+        # ---- trace ----
+        self._trace = None      # opened after the UI exists, see apps/batt_trace.py
+        self._seq = 0
+        self._uvs = []          # every conversion this batch; -1 = the read raised
+        self._rel = []          # us from the batch start
+        self._gap = []          # us from the previous conversion
+        self._sp = []           # us from the last repaint request, -1 = none yet
+        self._batch_us = 0
+        self._prev_us = 0
+        self._paint_us = 0
+        self._paint_cost_us = 0
+
         self._open_adc()
         self._build_ui(content)
+        self._trace = open_session()
         self._next_ms = time.ticks_add(time.ticks_ms(), SETTLE_MS)
         print("[Battery] ADC{} enabled, settling {}ms".format(
             ADC_CHANNEL, SETTLE_MS))
@@ -465,6 +490,17 @@ class BatteryApp(object):
     # ---------- sampling ----------
     def _read_one(self):
         self._attempts += 1
+        traced = self._trace is not None
+        if traced:
+            now_us = time.ticks_us()
+            if self._batch_us == 0:
+                self._batch_us = now_us
+            gap = time.ticks_diff(now_us, self._prev_us) if self._prev_us else 0
+            self._prev_us = now_us
+            self._rel.append(time.ticks_diff(now_us, self._batch_us))
+            self._gap.append(gap)
+            self._sp.append(time.ticks_diff(now_us, self._paint_us)
+                            if self._paint_us else -1)
         # One conversion per sample, taken as read_uv() only. Both methods describe
         # the same 12-bit conversion (measured raw=3417 next to 1501mV), so the code
         # is derived instead of read a second time.
@@ -473,6 +509,8 @@ class BatteryApp(object):
             self._fails = 0
         except BaseException as error:
             self._fails += 1
+            if traced:
+                self._uvs.append(-1)
             print("[Battery] read failed ({}/{}): {}".format(
                 self._fails, FAIL_LIMIT, error))
             if self._fails >= FAIL_LIMIT:
@@ -482,6 +520,8 @@ class BatteryApp(object):
 
         if uv <= 0 or uv > MAX_INPUT_UV:
             self._rejected += 1
+            if traced:
+                self._uvs.append(uv)
             return
 
         # Derive the 12-bit code from the same conversion instead of reading the
@@ -491,8 +531,10 @@ class BatteryApp(object):
         self._tap_uv = uv
         self._raws.append(raw)
         self._mvs.append(batt.pack_mv(uv))
+        if traced:
+            self._uvs.append(uv)
 
-    def _publish(self):
+    def _publish(self, quiet=False):
         raws = sorted(self._raws)
         mvs = sorted(self._mvs)
         sampled = len(mvs)
@@ -503,7 +545,10 @@ class BatteryApp(object):
             self._raws_median = 0
             self._span = 0
             self._tap_uv = 0
-            self._set_status(STATUS_ERROR)
+            if quiet:
+                self._status = STATUS_ERROR
+            else:
+                self._set_status(STATUS_ERROR)
         else:
             middle = sampled // 2
             self._raws_median = raws[middle]
@@ -511,24 +556,55 @@ class BatteryApp(object):
             self._span = mvs[-1] - mvs[0]
             status, pct = _classify(self._mv, self._span, self._rejected, sampled)
             self._percent = pct
-            self._set_status(status)
+            if quiet:
+                self._status = status
+            else:
+                self._set_status(status)
             if self._mv > ABSENT_MAX_MV:
                 self._history.append(self._mv)
                 if len(self._history) > HISTORY_POINTS:
                     del self._history[0]
                 self._history_dirty = True
 
-        self._paint()
-        if self._history_dirty:
-            self._history_dirty = False
-            self._repaint_history()
+        t_paint = time.ticks_us()
+        if quiet:
+            self._paint_cost_us = -1
+        else:
+            self._paint()
+            if self._history_dirty:
+                self._history_dirty = False
+                self._repaint_history()
+            self._paint_us = time.ticks_us()
+            self._paint_cost_us = time.ticks_diff(self._paint_us, t_paint)
 
-        print("[Battery] raw={} tap={}mV pack={}mV span={}mV reject={} pct={} {}".format(
-            self._raws_median, self._tap_uv // 1000,
-            self._mv if self._mv is not None else -1,
-            self._span, self._rejected,
-            self._percent if self._percent is not None else -1,
-            self._status))
+        # A detached USB console must not stop the batch loop: with the cable out the
+        # trace file is the only record left of what happened.
+        try:
+            print("[Battery] raw={} tap={}mV pack={}mV span={}mV reject={} pct={} {}".format(
+                self._raws_median, self._tap_uv // 1000,
+                self._mv if self._mv is not None else -1,
+                self._span, self._rejected,
+                self._percent if self._percent is not None else -1,
+                self._status))
+        except BaseException:
+            pass
+
+        if self._trace is not None:
+            try:
+                self._trace.batch(self._rel, self._gap, self._sp, self._uvs,
+                                  self._raws_median, self._tap_uv,
+                                  self._status, self._percent,
+                                  self._paint_cost_us, quiet)
+                self._seq += 1
+            except BaseException as error:
+                print("[Battery] trace failed: {}".format(error))
+                self._trace = None
+        self._uvs = []
+        self._rel = []
+        self._gap = []
+        self._sp = []
+        self._batch_us = 0
+        self._prev_us = 0
 
         self._raws = []
         self._mvs = []
@@ -553,19 +629,36 @@ class BatteryApp(object):
             self._next_ms = now
             return
 
+        if self._batch_ms is None:
+            self._batch_ms = now
         self._read_one()
-        if self._attempts < SAMPLE_COUNT:
+        # Close on elapsed time, never on a sample count alone: the loop's own period
+        # is what would otherwise decide the window. The count stays as a cap so a loop
+        # that suddenly runs fast cannot make one batch outnumber the others.
+        elapsed = time.ticks_diff(now, self._batch_ms)
+        if (self._attempts < SAMPLE_COUNT
+                and not (elapsed >= SAMPLE_WINDOW_MS
+                         and len(self._mvs) >= SAMPLE_MIN_COUNT)):
             self._next_ms = time.ticks_add(now, SAMPLE_GAP_MS)
             return
 
-        self._publish()
-        # Accumulate on the batch deadline rather than on "now": one batch costs
-        # 31 * 10ms = 310ms, so chaining from now would stretch the period to 1.31s
-        # and the "31 / 1 s" readout would be a lie.
+        quiet = bool(self._trace is not None and self._seq
+                     and self._seq % TRACE_QUIET_EVERY == 0)
+        self._publish(quiet)
+        self._batch_ms = None
+        # Accumulate on the batch deadline rather than on "now": a batch costs
+        # SAMPLE_WINDOW_MS, so chaining from now would stretch the period and make the
+        # "n / 1 s" readout a lie.
         self._next_ms = time.ticks_add(due, REFRESH_MS)
 
     def destroy(self):
         self._release()
+        if self._trace is not None:
+            try:
+                self._trace.close()
+            except BaseException:
+                pass
+            self._trace = None
         print("[Battery] divider disabled")
 
 

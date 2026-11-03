@@ -136,7 +136,8 @@ nothing points at the cause.
 
 | Symptom | Cause | Do instead |
 |---|---|---|
-| The battery span reads about 2.4 V of noise and the raw code alternates between two values (3837 / 3297) | The ADC was sampled while another app owned the camera or KPU; the pattern did not reproduce on an idle board | Confirm the board is idle before diagnosing the sampling code; 31 samples at 10 ms on an idle board hold 3-40 mV |
+| The battery span reads about 2.4 V of noise and the raw code alternates between two values (3837 / 3297) | The ADC was sampled while another app owned the camera or KPU; the pattern did not reproduce on an idle board | Confirm the board is idle before diagnosing the sampling code; an idle board holds the peak-to-peak span under 25 mV |
+| The battery span jumps by 150-250 mV although the reading is steady before and after | The batch window straddled a real level step, typically the 218 mV change when the USB cable is plugged in or pulled while the app samples | Compare `min`/`max` instead of trusting `span`: a step between two stable levels is not ripple, so judge instability by the distribution, not by peak-to-peak |
 | Toggling the divider enable pin changes nothing | On this board GPIO69 does not gate the ADC5 divider, and `Pin.value(1)` reads back 0 | Do not rely on it to save power; the divider is permanently powered |
 | The board wedges and the serial link drops while probing ADC channels | `ADC(4)` hangs this board | Never open channel 4; channels 0-3 and 5 are safe |
 

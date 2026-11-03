@@ -176,8 +176,13 @@ gyro LSB is 15.6 mdps with 0.2-0.5 dps noise, so one decimal suffices.
   `1501 * 4095 / 1800 = 3414`. Either one alone is usable and they may be read
   back to back — measured 14 consecutive pairs at 10 ms spacing with no
   saturated value.
-- With 31 samples 10 ms apart the peak-to-peak span is 3-40 mV, which is why
-  the app's instability threshold is 100 mV.
+- A batch is a 320 ms window, not a fixed number of samples: `step()` is called
+  once per panel refresh (measured ~33 ms with the desktop up), so only the
+  elapsed time keeps the window — and therefore the span — comparable between
+  runs. The count is capped at 31 reads, which leaves about 11 in a normal
+  window. Measured over 95 batches with the desktop running: span 15 mV median,
+  21 mV p90. Those batches used the older, longer window, so they bound the
+  current one from above; the app's instability threshold is 100 mV.
 - **GPIO69 does not gate this divider.** The reading is unchanged with the pin
   high, low, or after a 3 s settle, and `Pin.value(1)` reads back 0. Drive it
   low on exit so it is never left floating, but do not count on it to save
