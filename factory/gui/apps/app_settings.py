@@ -20,6 +20,7 @@ import lvgl as lv
 import config
 from ui import backlight
 from ui import beep
+from version import GUI_VERSION
 
 COL_TEXT = 0xE6EAF0
 COL_MUTED = 0x8A94A2
@@ -85,6 +86,7 @@ GROUPS = (
     ("SYSTEM", (
         # This section is the old System tile: that entry was a placeholder, so the
         # board facts live here instead of behind a second, empty icon.
+        {"type": "info", "label": "GUI version", "value": GUI_VERSION},
         {"type": "info", "label": "Firmware", "value": FW_RELEASE},
         {"type": "info", "label": "Machine", "value": FW_MACHINE},
         # Scope matters: gc only reports the MicroPython GC arena, whose initial
