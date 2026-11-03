@@ -41,6 +41,7 @@ Recovery for every entry here is a power cycle. Programmatic resets do not help.
 | Probe stops right after `load_kmodel`, then the serial link dies with `ClearCommError` / `PermissionError(13)` | Called `get_output_tensor()` before `kpu.run()`; the native call blocks with no exception and the board never returns | Call `get_output_tensor()` only after `run()`; to inspect a model, run it on a synthetic frame first |
 | Board wedges inside `aidemo.licence_det_postprocess` with no exception | Passed the raw `to_numpy()` array; the function wants the `AIBase` results **list** (`[ndarray]`), and a bare ndarray hangs the native layer | Pass `results` as a one-element list, or use `yolo_license_plate_det_postprocess` with the `yolo_license_plate_det` model |
 | Board unresponsive mid-probe | Created an `lv` widget without display initialisation | Run the probe with the `--lvgl` flag |
+| Board wedges while loading the 9th kmodel, no exception, serial dies with `PermissionError(13)` | Too many `nn.kpu` instances resident at once. Ten GUI models coexist and still infer (measured: 32.8 MB, heap +1 KB), but adding the three Detect alternates wedges the board at 21.7 MB, so the limit is not the byte total | Keep the resident set at the ten models that were verified. Load alternates on demand, inside the app, one at a time |
 
 ## B. Traps that fail silently
 

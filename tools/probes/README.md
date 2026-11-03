@@ -165,6 +165,7 @@ See `docs/pitfalls.md` for the full trap index.
 | `_cap_ocr_result.py` | Result view geometry (12 labels, reading order, no overlap) plus a band capture (needs `--lvgl`) |
 | `_probe_preload_budget.py` | Whether every GUI kmodel can stay resident at once, and the heap cost |
 | `_probe_preload_run.py` | Inference still works with all ten GUI models resident |
+| `_probe_boot_budget.py` | Per-item boot cost for fonts, the OCR dictionary and thirteen kmodels (needs `--lvgl`) |
 | `_cap_run.py` | Run a display probe as a subprocess, capture raw output |
 | `_start_launcher.py` | Start the on-board GUI with a single exec |
 
