@@ -64,8 +64,7 @@ try:
     skel_ok = (not app.palm_dot.has_flag(lv.obj.FLAG.HIDDEN)
                and not app.finger_lines[0].has_flag(lv.obj.FLAG.HIDDEN)
                and not app.dots[0].has_flag(lv.obj.FLAG.HIDDEN))
-    print("V skeleton_visible={} box_visible={}".format(
-        skel_ok, not app.box_line.has_flag(lv.obj.FLAG.HIDDEN)))
+    print("V skeleton_visible={}".format(skel_ok))
 
     launcher.close_app()
     launcher = None

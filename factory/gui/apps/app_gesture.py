@@ -4,8 +4,9 @@
 #   stage 2  handkp_det.kmodel (256x256) -> 21 keypoints on the largest hand
 #   classify with pure angle rules over the finger joints -> one of nine names
 #
-# The overlay draws the hand box, a 21-point skeleton (palm + five four-joint
-# fingers), and the recognised gesture in the top bar. Layout and interaction
+# The overlay draws a 21-point skeleton (palm + five four-joint fingers) and
+# the recognised gesture in the top bar; the det box is used for the crop only,
+# never drawn. Layout and interaction
 # follow Pose: immersive screen, one 56 px info bar, CANCEL(GPIO0) exits,
 # OK(GPIO53) freezes/resumes.
 #
@@ -83,7 +84,6 @@ COL_HINT = 0x7A8794
 COL_FROZEN = 0xFF8A65
 COL_ERROR = 0xFF6B6B
 
-COL_BOX = 0xFFB74D
 COL_PALM = 0x00E5A0
 COL_DOT = 0x5CE8C0
 FINGER_COLORS = [0xE57373, 0xF4A941, 0xD4E157, 0x66BB6A, 0x64B5F6]
@@ -178,17 +178,6 @@ class GestureApp:
         self.img_widget = lv.img(content)
         self.img_widget.set_size(self.img_w, self.img_h)
         self.img_widget.align(lv.ALIGN.CENTER, 0, 0)
-
-        # ---- hand box outline (closed 5-point polyline) ----
-        self.box_line = lv.line(content)
-        self.box_line.set_points([{"x": 0, "y": 0}] * 5, 5)
-        self.box_line.set_style_line_width(LINE_W, 0)
-        self.box_line.set_style_line_color(lv.color_hex(COL_BOX), 0)
-        try:
-            self.box_line.set_style_line_rounded(True, 0)
-        except BaseException:
-            pass
-        self.box_line.add_flag(lv.obj.FLAG.HIDDEN)
 
         # ---- skeleton pool: palm dot + five finger polylines + 20 joint dots ----
         self.palm_dot = self._make_dot(PALM_SIZE, COL_PALM)
@@ -415,19 +404,11 @@ class GestureApp:
 
     # ---------------- drawing ----------------
     def _hide_overlay(self):
-        self.box_line.add_flag(lv.obj.FLAG.HIDDEN)
         self.palm_dot.add_flag(lv.obj.FLAG.HIDDEN)
         for ln in self.finger_lines:
             ln.add_flag(lv.obj.FLAG.HIDDEN)
         for dot in self.dots:
             dot.add_flag(lv.obj.FLAG.HIDDEN)
-
-    def _show_box(self, box):
-        x1, y1, x2, y2 = int(box[2]), int(box[3]), int(box[4]), int(box[5])
-        pts = [{"x": x1, "y": y1}, {"x": x2, "y": y1}, {"x": x2, "y": y2},
-               {"x": x1, "y": y2}, {"x": x1, "y": y1}]
-        self.box_line.set_points(pts, 5)
-        self.box_line.clear_flag(lv.obj.FLAG.HIDDEN)
 
     def _show_skeleton(self, pts):
         px, py = pts[0], pts[1]
@@ -520,8 +501,6 @@ class GestureApp:
             return
 
         if pts is not None:
-            if box is not None:
-                self._show_box(box)
             self._show_skeleton(pts)
             self.last_gesture = gesture
             self._print_state(box, gesture)
