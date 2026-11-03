@@ -13,6 +13,51 @@ inference, post-processing, LVGL object updates and flush.
 Observed jitter is normal: single frames of 30-40 ms occur from system-level
 scheduling (LVGL, touch, network manager) and are not controllable by an app.
 
+## Boot preload
+
+Every blocking resource loads once, at boot, into a resident pool
+(`model_pool`, `font_pool`, `ocr_dict`), so an app's open path is a lookup
+instead of a load. Measured cold, one process, cache-purged:
+`_probe_boot_preload.py`.
+
+| Boot step | Cost |
+|---|---|
+| tile cache read (15 tiles) | 895-1036 ms |
+| bitmap fonts, 5 files | 5400-5650 ms |
+| OCR dictionary (6549 entries) | 337-346 ms |
+| ten kmodels | 3977-4308 ms |
+| progress-bar animation | 640 ms total |
+| **assets subtotal** | **11.2-11.3 s** |
+| Wi-Fi (connected) | 5.6 s, overlapped with nothing |
+| **total, Wi-Fi connected** | **about 11.3 s** |
+| **total, Wi-Fi unreachable** | **about 27 s** (the failing `connect()` blocks ~15 s in the C layer) |
+
+The progress bar is interpolated by hand, in between steps, at a cost of about
+640 ms over the whole boot. It cannot be driven by `lv_anim`: the boot spends most
+of its time inside blocking C calls (`load_kmodel`, `font_load`) where nothing
+repaints, so a timer-driven animation would sit frozen and then snap to its end
+value on the next tick. Animating between steps is the only place the motion can
+actually show. Measured: 72 rendered frames, the 41% jump at the OCR font turned
+into a 13-frame sweep, no hard jump left among the steps themselves.
+
+The fonts are 5.4 s of that, and 4.9 s of the fonts is the 4036-glyph OCR font
+alone. The models load in 4.0-4.3 s and cost about 1 KB of Python heap (see
+`docs/board-ai-runtime.md`), so the pool is affordable; what it buys is the open
+path below.
+
+App open cost with everything resident, measured through the real launcher:
+
+| App | Before preload | After |
+|---|---|---|
+| OCR | 2151-2289 ms | **468-817 ms** |
+| Plate | about 1200 ms | **240-632 ms** |
+| Faces | about 1000 ms | **234-459 ms** |
+| Points | about 1150 ms | **243-438 ms** |
+
+What remains is sensor bring-up, the ai2d build and the widget tree; no kmodel or
+font is loaded. `release_home` still applies: the pool removes the load cost, not
+the need for a contiguous block for `to_numpy()`.
+
 ## Repaint costs
 
 Because the firmware uses `DISP_RENDER_MODE.FULL`, any invalidation repaints the
@@ -202,20 +247,23 @@ runs one blocking detect+recognize pass. Measured inside the real launcher
 
 | Stage | Cost |
 |---|---|
-| det kmodel + rec kmodel load | 1900 ms, once at open |
+| det kmodel + rec kmodel load | 1900 ms, once at open (now moved to boot) |
 | app open total (models only) | 2200 ms |
-| CJK font load (4036 glyphs) | 4900 ms, once on the first scan |
+| CJK font load (4036 glyphs) | 4900 ms, once |
 | first scan, 12 lines | 6300 ms (font + detect + recognize) |
 | later scans, 12 lines | 1400 ms |
 | detection (ai2d 640x640 + kpu + `ocr_post_process`) | ~230-294 ms |
 | recognition per box (rec ai2d 512x32 + kpu + CTC) | ~70 ms |
 | preview while idle | 28.4 fps, no frame over 40 ms |
 
-The font is loaded on the **first scan**, not at open. At open it froze the
-screen for 4.9 s before any preview appeared, which reads as the app hanging;
-moving it to the scan the user explicitly triggers keeps open at 2.2 s and the
-preview smooth from the first frame. It is module-cached, so only the first scan
-in a process pays it.
+Both models, the dictionary and the font now come from the boot-time pool, so the
+open path no longer pays them: measured 468-817 ms, all of it sensor bring-up,
+ai2d build and the widget tree. Three earlier placements were rejected on the way
+here, and each one is why the boot preload exists:
+
+- at open, the font froze the screen for 4.9 s before any preview appeared;
+- on the first scan, it kept open at 2.2 s but moved the 4.9 s into the scan;
+- in the pool, it costs 5.4 s of boot and nothing at either point.
 
 The glyph count is the only font-load lever: measured ~1.2 ms per glyph,
 independent of file size or range count. The shipped subset is 4036 glyphs: the

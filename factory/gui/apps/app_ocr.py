@@ -40,6 +40,9 @@ from ui import beep
 from apps.error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                         close_sensor)
 from camera_fov import set_preview
+from model_pool import get as model_get
+import font_pool
+import ocr_dict
 
 PREVIEW_W = 800               # capture size shared by preview and AI (= screen)
 PREVIEW_H = 480
@@ -87,14 +90,11 @@ MODEL_MISSING = ("OCR models missing on SD card.\n"
 # The CJK font covers every character the dict can emit except the rare hanzi
 # outside GB2312 level-1: 4036 glyphs = 3743 common hanzi + 292 punctuation and
 # symbol characters + a space (tools/ocr_charset.txt). Omitting the punctuation
-# renders every comma and full stop as a box. lv.font_load costs ~1.2 ms per
-# glyph and is not cached by the loader, so glyph count is the only lever: this
-# build loads in 4.9 s, the full 6547-glyph dict in 8.3 s.
-# Loaded on the first scan, not at open: at open it froze the screen for 4.9 s
-# before any preview appeared, which reads as the app hanging. The user already
-# accepts a wait after tapping Scan, and the module cache makes later scans fast.
+# renders every comma and full stop as a box. lv.font_load costs ~1.2 ms per glyph
+# and is not cached by the loader, so glyph count is the only lever: this build
+# loads in 4.96 s, the full 6547-glyph dict in 8.3 s.
+# The boot sequence preloads it into font_pool, so getting it here is a lookup.
 FONT_FILE = "ocr_cjk_16.bin"
-_OCR_FONT = None
 
 
 def _font(*names):
@@ -106,36 +106,12 @@ def _font(*names):
     return None
 
 
-def _assets_dir():
-    """Asset directory derived from this module's __file__ (gui/ is above apps/)."""
-    path = globals().get("__file__")
-    if path:
-        try:
-            base = path.rsplit("/", 1)[0]        # .../gui/apps
-            return base.rsplit("/", 1)[0] + "/assets"
-        except BaseException:
-            pass
-    return "/sdcard/factory/gui/assets"
-
-
 def _ocr_font():
-    """Load (once per process) the prebaked CJK bitmap font for result text."""
-    global _OCR_FONT
-    if _OCR_FONT is not None:
-        return _OCR_FONT
-    load = getattr(lv, "font_load", None)
-    if load is not None:
-        path = "A:" + _assets_dir() + "/fonts/" + FONT_FILE
-        try:
-            t0 = time.ticks_ms()
-            font = load(path)
-            print("[OCR] font load {}ms mem_free={}".format(
-                time.ticks_diff(time.ticks_ms(), t0), gc.mem_free()))
-            if font is not None:
-                _OCR_FONT = font
-                return _OCR_FONT
-        except BaseException as error:
-            print("[OCR] font load failed: {}".format(error))
+    """The prebaked CJK bitmap font for result text, from the shared font cache."""
+    font = font_pool.get(FONT_FILE)
+    if font is not None:
+        return font
+    print("[OCR] CJK font unavailable, falling back to a Latin font")
     return _font("font_montserrat_16", "font_montserrat_14")
 
 
@@ -214,17 +190,23 @@ class OcrApp:
         self.mask.set_flex_align(lv.FLEX_ALIGN.CENTER, lv.FLEX_ALIGN.CENTER,
                                  lv.FLEX_ALIGN.CENTER)
         self.panel_labels = []
-        # The CJK font is applied by _ensure_font on the first scan, not here:
-        # loading it at open froze the screen for ~4.9 s before the preview ran.
+        # With the boot preload the font is already resident, so apply it now; only a
+        # build with BOOT_PRELOAD_FONTS=False pays the 4.96 s load, and then it is
+        # deferred to the first scan so the preview still appears immediately.
+        preloaded = font_pool.is_loaded(FONT_FILE)
+        ready_font = _ocr_font() if preloaded else None
         for _ in range(MAX_BOXES):
             lab = lv.label(self.mask)
             lab.set_text("")
             lab.set_width(lv.pct(100))
             lab.set_style_text_align(lv.TEXT_ALIGN.CENTER, 0)
             lab.set_style_text_color(lv.color_hex(COL_RESULT), 0)
+            if ready_font is not None:
+                lab.set_style_text_font(ready_font, 0)
             lab.clear_flag(lv.obj.FLAG.CLICKABLE)
             lab.add_flag(lv.obj.FLAG.HIDDEN)
             self.panel_labels.append(lab)
+        self._font_applied = ready_font is not None
 
         # ---- top bar: the whole strip is one click target (scan toggle) ----
         bar_w = self.img_w - TOPBAR_LEFT - TOPBAR_RIGHT
@@ -277,11 +259,10 @@ class OcrApp:
             if not self._exists(path):
                 raise AppUnavailable(MODEL_MISSING)
 
-        try:
-            with open(DICT_PATH, "r") as f:
-                self.dict_word = f.read(100000).split("\r\n")
-        except BaseException as error:
-            print("[OCR] dict load failed: {}".format(error))
+        # Shared cache: the boot sequence fills it, so this is a lookup. Keeping one
+        # copy also stops every open from re-reading 6549 strings.
+        self.dict_word = ocr_dict.words()
+        if not self.dict_word:
             raise AppUnavailable(MODEL_MISSING)
 
         sensor = None
@@ -327,13 +308,9 @@ class OcrApp:
             return False
 
     def _load_models(self):
-        kpu = nn.kpu()
-        kpu.load_kmodel(DET_MODEL)
-        self.kpu_det = kpu
-
-        kpu = nn.kpu()
-        kpu.load_kmodel(REC_MODEL)
-        self.kpu_rec = kpu
+        # Both are pooled (boot preloads them), so these are lookups.
+        self.kpu_det = model_get(DET_MODEL)
+        self.kpu_rec = model_get(REC_MODEL)
 
         a2d = Ai2d()
         a2d.set_ai2d_dtype(nn.ai2d_format.NCHW_FMT, nn.ai2d_format.NCHW_FMT,
@@ -350,15 +327,9 @@ class OcrApp:
         print("[OCR] models loaded pad={} mem_free={}".format(top, gc.mem_free()))
 
     def _release_models(self):
-        for name in ("kpu_det", "kpu_rec"):
-            kpu = getattr(self, name)
-            if kpu is None:
-                continue
-            try:
-                kpu.release()
-            except BaseException as error:
-                print("[OCR]   {}.release error: {}".format(name, error))
-            setattr(self, name, None)
+        # The kpus belong to the shared pool; only the ai2d instances are per-app.
+        self.kpu_det = None
+        self.kpu_rec = None
         for name in ("ai2d_det", "ai2d_rec"):
             a2d = getattr(self, name)
             if a2d is None:

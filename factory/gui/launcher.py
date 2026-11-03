@@ -106,12 +106,59 @@ SWIPE_DIAG = False
 # nothing. Frames with no dirty area return quickly from refr_now.
 FRAME_BOOST = True
 BOOST_TAIL_MS = 400   # boost duration after release; covers SNAP_ANIM_MS with margin
-# Delay before the network service auto-starts on boot (net_mgr.start()); 0 = now.
-# Why the delay: start() synchronously kicks off WLAN init and the connect thread,
-# whose driver section holds the GIL and, as measured, stalls first-screen rendering
-# and touch response for several seconds. Desktop becomes usable first, WiFi connects
-# in the background.
-NET_BOOT_DELAY_MS = 1200
+
+# ---- Boot preload ----
+# Every app takes its kpu and its bitmap fonts from model_pool / font_pool, both of
+# which load on first use. Loading them here instead makes an app's open path a dict
+# lookup: measured on board, OCR went from 2151 ms to 253-320 ms once its two models
+# were already resident.
+#
+# The step weights are measured milliseconds, not item counts, so the bar advances at
+# a believable rate instead of jumping through six 100 ms steps and then sitting still
+# for 5 s. Re-measure with tools/probes/_probe_boot_budget.py and _probe_font_boot.py
+# after changing the asset set.
+BOOT_PRELOAD_MODELS = True   # False = load models inside each app (comparison / debug)
+BOOT_PRELOAD_FONTS = True    # False saves 5.5 s of boot, at the cost of a slow first open
+BOOT_DICT_MS = 239           # OCR dictionary, measured
+BOOT_TILES_MS = 900          # tile cache read, measured
+BOOT_HOME_MS = 1000          # build_home, measured
+# Boot-time Wi-Fi budget: one attempt inside a hard 15 s window. wlan.connect() to an
+# unreachable AP blocks ~9 s inside the C layer and cannot be interrupted from Python,
+# so the retry ladder (3 tries, 10 s apart) would hold the progress screen for tens of
+# seconds. When the window closes the desktop appears without a network and the status
+# bar stays disconnected until the user connects from the Wi-Fi app.
+BOOT_WIFI_TIMEOUT_MS = 15000
+
+KMODEL_DIR = "/sdcard/examples/kmodel"
+
+# Every model any app can load, minus the three Detect alternates, with its measured
+# load cost. Ten is the ceiling: adding the alternates wedges the board while loading
+# the ninth (no exception, dead serial link). Alternates stay on demand in app_vision.
+# The per-item costs are what keep the bar honest: the OCR pair alone is 1409 ms, so
+# advancing one tenth per model would stall the bar for over a second at a time.
+BOOT_MODELS = [
+    ("face_detection_320.kmodel", 186),
+    ("face_liveness_rgb.kmodel", 74),
+    ("face_landmark.kmodel", 98),
+    ("face_recognition_mobile.kmodel", 162),
+    ("yolov8n_320.kmodel", 566),
+    ("yolo11n-pose.kmodel", 831),
+    ("yolo_license_plate_det.kmodel", 907),
+    ("licence_reco.kmodel", 75),
+    ("ocr_det_int16.kmodel", 599),
+    ("ocr_rec_int16.kmodel", 810),
+]
+
+# Every baked bitmap font, cheap to expensive with its measured load cost. 4958 of the
+# 5457 ms total is the 4036-glyph OCR font, so it has to carry most of the bar.
+BOOT_FONTS = [
+    ("mono_dejavu_16.bin", 106),
+    ("ui_nunito_bold_22.bin", 110),
+    ("kb_nunito_bold_28.bin", 119),
+    ("plate_cjk_30.bin", 164),
+    ("ocr_cjk_16.bin", 4958),
+]
+
 TILE_SIZE = 164            # icon block size
 ICON_SIZE = 112            # icon image size inside a tile (read by tools/gen_tile_cache.py)
 TILE_BG = 0x1E222B         # tile card fill (the offline baker parses this too; never edit one side)
@@ -430,6 +477,7 @@ if _gui_dir not in sys.path:
 # back: this file runs via exec(open().read()), so a reverse import would execute it a
 # second time and build a second Launcher.
 from ui import paging
+from ui import splash as splash_ui
 from net import service as net_mgr
 # Shared ADC5 access: the status bar and the Battery app hold one channel handle, so
 # the app never opens a second one.
@@ -440,6 +488,11 @@ from apps.error import AppUnavailable
 # Click sound (passive buzzer on IO43). init/poll failures all degrade silently so
 # they never block startup.
 from ui import beep
+# Resident kpu / bitmap-font caches: apps take their resources from these instead of
+# loading them at open, which is what makes the boot preload worth doing.
+import model_pool
+import font_pool
+import ocr_dict
 
 SWIPE_THRESHOLD_PX = paging.SWIPE_THRESHOLD_PX   # 120px, shared with every app
 SNAP_ANIM_MS = paging.SNAP_ANIM_MS               # 200ms
@@ -2421,24 +2474,11 @@ class Launcher:
             self.splash = None
         buttons = HardwareButtons()
         last_clock_update = time.ticks_ms()
-        # Network service auto-start: net_mgr.start() is deliberately not called before
-        # build_home, because start() immediately spins up the connect thread whose wlan
-        # driver section holds the GIL and slows first-screen rendering and touch response
-        # (measured: the splash sat on "preparing apps..." until WiFi produced a result).
-        # Instead it starts NET_BOOT_DELAY_MS after the home screen appears, so the desktop
-        # is interactive first and WiFi connects in the background.
-        # Once the connection limit is reached the service stops, and only a manual
-        # connect in the Network app brings it back.
-        net_boot_due = time.ticks_add(last_clock_update, NET_BOOT_DELAY_MS)
+        # The network decision already happened in boot_load(): it is either connected,
+        # not configured, or gave up after a 12 s deadline. Nothing here starts a connect,
+        # so the desktop never inherits a held GIL from a wlan C call.
         while True:
             os.exitpoint()
-            if net_boot_due is not None and \
-                    time.ticks_diff(time.ticks_ms(), net_boot_due) >= 0:
-                net_boot_due = None
-                try:
-                    net_mgr.start()
-                except BaseException as e:
-                    print("[GUI] net start error:", e)
             # Click-sound shutdown: duty is zeroed when its time is up (an integer
             # comparison when idle)
             beep.poll()
@@ -2520,27 +2560,113 @@ class Launcher:
                 time.sleep_ms(max(1, min(next_wake, 30)))
 
 
-def _show_splash():
-    """Boot splash: the first tile bake costs ~1.3s each, so this avoids a blank black
-    wait. When the cache hits, it only flashes by."""
-    scr = lv.obj()
-    scr.set_style_bg_color(lv.color_hex(COL_BG), 0)
-    scr.set_style_bg_opa(lv.OPA.COVER, 0)
-    scr.set_style_border_width(0, 0)
-    lb = lv.label(scr)
-    lb.set_text(_sym("HOME") + " RockBase")
-    lb.set_style_text_color(lv.color_hex(COL_TEXT), 0)
-    font = _font("font_montserrat_24", "font_montserrat_16")
-    if font:
-        lb.set_style_text_font(font, 0)
-    lb.align(lv.ALIGN.CENTER, 0, -10)
-    tip = lv.label(scr)
-    tip.set_text("preparing apps...")
-    tip.set_style_text_color(lv.color_hex(COL_MUTED), 0)
-    tip.align(lv.ALIGN.CENTER, 0, 24)
-    lv.scr_load(scr)
-    lv.task_handler()
-    return scr
+def boot_load(splash):
+    """Load every blocking resource before the desktop appears, driving the bar.
+
+    Order matters, and Wi-Fi goes last. Overlapping the connect worker with the asset
+    loading was measured at 24.7 s total: a failing wlan.connect() holds the GIL for
+    ~9 s, which stretched the tile step from 1.2 s to 7.4 s and the assets from 11 s
+    to 24.7 s. Sequentially the assets keep their own speed and only the connect
+    itself is slow.
+    """
+    t_all = time.ticks_ms()
+
+    # Total is the sum of the measured step costs, so the bar always lands on 100%
+    # exactly when the last step finishes.
+    span = BOOT_TILES_MS + BOOT_HOME_MS + BOOT_DICT_MS
+    if BOOT_PRELOAD_FONTS:
+        for _name, ms in BOOT_FONTS:
+            span += ms
+    if BOOT_PRELOAD_MODELS:
+        for _name, ms in BOOT_MODELS:
+            span += ms
+    done = 0
+    splash.set(0, span, "Preparing desktop", "tile cache")
+
+    # ---- 1. tiles ----
+    t0 = time.ticks_ms()
+    bake_all_tiles(splash.scr)
+    print("[BOOT] tiles {}ms".format(time.ticks_diff(time.ticks_ms(), t0)))
+    done += BOOT_TILES_MS
+    splash.set(done, span, "Preparing desktop", "tiles ready")
+
+    # ---- 2. fonts ----
+    t_step = time.ticks_ms()
+    fonts_ok = 0
+    if BOOT_PRELOAD_FONTS:
+        for i in range(len(BOOT_FONTS)):
+            name, ms = BOOT_FONTS[i]
+            splash.set(done, span, "Loading fonts {}/{}".format(
+                i + 1, len(BOOT_FONTS)), name)
+            if font_pool.get(name) is not None:
+                fonts_ok += 1
+            done += ms
+            splash.set(done, span, "Loading fonts {}/{}".format(
+                i + 1, len(BOOT_FONTS)), name)
+    else:
+        splash.note("fonts: on demand")
+    print("[BOOT] fonts {}ms loaded={}/{}".format(
+        time.ticks_diff(time.ticks_ms(), t_step), fonts_ok, len(BOOT_FONTS)))
+
+    # ---- 3. OCR dictionary ----
+    t_step = time.ticks_ms()
+    splash.set(done, span, "Loading text dictionary", "dict.txt")
+    dict_ok = ocr_dict.words() is not None
+    done += BOOT_DICT_MS
+    print("[BOOT] dict {}ms ok={} entries={}".format(
+        time.ticks_diff(time.ticks_ms(), t_step), dict_ok,
+        len(ocr_dict.words()) if dict_ok else 0))
+
+    # ---- 4. models ----
+    if BOOT_PRELOAD_MODELS:
+        for i in range(len(BOOT_MODELS)):
+            name, ms = BOOT_MODELS[i]
+            splash.set(done, span, "Loading models {}/{}".format(
+                i + 1, len(BOOT_MODELS)), name)
+            try:
+                model_pool.get(KMODEL_DIR + "/" + name)
+            except BaseException as error:
+                # One bad model must not stop the boot: the app that needs it shows
+                # the existing "unavailable" panel instead.
+                print("[BOOT] model skipped {}: {}".format(name, error))
+            done += ms
+            splash.set(done, span, "Loading models {}/{}".format(
+                i + 1, len(BOOT_MODELS)), name)
+    print("[BOOT] assets done {}ms resident_models={}".format(
+        time.ticks_diff(time.ticks_ms(), t_all), model_pool.loaded_count()))
+
+    # ---- 5. network decision (last: it can hold the GIL for seconds) ----
+    wifi_waiting = False
+    t_wifi = time.ticks_ms()
+    try:
+        wifi_waiting = net_mgr.boot_start()
+    except BaseException as error:
+        print("[BOOT] wifi start failed: {}".format(error))
+    if wifi_waiting:
+        splash.set(done, span, "Connecting to Wi-Fi",
+                   "one attempt, up to {} s".format(
+                       BOOT_WIFI_TIMEOUT_MS // 1000))
+        outcome = net_mgr.boot_wait(BOOT_WIFI_TIMEOUT_MS)
+        if outcome == "connected":
+            splash.note("Wi-Fi: connected " + net_mgr.ip())
+        elif outcome == "idle":
+            splash.note("Wi-Fi: not configured")
+        else:
+            # Warning colour: the boot continues, the desktop just has no network
+            # until the user connects from the Wi-Fi app.
+            splash.warn("Wi-Fi: not connected")
+    else:
+        splash.note("Wi-Fi: " + ("connected" if net_mgr.state == net_mgr.CONNECTED
+                                 else "not configured"))
+    # Measured: the failing path is ~9 s inside wlan.connect() plus radio bring-up,
+    # and none of it can be interrupted from Python. Logged separately so a slow boot
+    # can be attributed to the network instead of the assets.
+    print("[BOOT] wifi phase {}ms".format(
+        time.ticks_diff(time.ticks_ms(), t_wifi)))
+
+    done += BOOT_HOME_MS
+    splash.set(done, span, "Preparing desktop", "building home")
+    print("[BOOT] total {}ms".format(time.ticks_diff(time.ticks_ms(), t_all)))
 
 
 def main():
@@ -2558,10 +2684,16 @@ def main():
         # sound cannot be muted by its shutdown thread and inevitably becomes a long tone;
         # let beep stay silent for that window instead.
         beep.set_busy_check(net_mgr.busy)
-        splash = _show_splash()
-        bake_all_tiles(splash)
+        splash = splash_ui.Splash()
+        try:
+            boot_load(splash)
+        except BaseException as error:
+            # The desktop must appear even if a preload step misbehaves; apps fall back
+            # to loading their own resources.
+            print("[BOOT] preload error: {}".format(error))
+            sys.print_exception(error)
         launcher = Launcher()
-        launcher.splash = splash   # deleted safely in run() once home is loaded
+        launcher.splash = splash.scr   # deleted safely in run() once home is loaded
         TouchScreen()
         launcher.run()
     except KeyboardInterrupt as e:
@@ -2571,6 +2703,7 @@ def main():
         raise
     finally:
         beep.shutdown()
+        model_pool.release_all()
         lv.deinit()
         Display.deinit()
         gc.collect()

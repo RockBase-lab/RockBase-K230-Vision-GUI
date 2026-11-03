@@ -77,6 +77,17 @@ CONNECT_WAIT_MS = 5000         # upper bound for waiting on isconnected after co
                                # Python); this timeout only covers the wait after
                                # connect returns.
 RETRY_DELAY_MS = 10000         # gap between one failure and the next attempt
+# Boot-time connect budget: one attempt, one hard deadline, no retry ladder.
+# The failing path costs ~9 s inside wlan.connect() (C layer, cannot be interrupted
+# from Python) plus ~1.5 s for the AP scan, so retrying would triple an already long
+# boot. When the budget runs out the boot continues without a network and the user
+# reconnects from the Wi-Fi app.
+BOOT_CONNECT_TIMEOUT_MS = 15000
+# Post-connect poll for the boot attempt. Measured on board: connect() returns after
+# ~3 s with isconnected() still False, and the link comes up a few seconds later, so
+# this must be long enough to cover it. The boot sequence additionally bounds the
+# whole phase with BOOT_CONNECT_TIMEOUT_MS.
+BOOT_CONNECT_WAIT_MS = 6000
 NTP_INTERVAL_MS = 6 * 3600 * 1000   # 6h automatic re-sync
 NTP_FIRST_DELAY_MS = 4000      # delay before the first NTP after connect (DHCP/router settling)
 NTP_RETRY_MS = 10 * 60 * 1000  # retry gap after the whole server pool fails
@@ -128,6 +139,10 @@ _last_ntp_region = ""
 
 # Sole WLAN owner: while _worker_busy=True the main loop never touches _wlan.
 _worker_busy = False
+# True while the boot attempt owns the retry policy: a failure stops the service
+# instead of scheduling another try, so the desktop never inherits a connect in
+# flight (a failing wlan.connect() holds the GIL for ~9 s and freezes the UI).
+_boot_only = False
 _connect_result = None         # filled by the worker: True=up / False=failed
 _ntp_pending = None            # filled by the worker: None=none / False=failed / (idx,epoch)
 _scan_busy = False
@@ -326,21 +341,41 @@ def apply_tz(tz=None):
         return False
 
 
-def _start_connect(ssid, password):
-    """Start a connect worker (never blocks the main loop). Bumps this power-on's
-    counter (memory only, not persisted)."""
-    global state, _worker_busy, _connect_result, _tries, _retry_at
-    _tries += 1
-    _retry_at = 0
+def _start_connect(ssid, password, scan_first=True, require_ap=False, wait_ms=None,
+                   boot=False):
+    """Start a connect worker (never blocks the main loop).
+
+    boot=True is the power-on attempt: it counts against no retry budget, prints no
+    "attempt n/3" (there is exactly one), and marks the service so a failure stops
+    it rather than scheduling another try.
+
+    require_ap=True makes the worker skip connect() entirely when the saved SSID is
+    not in the scan result, which avoids the ~9 s driver timeout for an absent AP.
+    wait_ms overrides CONNECT_WAIT_MS for the post-connect poll.
+    """
+    global state, _worker_busy, _connect_result, _tries, _retry_at, _boot_only
+    if boot:
+        _boot_only = True
+        _retry_at = 0
+    else:
+        _tries += 1
+        _retry_at = 0
     state = CONNECTING
     _worker_busy = True
     _connect_result = None
-    print("[net] connect '{}' attempt {}/{}".format(ssid, _tries, MAX_TRIES))
+    if boot:
+        print("[net] boot: connect '{}' (one attempt, {} s budget)".format(
+            ssid, BOOT_CONNECT_TIMEOUT_MS // 1000))
+    else:
+        print("[net] connect '{}' attempt {}/{}".format(ssid, _tries, MAX_TRIES))
     import _thread
-    _thread.start_new_thread(_connect_worker, (ssid, password))
+    _thread.start_new_thread(
+        _connect_worker, (ssid, password, scan_first, require_ap,
+                          CONNECT_WAIT_MS if wait_ms is None else wait_ms))
 
 
-def _connect_worker(ssid, password):
+def _connect_worker(ssid, password, scan_first=True, require_ap=False,
+                    wait_ms=None):
     """Connect in a _thread and poll isconnected until success or timeout.
 
     connect() to an unreachable AP blocks ~9s (measured), so this must never run
@@ -353,56 +388,104 @@ def _connect_worker(ssid, password):
     while connected instead of showing an empty list forever.
     """
     global _worker_busy, _connect_result, last_error, _scan_cache
+    if wait_ms is None:
+        wait_ms = CONNECT_WAIT_MS
+    # Captured now, not read after the connect: the main thread may have given up on
+    # the boot budget by then and cleared the flag, and the attribution line is the
+    # only way to tell where a 15 s phase actually went.
+    boot = _boot_only
+    t_w = time.ticks_ms()
     w = _get_wlan()
-    try:
-        parsed = _parse_scan(w.scan())
-        if parsed:
-            _scan_cache = parsed
-    except Exception:
-        pass
+    parsed = None
+    if scan_first or require_ap:
+        try:
+            parsed = _parse_scan(w.scan())
+            if parsed:
+                _scan_cache = parsed
+        except Exception:
+            pass
+    t_scan = time.ticks_diff(time.ticks_ms(), t_w)
+    if require_ap:
+        # A scan is ~1.5 s; connect() to an AP that is not in range costs ~9 s in
+        # the driver. Skipping it is the difference between a 1.5 s and a 10 s boot
+        # failure, and the outcome is the same: no network this boot.
+        names = []
+        for entry in parsed or []:
+            try:
+                names.append(entry[0])
+            except BaseException:
+                pass
+        if ssid not in names:
+            print("[net] boot: AP '{}' not in scan ({} seen) after {}ms".format(
+                ssid, len(names), t_scan))
+            last_error = "saved network not in range"
+            _connect_result = False
+            _worker_busy = False
+            return
     ok = False
     err = ""
+    t_c = time.ticks_ms()
     try:
         w.connect(ssid, password)
     except Exception as e:
         err = str(e)
-    deadline = time.ticks_add(time.ticks_ms(), CONNECT_WAIT_MS)
-    while time.ticks_diff(deadline, time.ticks_ms()) > 0:
+    t_connect = time.ticks_diff(time.ticks_ms(), t_c)
+    # connect() returning does NOT mean the link is up: measured on board, it returns
+    # after ~3 s while isconnected() is still False, and only becomes True a few
+    # seconds later. Checking once here made every boot attempt report a failure while
+    # the same credentials connected fine from the Wi-Fi app, which polls. So poll in
+    # both cases; the boot path is bounded by BOOT_CONNECT_POLL_MS and, above that,
+    # by the boot sequence's own hard deadline.
+    deadline = time.ticks_add(time.ticks_ms(), wait_ms)
+    while True:
         try:
             if w.isconnected():
                 ok = True
                 break
         except Exception:
             pass
-        time.sleep_ms(300)
+        if time.ticks_diff(deadline, time.ticks_ms()) <= 0:
+            break
+        time.sleep_ms(200)
     # The driver often does not raise on an association failure (it only logs
     # "run connect failed."), leaving last_error empty or stale so the UI has no
     # reason to show. Provide a readable failure message here.
-    if not ok and not err:
+    if ok:
+        last_error = ""
+    elif not err:
         err = "assoc failed (AP seen? check password/router)"
     if not ok:
         last_error = err
+    if boot:
+        # Boot attribution: the connect() call is the part Python cannot interrupt,
+        # so it is logged separately from everything else in the phase.
+        print("[net] boot: scan={}ms connect={}ms poll={}ms -> {}".format(
+            t_scan, t_connect,
+            max(0, time.ticks_diff(time.ticks_ms(), t_c) - t_connect),
+            "ok" if ok else "failed"))
     _connect_result = ok
     _worker_busy = False
 
 
 def connect(ssid, password):
     """Manual connect: reset the budget, save the config, start trying (also
-    revives a stopped service)."""
+    revives a stopped service). A manual connect uses the normal retry ladder, not
+    the boot single-attempt policy."""
     if _worker_busy:
         return
-    global _tries, _retry_at, _creds_user_set
+    global _tries, _retry_at, _creds_user_set, _boot_only
     cfg["ssid"] = ssid
     cfg["password"] = password
     _creds_user_set = True
     _tries = 0
     _retry_at = 0
+    _boot_only = False
     save()
     _start_connect(ssid, password)
 
 
 def disconnect():
-    global state, _ip_hold, _tries, _retry_at
+    global state, _ip_hold, _tries, _retry_at, _boot_only
     if _worker_busy:
         return
     _ip_hold = ""
@@ -413,6 +496,7 @@ def disconnect():
     state = IDLE
     _tries = 0
     _retry_at = 0
+    _boot_only = False
 
 
 def ip():
@@ -487,39 +571,80 @@ def wifi_icon_key():
     return str(rssi_bucket(connected_rssi()) + 1)
 
 
-# ---------------- Lifecycle: start / poll ----------------
+# ---------------- Lifecycle: boot / poll ----------------
 
-def start():
-    """Called once when launcher.py boots: load the config, apply the timezone, and
-    auto-reconnect only when stored credentials exist.
+def boot_start():
+    """Start the power-on connect attempt.
 
-    With no net.json (never configured) it returns immediately without touching
-    the radio or starting a worker -- wlan.connect() blocks ~9s on an unreachable
-    AP and waiting during the very first boot is pointless. The budget is a
-    memory counter (_tries starts at 0), so boot needs no history lookup.
+    Returns True when the boot sequence should wait for it. One attempt, one 15 s
+    deadline, no retry ladder: a failing wlan.connect() holds the GIL for ~9 s, so a
+    second try would stall the progress screen again for the same amount, and the
+    user only asked for one 15 s window.
     """
-    global state, _last_ntp_ms
+    global state, _last_ntp_ms, _boot_only
     load()
     apply_tz()
+    _boot_only = False
     if not cfg["ssid"]:
         state = IDLE
-        print("[net] no saved wifi, network off (radio untouched)")
-        return
-    # After a soft reset (Ctrl-D) the firmware-level link survives while module
-    # state resets. Measured: isconnected() is still True then, so adopt it as
-    # CONNECTED, avoiding a duplicate connect and a "connected but shown as
-    # disconnected" UI. On a cold boot isconnected() is False and the normal
-    # reconnect path runs.
+        print("[net] boot: no saved wifi, network off (radio untouched)")
+        return False
+    # After a soft reset the firmware-level link survives while module state resets.
+    # Measured: isconnected() is still True then, so adopt it instead of reconnecting.
     try:
         if _get_wlan().isconnected():
             state = CONNECTED
             _last_ntp_ms = time.ticks_add(
                 time.ticks_ms(), NTP_FIRST_DELAY_MS - NTP_INTERVAL_MS)
             print("[net] boot: adopting existing link, ip={}".format(ip()))
-            return
+            return False
     except Exception:
         pass
-    _start_connect(cfg["ssid"], cfg["password"])
+    _start_connect(cfg["ssid"], cfg["password"], scan_first=False,
+                   require_ap=True, wait_ms=BOOT_CONNECT_WAIT_MS, boot=True)
+    return True
+
+
+def boot_wait(timeout_ms, tick=None):
+    """Wait for the boot connect to resolve, up to timeout_ms.
+
+    Returns "connected", "idle", "gave_up" or "timeout". tick() runs every
+    iteration so the caller can repaint: the failing wlan.connect() holds the GIL,
+    so the tick simply stops being called for those seconds.
+
+    On expiry the radio is dropped and the service stops for this power-on; the
+    desktop is then guaranteed never to start a connect on its own.
+    """
+    global state, _retry_at, _boot_only
+    deadline = time.ticks_add(time.ticks_ms(), timeout_ms)
+    while True:
+        if tick is not None:
+            try:
+                tick()
+            except BaseException:
+                pass
+        poll()
+        if state == CONNECTED:
+            _boot_only = False
+            return "connected"
+        if state == IDLE:
+            _boot_only = False
+            return "idle"
+        if state == GAVE_UP:
+            _boot_only = False
+            return "gave_up"
+        if time.ticks_diff(deadline, time.ticks_ms()) <= 0:
+            _boot_only = False
+            _retry_at = 0
+            state = GAVE_UP
+            try:
+                _get_wlan().disconnect()
+            except Exception:
+                pass
+            print("[net] boot: {} s budget spent, network off until a manual "
+                  "connect".format(timeout_ms / 1000.0))
+            return "timeout"
+        time.sleep_ms(50)
 
 
 def poll():
@@ -530,6 +655,7 @@ def poll():
     running) WLAN is never touched; just wait for the worker to fill in results.
     """
     global state, _last_ntp_ms, _ntp_pending, _connect_result, _tries, _retry_at
+    global _boot_only
     now = time.ticks_ms()
 
     # Consume the connect result (one-shot, when the worker finishes)
@@ -544,14 +670,23 @@ def poll():
             _last_ntp_ms = time.ticks_add(
                 now, NTP_FIRST_DELAY_MS - NTP_INTERVAL_MS)
             print("[net] connected, ip={}".format(ip()))
-        elif _tries >= MAX_TRIES:
+        elif _boot_only or _tries >= MAX_TRIES:
+            # Boot owns a single attempt: a failure stops the service here so the
+            # desktop never inherits a retry, and the status bar shows no network
+            # until the user connects from the Wi-Fi app.
             state = GAVE_UP
+            _boot_only = False
+            _retry_at = 0
             try:
                 _get_wlan().disconnect()
             except Exception:
                 pass
-            print("[net] {} attempts failed, service stopped "
-                  "(until manual connect)".format(_tries))
+            if _tries >= MAX_TRIES:
+                print("[net] {} attempts failed, service stopped "
+                      "(until manual connect)".format(_tries))
+            else:
+                print("[net] boot: connect failed, service stopped "
+                      "(manual connect in the Wi-Fi app)")
         else:
             # No back-to-back retry after a failure: the wlan.connect() failure
             # path holds the GIL for a long time, and consecutive attempts chain
@@ -580,8 +715,11 @@ def poll():
     except Exception:
         alive = False
     if not alive:
-        print("[net] link lost, reconnecting")
-        _start_connect(cfg["ssid"], cfg["password"])
+        # No automatic reconnect. A failing wlan.connect() blocks ~9 s in the C layer
+        # with the GIL held, which freezes the UI; the desktop stays smooth instead and
+        # the user reconnects from the Wi-Fi app when they want to.
+        print("[net] link lost, service stops until a manual connect")
+        state = GAVE_UP
         return
 
     # NTP: consume the worker result first, then schedule the next one (reversed

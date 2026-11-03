@@ -40,6 +40,7 @@ from ui import beep
 from apps.error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                         close_sensor)
 from camera_fov import set_preview
+from model_pool import get as model_get
 
 PREVIEW_W = 800               # capture size shared by preview and AI (= screen)
 PREVIEW_H = 480
@@ -428,13 +429,9 @@ class PlateApp:
 
     def _load_models(self):
         mw, mh = DET_IN
-        kpu = nn.kpu()
-        kpu.load_kmodel(DET_MODEL)
-        self.kpu_det = kpu
-
-        kpu = nn.kpu()
-        kpu.load_kmodel(REC_MODEL)
-        self.kpu_rec = kpu
+        # Both are pooled (boot preloads them), so these are lookups.
+        self.kpu_det = model_get(DET_MODEL)
+        self.kpu_rec = model_get(REC_MODEL)
 
         a2d = Ai2d()
         a2d.set_ai2d_dtype(nn.ai2d_format.NCHW_FMT, nn.ai2d_format.NCHW_FMT,
@@ -449,15 +446,9 @@ class PlateApp:
             PAD_TOP, Y_OFF, gc.mem_free()))
 
     def _release_models(self):
-        for name in ("kpu_det", "kpu_rec"):
-            kpu = getattr(self, name)
-            if kpu is None:
-                continue
-            try:
-                kpu.release()
-            except BaseException as error:
-                print("[Plate]   {}.release error: {}".format(name, error))
-            setattr(self, name, None)
+        # The kpus belong to the shared pool; only the ai2d instances are per-app.
+        self.kpu_det = None
+        self.kpu_rec = None
         if self.ai2d_det is not None:
             try:
                 self.ai2d_det.deinit()

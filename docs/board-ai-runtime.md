@@ -413,11 +413,12 @@ plus every punctuation and symbol character it can emit, plus a space) load in
 4900 ms, the full 6547-glyph dict in 8276 ms. Dropping the punctuation instead
 renders every comma and full stop as a box, which is what the first build did.
 
-Load it on the **first scan**, not at open: at open it froze the screen for
-4.9 s before the preview ever appeared, which the user reads as a hang. The app
-open then costs 2.2 s (models only) and the preview runs at 28.4 fps from the
-first frame. The font is module-cached, so only the first scan pays it; see
-`docs/performance-budget.md`.
+Load it at boot into the shared font cache (`font_pool`), not at open and not on
+the first scan. At open it froze the screen for 4.9 s before the preview ever
+appeared, which the user reads as a hang; on the first scan it stayed resident
+but moved the 4.9 s into the scan. In the boot pool it costs 5.4 s of boot and
+nothing at either point, and every app then reaches the font through a dict
+lookup. See `docs/performance-budget.md`.
 
 ## Human pose (17 keypoints)
 
@@ -937,6 +938,27 @@ side, not about the Python heap, and it is affordable on this board. It does
 **not** replace `release_home`: that flag exists to give `to_numpy()` a
 contiguous 705 KB block, which is still needed because the home screen leaves
 the heap at 2.3 MB and fragmented.
+
+### the shared kpu pool owns the model, the app owns its ai2d
+
+`factory/gui/model_pool.py` keeps one `nn.kpu` per kmodel path for the life of the
+process; apps call `model_get(path)` and never `release()` it. The ownership split
+matters because releasing a pooled kpu takes the model away from every other app:
+
+| Object | Owner | Freed by |
+|---|---|---|
+| `nn.kpu` | `model_pool` | `release_all()`, at shutdown only |
+| `Ai2d` | the app | the app's `destroy()` |
+
+An `Ai2d` stays per-app on purpose: the input geometry differs per app, so it has
+to be built with that app's sizes. Measured effect of the pool: OCR open went from
+2151 ms to 468-817 ms, and consecutive open/close cycles of four apps kept all ten
+models resident with no growth.
+
+The one app that does not take every model from the pool is Detect, which can
+switch between four models. Its default is pooled; the three alternates are loaded
+and released by the app, because pooling them would put thirteen kpus resident and
+the measured ceiling is ten.
 
 ## Reference numbers (yolov8n_320, 640x360 into 320, 40 frames)
 

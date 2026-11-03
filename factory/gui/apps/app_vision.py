@@ -47,6 +47,7 @@ from ui import beep
 from apps.error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                        close_sensor)
 from camera_fov import set_preview
+import model_pool
 
 PREVIEW_W = 800               # capture size shared by preview and AI (= screen, source == widget)
 PREVIEW_H = 480
@@ -192,6 +193,7 @@ class VisionApp:
         self.content = content
         self.sensor = None
         self.kpu = None
+        self._owns_kpu = False   # True only for the on-demand alternates
         self.ai2d = None
         self.frozen = False
         self.frame_count = 0
@@ -336,14 +338,19 @@ class VisionApp:
         self._update_stat()
 
     def _release_model(self):
-        """Release kpu + ai2d. This must happen before a hot switch, otherwise
-        native memory piles up and the board dies."""
-        if self.kpu is not None:
+        """Release the ai2d, and the kpu only when this app owns it.
+
+        The default model comes from the shared pool and must not be released. The
+        three alternates are loaded here instead of in the pool: pooling them too
+        would put thirteen kpus resident, and the measured ceiling is ten (the board
+        wedges while loading the ninth of the extra set, with no exception)."""
+        if self.kpu is not None and self._owns_kpu:
             try:
                 self.kpu.release()
             except BaseException as e:
                 print("[Vision]   kpu.release error:", e)
-            self.kpu = None
+        self.kpu = None
+        self._owns_kpu = False
         if self.ai2d is not None:
             try:
                 self.ai2d.deinit()
@@ -365,9 +372,17 @@ class VisionApp:
         _scale, pad_top = letterbox(self.cfg)
         self.y_off = y_pad_offset(self.cfg)
 
-        kpu = nn.kpu()
-        kpu.load_kmodel(self.cfg["path"])
-        self.kpu = kpu
+        # The default model is boot-preloaded; the alternates are loaded and released
+        # by this app so the resident count stays at the measured ceiling.
+        path = self.cfg["path"]
+        if model_pool.is_loaded(path):
+            self.kpu = model_pool.get(path)
+            self._owns_kpu = False
+        else:
+            kpu = nn.kpu()
+            kpu.load_kmodel(path)
+            self.kpu = kpu
+            self._owns_kpu = True
 
         ai2d = Ai2d()
         ai2d.set_ai2d_dtype(nn.ai2d_format.NCHW_FMT, nn.ai2d_format.NCHW_FMT,

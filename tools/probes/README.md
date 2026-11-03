@@ -15,6 +15,11 @@ Always add `--lvgl` when the script creates any `lv` object or calls
 `lv.task_handler()`; the flag injects the same display initialisation the GUI
 uses. Without it the first widget creation hangs the board.
 
+Never pipe a probe through a line filter. `Select-Object -Last N`, `grep` and
+`Select-String` buffer until the process exits, so a probe that legitimately
+never returns (anything that ends in `launcher.run()`) prints nothing at all and
+looks identical to a wedged board.
+
 Every probe terminates on its own. `canmv_driver.py run` keeps the port open
 after the script ends and is not suitable for this purpose.
 
@@ -160,6 +165,11 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_preload_budget.py` | Whether every GUI kmodel can stay resident at once, and the heap cost |
 | `_probe_preload_run.py` | Inference still works with all ten GUI models resident |
 | `_probe_boot_budget.py` | Per-item boot cost for fonts, the OCR dictionary and thirteen kmodels (needs `--lvgl`) |
+| `_probe_boot_preload.py` | Whole boot preload plus app open cost with everything resident (needs `--lvgl`) |
+| `_probe_boot_anim.py` | Progress-bar percentage trace: intermediate frames per step and the motion cost (needs `--lvgl`) |
+| `_cap_boot_bar.py` | Captures the progress bar at two percentages, to verify it renders (needs `--lvgl`) |
+| `_probe_net_boot_vs_app.py` | Boot connect path against the Wi-Fi app path, in one process |
+| `_start_launcher_cold.py` | Start the GUI with every factory module purged, as a power-on would |
 | `_cap_run.py` | Run a display probe as a subprocess, capture raw output |
 | `_start_launcher.py` | Start the on-board GUI with a single exec |
 

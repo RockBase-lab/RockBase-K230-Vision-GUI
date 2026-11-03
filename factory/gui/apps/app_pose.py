@@ -52,6 +52,7 @@ from ui import beep
 from apps.error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                         close_sensor)
 from camera_fov import set_preview
+from model_pool import get as model_get
 
 PREVIEW_W = 800                # capture size shared by preview and AI (= screen)
 PREVIEW_H = 480
@@ -299,9 +300,9 @@ class PoseApp:
         # width saturates first and the bands are vertical only.
         self.pad_top = int((mh - int(PREVIEW_H * min(
             float(mw) / PREVIEW_W, float(mh) / PREVIEW_H))) / 2)
-        kpu = nn.kpu()
-        kpu.load_kmodel(MODEL_PATH)
-        self.kpu = kpu
+        # Pooled: boot preloads it, so this is a lookup. The pool owns it and this
+        # app must not release it.
+        self.kpu = model_get(MODEL_PATH)
 
         ai2d = Ai2d()
         ai2d.set_ai2d_dtype(nn.ai2d_format.NCHW_FMT, nn.ai2d_format.NCHW_FMT,
@@ -315,12 +316,9 @@ class PoseApp:
             self.pad_top, gc.mem_free()))
 
     def _release_model(self):
-        if self.kpu is not None:
-            try:
-                self.kpu.release()
-            except BaseException as error:
-                print("[Pose] kpu.release error:", error)
-            self.kpu = None
+        # The kpu belongs to the shared pool (boot preloaded it, and another app may
+        # reuse the same instance); only the ai2d is per-app.
+        self.kpu = None
         if self.ai2d is not None:
             try:
                 self.ai2d.deinit()

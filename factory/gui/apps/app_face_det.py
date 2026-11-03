@@ -71,6 +71,7 @@ from ui import beep
 from apps.error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                        close_sensor)
 from camera_fov import set_preview
+from model_pool import get as model_get
 
 PREVIEW_W = 800               # capture size shared by preview and AI (= screen, source == widget)
 PREVIEW_H = 480
@@ -397,12 +398,8 @@ class FaceDetApp:
             return False
 
     def _release_model(self):
-        if self.kpu is not None:
-            try:
-                self.kpu.release()
-            except BaseException as e:
-                print("[Faces]   kpu.release error:", e)
-            self.kpu = None
+        # The kpu is owned by the shared pool; only the ai2d is per-app.
+        self.kpu = None
         if self.ai2d is not None:
             try:
                 self.ai2d.deinit()
@@ -415,8 +412,7 @@ class FaceDetApp:
         mw, mh = MODEL_IN
         _scale, pad_top = letterbox()
 
-        kpu = nn.kpu()
-        kpu.load_kmodel(MODEL_PATH)
+        kpu = model_get(MODEL_PATH)
         self.kpu = kpu
 
         ai2d = Ai2d()

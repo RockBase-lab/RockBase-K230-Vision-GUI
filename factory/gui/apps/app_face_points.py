@@ -32,6 +32,7 @@ from ui import beep
 from apps.error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                         close_sensor)
 from camera_fov import set_preview
+from model_pool import get as model_get
 
 PREVIEW_W = 800
 PREVIEW_H = 480
@@ -427,13 +428,9 @@ class FacePointsApp:
             return False
 
     def _load_models(self):
-        kpu = nn.kpu()
-        kpu.load_kmodel(DET_MODEL)
-        self.kpu_det = kpu
-
-        kpu = nn.kpu()
-        kpu.load_kmodel(LM_MODEL)
-        self.kpu_lm = kpu
+        # Both are pooled (boot preloads them), so these are lookups.
+        self.kpu_det = model_get(DET_MODEL)
+        self.kpu_lm = model_get(LM_MODEL)
 
         _scale, pad_top = letterbox()
         a2d = Ai2d()
@@ -455,14 +452,9 @@ class FacePointsApp:
             DET_IN[0], LM_IN, gc.mem_free()))
 
     def _release_models(self):
-        for name in ("kpu_det", "kpu_lm"):
-            kpu = getattr(self, name)
-            if kpu is not None:
-                try:
-                    kpu.release()
-                except BaseException as e:
-                    print("[Points]   {}.release error: {}".format(name, e))
-                setattr(self, name, None)
+        # The kpus belong to the shared pool; only the ai2d instances are per-app.
+        self.kpu_det = None
+        self.kpu_lm = None
         for name in ("a2d_det", "a2d_lm"):
             a2d = getattr(self, name)
             if a2d is not None:

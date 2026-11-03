@@ -157,6 +157,7 @@ nothing points at the cause.
 | `wlan.scan()` returns zero entries | The radio is locked to the current channel after about 3 s connected | Disconnect, wait 600 ms, scan, reconnect |
 | Reported signal is about 14 dB too good | `wlan.status('rssi')` is optimistic | Use the scan cache; this is only a cold-start fallback |
 | `connect()` returns without raising but never connects | Association failure is reported only by the C layer | Check `isconnected()` and record the failure |
+| `connect()` returns quickly and `isconnected()` is still False, then the link comes up on its own; a single check reports a false failure | Measured: `connect()` returned after 3.0-3.3 s with the association still pending, and `isconnected()` became True only after another 0.8 s of polling. Everything else about the attempt was identical | Poll `isconnected()` until it flips or a deadline expires. Never sample it once: the boot sequence reported "cannot connect" on every power-on while the same credentials connected in about 1.5 s from the app, which polls |
 | `AttributeError` on scan results | Entries are objects, not dicts | Attribute access; ssid is bytes |
 | The radio cannot be reset | `active(False)` is refused by RT-Smart | Power cycle, and restart the access point |
 
@@ -190,6 +191,14 @@ Run two connects: one with the stored password, one with a deliberately wrong
 password. If both behave identically — same `run connect failed.` from the C
 layer, the same roughly 15.5 s block, `isconnected()` false throughout — the
 failure happens before password validation, so it is not a password problem.
+
+Before concluding either way, compare the two **code paths** that are supposed to
+do the same thing. A boot attempt that failed on every power-on while the Wi-Fi
+app succeeded with the same credentials came down to one difference: the boot
+path sampled `isconnected()` once after `connect()` returned, the app polled it.
+`_probe_net_boot_vs_app.py` runs both in one process and prints the outcome and
+timing of each, which separates "the radio cannot connect" from "the caller
+misread the result".
 
 Then check whether the AP appears in a scan, cross-check with the official
 network manager, and as a last step power cycle the board **and restart the

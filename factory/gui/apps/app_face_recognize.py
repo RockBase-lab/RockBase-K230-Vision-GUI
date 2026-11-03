@@ -55,6 +55,7 @@ import aidemo
 from libs.AI2D import Ai2d
 from media.sensor import Sensor, CAM_CHN_ID_1, CAM_CHN_ID_2
 from ui import beep
+from model_pool import get as model_get
 from ui import kb_layer
 from audio import greet
 from apps.error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
@@ -861,13 +862,9 @@ class FaceRecognizeApp:
             return False
 
     def _load_models(self):
-        kpu = nn.kpu()
-        kpu.load_kmodel(DET_MODEL)
-        self.kpu_det = kpu
-
-        kpu = nn.kpu()
-        kpu.load_kmodel(REG_MODEL)
-        self.kpu_reg = kpu
+        # All three are pooled (boot preloads them), so these are lookups.
+        self.kpu_det = model_get(DET_MODEL)
+        self.kpu_reg = model_get(REG_MODEL)
 
         _scale, pad_top = letterbox()
         a2d = Ai2d()
@@ -889,9 +886,7 @@ class FaceRecognizeApp:
         # the photo gate simply reports real.
         if self._exists(LIVE_MODEL):
             try:
-                kpu = nn.kpu()
-                kpu.load_kmodel(LIVE_MODEL)
-                self.kpu_live = kpu
+                self.kpu_live = model_get(LIVE_MODEL)
                 self.a2d_live = Ai2d()
                 self.a2d_live.set_ai2d_dtype(nn.ai2d_format.NCHW_FMT,
                                              nn.ai2d_format.NCHW_FMT,
@@ -903,14 +898,10 @@ class FaceRecognizeApp:
             print("[Recognize] liveness kmodel absent, enroll tags all live")
 
     def _release_models(self):
-        for name in ("kpu_det", "kpu_reg", "kpu_live"):
-            kpu = getattr(self, name)
-            if kpu is not None:
-                try:
-                    kpu.release()
-                except BaseException as e:
-                    print("[Recognize]   {}.release error: {}".format(name, e))
-                setattr(self, name, None)
+        # The kpus belong to the shared pool; only the ai2d instances are per-app.
+        self.kpu_det = None
+        self.kpu_reg = None
+        self.kpu_live = None
         for name in ("a2d_det", "a2d_reg", "a2d_live"):
             a2d = getattr(self, name)
             if a2d is not None:
