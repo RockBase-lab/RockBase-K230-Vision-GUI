@@ -87,12 +87,12 @@ MODEL_MISSING = ("OCR models missing on SD card.\n"
                  "  " + REC_MODEL + "\n"
                  "  " + DICT_PATH)
 
-# The CJK font covers every character the dict can emit except the rare hanzi
-# outside GB2312 level-1: 4036 glyphs = 3743 common hanzi + 292 punctuation and
-# symbol characters + a space (tools/ocr_charset.txt). Omitting the punctuation
-# renders every comma and full stop as a box. lv.font_load costs ~1.2 ms per glyph
-# and is not cached by the loader, so glyph count is the only lever: this build
-# loads in 4.96 s, the full 6547-glyph dict in 8.3 s.
+# The CJK font covers every character the recognition dictionary can emit: 6549
+# glyphs = 6255 hanzi + 293 punctuation and symbol characters + a space
+# (tools/ocr_charset.txt). A narrower subset renders the omitted characters as boxes
+# even though the model read them correctly, which is why the full vocabulary ships.
+# lv.font_load costs ~1.14 ms per glyph and is not cached by the loader, so glyph
+# count is the only lever: this build loads in 7.5 s.
 # The boot sequence preloads it into font_pool, so getting it here is a lookup.
 FONT_FILE = "ocr_cjk_16.bin"
 
@@ -191,7 +191,7 @@ class OcrApp:
                                  lv.FLEX_ALIGN.CENTER)
         self.panel_labels = []
         # With the boot preload the font is already resident, so apply it now; only a
-        # build with BOOT_PRELOAD_FONTS=False pays the 4.96 s load, and then it is
+        # build with BOOT_PRELOAD_FONTS=False pays the 7.5 s load, and then it is
         # deferred to the first scan so the preview still appears immediately.
         preloaded = font_pool.is_loaded(FONT_FILE)
         ready_font = _ocr_font() if preloaded else None

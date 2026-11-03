@@ -277,6 +277,13 @@ corrupts behaviour. Each one links to the measured explanation.
     exception and a dead serial link. The limit is not the byte total, so
     do not probe upward. Load alternates on demand, one at a time. See
     `docs/pitfalls.md`.
+15. **Never call `release()` on a kpu obtained from `model_pool`.** The
+    pool owns every kpu it hands out and shares one instance across apps;
+    an app that releases it takes the model away from the next app that
+    needs it. An app's `destroy()` frees only its own `Ai2d`, which is
+    per-app because the input geometry differs. Verify with
+    `tools/probes/_probe_pool_lifecycle.py`: the pool size must read
+    10 -> 10 -> 10 across an app's open and close.
 
 The complete list of traps, including the ones that fail silently instead
 of hanging the board, is `docs/pitfalls.md`. Read it before writing a new

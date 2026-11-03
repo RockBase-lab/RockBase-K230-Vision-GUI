@@ -88,6 +88,31 @@ Missing any one of them makes the text shake:
 3. A monospace font, so glyph widths are constant. Combined with a fixed-width
    field, the columns never move.
 
+### a label's width is resolved by the layout pass of its screen
+
+`get_width()` on a label that has never been through layout returns 0, and it
+does not refresh afterwards: `set_text` on an already-laid-out label keeps the old
+width, and loading a second screen does not re-lay-out labels created for the
+first. Measured while checking glyph coverage, where this read 0 or stale values
+and looked like the font was broken.
+
+Reliable pattern in a probe: create the screen and every label first, choose the
+text, then `lv.scr_load(scr)` followed by two `lv.task_handler()` calls, and read
+the widths at the end. One screen per measurement, not one screen reused.
+
+Deleting the screen you just measured also makes every later label report 0,
+because that screen is the active one; see the rule against deleting the active
+screen.
+
+### a missing glyph is a narrower box, not a blank
+
+There is no error when the font has no glyph for a character: LVGL draws its
+fallback box. So "text rendered without raising" proves nothing about coverage, and
+the useful check is the advance width: present glyphs measure the font's full
+width (16.00 px for `ocr_cjk_16`), missing ones do not. Compare a suspect string
+against a control string of known-good characters rather than against an absolute
+number.
+
 ### tiny_ttf and freetype are unusable for live text
 
 - `lv.tiny_ttf_create_file("/sdcard/...ttf", size)` does render arbitrary TTF

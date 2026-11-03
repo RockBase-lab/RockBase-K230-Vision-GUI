@@ -22,26 +22,32 @@ instead of a load. Measured cold, one process, cache-purged:
 
 | Boot step | Cost |
 |---|---|
-| tile cache read (15 tiles) | 895-1036 ms |
-| bitmap fonts, 5 files | 5400-5650 ms |
-| OCR dictionary (6549 entries) | 337-346 ms |
+| tile cache read (15 tiles) | 710-1036 ms |
+| bitmap fonts, 5 files | 7969-8335 ms |
+| OCR dictionary (6549 entries) | 132-346 ms |
 | ten kmodels | 3977-4308 ms |
 | progress-bar animation | 640 ms total |
-| **assets subtotal** | **11.2-11.3 s** |
+| **assets subtotal** | **13.4-13.5 s** |
 | Wi-Fi (connected) | 5.6 s, overlapped with nothing |
-| **total, Wi-Fi connected** | **about 11.3 s** |
-| **total, Wi-Fi unreachable** | **about 27 s** (the failing `connect()` blocks ~15 s in the C layer) |
+| **total, Wi-Fi connected** | **13.5-13.6 s** |
+| **total, Wi-Fi unreachable** | **about 30 s** (the failing `connect()` blocks ~15 s in the C layer) |
+
+The fonts are 8.0-8.3 s of that, and 7.5 s of the fonts is the 6549-glyph OCR font
+alone. That font covers the whole recognition vocabulary on purpose: a narrower
+subset saved 2.6 s of boot but boxed characters the model had read correctly
+(measured: the GB2312 level-1 intersection is 3743 of 6255 hanzi, and the 2512
+missing ones include 圳 and 樽).
 
 The progress bar is interpolated by hand, in between steps, at a cost of about
 640 ms over the whole boot. It cannot be driven by `lv_anim`: the boot spends most
 of its time inside blocking C calls (`load_kmodel`, `font_load`) where nothing
 repaints, so a timer-driven animation would sit frozen and then snap to its end
 value on the next tick. Animating between steps is the only place the motion can
-actually show. Measured: 72 rendered frames, the 41% jump at the OCR font turned
-into a 13-frame sweep, no hard jump left among the steps themselves.
+actually show. Measured: 72 rendered frames, the largest single step (the OCR
+font) turned into a multi-frame sweep, no hard jump left among the steps
+themselves.
 
-The fonts are 5.4 s of that, and 4.9 s of the fonts is the 4036-glyph OCR font
-alone. The models load in 4.0-4.3 s and cost about 1 KB of Python heap (see
+The models load in 4.0-4.3 s and cost about 1 KB of Python heap (see
 `docs/board-ai-runtime.md`), so the pool is affordable; what it buys is the open
 path below.
 
@@ -249,7 +255,7 @@ runs one blocking detect+recognize pass. Measured inside the real launcher
 |---|---|
 | det kmodel + rec kmodel load | 1900 ms, once at open (now moved to boot) |
 | app open total (models only) | 2200 ms |
-| CJK font load (4036 glyphs) | 4900 ms, once |
+| CJK font load (6549 glyphs) | 7469 ms, once |
 | first scan, 12 lines | 6300 ms (font + detect + recognize) |
 | later scans, 12 lines | 1400 ms |
 | detection (ai2d 640x640 + kpu + `ocr_post_process`) | ~230-294 ms |
@@ -261,16 +267,18 @@ open path no longer pays them: measured 468-817 ms, all of it sensor bring-up,
 ai2d build and the widget tree. Three earlier placements were rejected on the way
 here, and each one is why the boot preload exists:
 
-- at open, the font froze the screen for 4.9 s before any preview appeared;
-- on the first scan, it kept open at 2.2 s but moved the 4.9 s into the scan;
-- in the pool, it costs 5.4 s of boot and nothing at either point.
+- at open, the font froze the screen for 7.5 s before any preview appeared;
+- on the first scan, it kept open at 2.2 s but moved the 7.5 s into the scan;
+- in the pool, it costs 7.5 s of boot and nothing at either point.
 
-The glyph count is the only font-load lever: measured ~1.2 ms per glyph,
-independent of file size or range count. The shipped subset is 4036 glyphs: the
-3743 GB2312 level-1 hanzi the dictionary uses, plus the 292 punctuation and
-symbol characters it can emit and a space. Dropping the punctuation renders every
-comma and full stop as a box; dropping the rare hanzi instead costs almost
-nothing. The full 6547-glyph dict costs 8276 ms and was rejected.
+The glyph count is the only font-load lever: measured ~1.14 ms per glyph,
+independent of file size or range count. The shipped font is the **whole**
+recognition vocabulary, 6549 glyphs: 6255 hanzi plus 293 punctuation and symbol
+characters plus a space. A narrower subset was tried and rejected. Restricting it
+to the GB2312 level-1 intersection (3743 of those 6255 hanzi) saved 2.6 s of boot
+but boxed 2512 characters the model reads correctly, including 圳 and 樽, so a
+correct reading of a place name or a poem came out unreadable. Since the vocabulary
+is what the model can ever emit, anything less than all of it is a latent bug.
 
 ## QR detection
 

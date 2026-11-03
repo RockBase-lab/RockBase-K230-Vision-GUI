@@ -149,14 +149,14 @@ BOOT_MODELS = [
     ("ocr_rec_int16.kmodel", 810),
 ]
 
-# Every baked bitmap font, cheap to expensive with its measured load cost. 4958 of the
-# 5457 ms total is the 4036-glyph OCR font, so it has to carry most of the bar.
+# Every baked bitmap font, cheap to expensive with its measured load cost. 7469 of the
+# 7969 ms total is the 6549-glyph OCR font, so it has to carry most of the bar.
 BOOT_FONTS = [
     ("mono_dejavu_16.bin", 106),
     ("ui_nunito_bold_22.bin", 110),
     ("kb_nunito_bold_28.bin", 119),
     ("plate_cjk_30.bin", 164),
-    ("ocr_cjk_16.bin", 4958),
+    ("ocr_cjk_16.bin", 7469),
 ]
 
 TILE_SIZE = 164            # icon block size

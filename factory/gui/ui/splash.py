@@ -22,8 +22,8 @@ COL_WARN = 0xFFC857
 
 # Progress motion. The bar is interpolated between steps by hand (see _animate_to)
 # because the boot sequence blocks inside C calls where nothing can repaint.
-# Budget scales with the distance covered, so the OCR font step (44% of the bar in
-# one go) sweeps and a 4% model step does not spend 200 ms of boot for nothing.
+# Budget scales with the distance covered, so the OCR font step (the largest single
+# step of the boot) sweeps and a 4% model step does not spend 200 ms for nothing.
 ANIM_MS_PER_PCT = 6
 ANIM_MIN_MS = 45
 ANIM_MAX_MS = 240
@@ -154,7 +154,7 @@ class Splash:
         the frames between steps is the only place the motion can actually show.
 
         Every millisecond here is boot time, so the distance decides the budget: a
-        4% step gets a blink, and a 44% jump (the OCR font) gets the full sweep.
+        2% step gets a blink, and a 30% jump (the OCR font) gets the full sweep.
         """
         start = self._pct
         if target <= start:

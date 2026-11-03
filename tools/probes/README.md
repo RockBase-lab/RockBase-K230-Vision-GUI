@@ -167,6 +167,9 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_ocr_boxes.py` | Raw `ocr_post_process` box count vs the app's size filter and cap |
 | `_probe_ocr_charset.py` | Prints, as base64, the dict characters outside the GB2312 level-1 range |
 | `_probe_ocr_vocab.py` | Prints the whole recognition vocabulary, to diff against the baked font |
+| `_probe_ocr_font_full.py` | Load cost of the full-vocabulary font and a glyph-advance sanity check |
+| `_probe_ocr_glyphs.py` | Advance of previously-boxed characters against a control string |
+| `_probe_pool_lifecycle.py` | Pooled kpu count across open/close of every app (needs `--lvgl`) |
 | `_probe_ocr_stall.py` | Per-frame cost after opening an app through the real launcher (needs `--lvgl`) |
 | `_cap_ocr_result.py` | Result view geometry (12 labels, reading order, no overlap) plus a band capture (needs `--lvgl`) |
 | `_probe_preload_budget.py` | Whether every GUI kmodel can stay resident at once, and the heap cost |

@@ -404,21 +404,27 @@ index 2 and the step axis is index 0. Decode with
 `dict.txt` is 94 ASCII plus 6455 CJK entries, so one rec model reads both
 scripts; no second model or language switch is needed.
 
-### the display font is the open-time cost, not the scan cost
+### the display font must cover the whole vocabulary
 
-Rendering recognised text needs a baked CJK font (`ocr_cjk_16.bin`). `font_load`
-costs ~1.2 ms per glyph and is not cached by the loader, so glyph count is the
-only lever: the shipped 4036 glyphs (GB2312 level-1 hanzi the dictionary uses,
-plus every punctuation and symbol character it can emit, plus a space) load in
-4900 ms, the full 6547-glyph dict in 8276 ms. Dropping the punctuation instead
-renders every comma and full stop as a box, which is what the first build did.
+The recognition model can only emit classes present in `dict.txt`, so that file
+defines the maximum it can ever read: 6548 distinct characters, of which 6255 are
+hanzi. Rendering needs a baked CJK font (`ocr_cjk_16.bin`), and the font must carry
+the **whole** vocabulary, because a character missing from it renders as a box even
+after the model read it correctly.
+
+`font_load` costs ~1.14 ms per glyph and is not cached by the loader, so glyph
+count is the only lever: the shipped 6549 glyphs (6255 hanzi, 293 punctuation and
+symbol characters, a space) load in 7469 ms. A subset restricted to the GB2312
+level-1 intersection (3743 of the 6255 hanzi, 4900 ms) was tried and rejected: it
+boxed 2512 characters, among them 圳 and 樽, so a correctly read place name or line
+of poetry came out unreadable.
 
 Load it at boot into the shared font cache (`font_pool`), not at open and not on
-the first scan. At open it froze the screen for 4.9 s before the preview ever
-appeared, which the user reads as a hang; on the first scan it stayed resident
-but moved the 4.9 s into the scan. In the boot pool it costs 5.4 s of boot and
-nothing at either point, and every app then reaches the font through a dict
-lookup. See `docs/performance-budget.md`.
+the first scan. At open it froze the screen for 7.5 s before the preview ever
+appeared, which the user reads as a hang; on the first scan it stayed resident but
+moved the 7.5 s into the scan. In the boot pool it costs 7.5 s of boot and nothing
+at either point, and every app then reaches the font through a dict lookup. See
+`docs/performance-budget.md`.
 
 ## Human pose (17 keypoints)
 

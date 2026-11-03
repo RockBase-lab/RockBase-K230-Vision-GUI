@@ -144,16 +144,15 @@ SPECS = {
              [(0x20, 0x7E)] + [(ord(c), ord(c)) for c in PLATE_CJK]),
         ],
     },
-    # OCR result labels: the ocr_rec dictionary can emit 6547 characters, but
-    # lv.font_load costs ~1.2 ms per glyph (measured: 6547 glyphs = 8.3 s, and
-    # it is not cached, so a reload costs the same). The full set is too slow to
-    # load on first scan, so the font covers the GB2312 level-1 common characters
-    # that intersect the dictionary (3743 glyphs, ~4.5 s). A rare character the
-    # subset omits renders as a box; the recognised text is still readable.
-    # The exact set lives in tools/ocr_charset.txt (generated from the dictionary
-    # intersected with GB2312 level-1, minus the CTC blank) so font and model
-    # cannot drift apart. bpp2 halves file size but not load time (glyph count
-    # dominates), it is kept small for SD footprint.
+    # OCR result labels: the font must cover every character the ocr_rec dictionary
+    # can emit, because a character missing here renders as a box even when the model
+    # read it correctly. That is 6549 glyphs (6255 hanzi + 293 punctuation/symbols +
+    # a space) and costs 7.5 s to load at ~1.14 ms per glyph, paid once at boot.
+    # A subset is tempting (the GB2312 level-1 intersection is only 3743 glyphs and
+    # 4.9 s) but it boxed ordinary characters such as 圳 and 樽, so the full set ships.
+    # The exact set lives in tools/ocr_charset.txt, generated from the dictionary, so
+    # font and model cannot drift apart. bpp2 halves file size but not load time
+    # (glyph count dominates); it is kept small for SD footprint.
     "ocr16": {
         "out": "ocr_cjk_16.bin",
         "size": 16,

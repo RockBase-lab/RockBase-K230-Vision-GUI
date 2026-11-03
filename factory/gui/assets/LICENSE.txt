@@ -108,13 +108,14 @@ fonts/plate_cjk_30.bin  <- 由 tools/gen_font.py 预烘的 30px 位图字体，�
 
 ----
 
-fonts/ocr_cjk_16.bin  <- 由 tools/gen_font.py 预烘的 16px bpp2 位图字体，取
-                         OCR 识别字典（examples/utils/dict.txt）能输出的字符共
-                         4036 字：GB2312 一级常用汉字 3743 个，加上字典可输出的
-                         292 个标点/符号字符和一个空格。字符集清单在
-                         tools/ocr_charset.txt。字典里的罕见汉字不在子集内，
-                         会被画成方框；标点必须包含，否则逗号句号全是方框。
-                         lv.font_load 每字形约 1.2ms，全字典 6547 字要 8.3s。
+fonts/ocr_cjk_16.bin  <- 由 tools/gen_font.py 预烘的 16px bpp2 位图字体，覆盖
+                         OCR 识别字典（examples/utils/dict.txt）能输出的全部字符
+                         共 6549 字：6255 个汉字，加上 293 个标点/符号字符和一个
+                         空格。字符集清单在 tools/ocr_charset.txt。
+                         必须覆盖整个字典：子集里没有的字，模型认对了也会被画成
+                         方框（例如「圳」「岑」「樽」都曾如此）。标点同样必须包含，
+                         否则逗号句号全是方框。
+                         lv.font_load 每字形约 1.14ms，本字体实测 7.5s。
 
 字体: Source Han Sans / 思源黑体 (https://github.com/adobe-fonts/source-han-sans)
 授权: SIL Open Font License 1.1 (OFL) — 允许子集化、嵌入与再分发，
