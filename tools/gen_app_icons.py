@@ -103,7 +103,6 @@ ICONS = {
     # character lines. Used instead of Lucide "car", which read as "vehicle
     # recognition rather than "licence plate".
     "plate": "license-plate",
-    "cvlab": "flask-conical",
     "ocr": "scan-text",
     "face_det": "scan-face",
     "landmark": "grid-3x3",

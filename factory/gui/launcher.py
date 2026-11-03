@@ -165,7 +165,6 @@ APP_ACCENTS = {
     "person":   0x9C92C9,
     "fall":     0xCC8A92,
     "plate":    0xA9BE7C,
-    "cvlab":    0x6FB8A4,
     "ocr":      0x94A3B8,
     "face_det": 0xD9A76A,
     "landmark": 0xC9AE7A,
@@ -370,12 +369,6 @@ FOLDER_MEMBERS = {
         # Measured per frame: detection 57-59 ms plus recognition 3-5 ms.
         {"id": "plate", "name": "Plate", "icon": "assets/icon_plate.png",
          "symbol": _sym("CARD"), "module": "apps.app_plate",
-         "immersive": True, "release_home": True},
-        # Classic CV bench (no neural network): blobs / segments / rects / motion on
-        # a half-size grayscale channel, results drawn as LVGL overlays. release_home
-        # because Hough and quad detection allocate large native working buffers.
-        {"id": "cvlab", "name": "CV Lab", "icon": "assets/icon_cvlab.png",
-         "symbol": _sym("FLASK_1"), "module": "apps.app_cvlab",
          "immersive": True, "release_home": True},
         {"id": "ocr", "name": "OCR", "icon": "assets/icon_ocr.png",
          # Snapshot text scan: preview runs live, OK/tap freezes and runs one
