@@ -30,6 +30,7 @@ import time
 import lvgl as lv
 from media.sensor import Sensor, CAM_CHN_ID_0, CAM_CHN_ID_2
 
+import config
 from audio import shutter
 from camera_fov import set_preview
 from apps.error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
@@ -89,9 +90,10 @@ def _ensure_dir(path):
 class CameraApp:
     def __init__(self, content, ctx):
         self.ctx = ctx
-        # OK already plays a synthesized shutter "ka-cha", so disable the hardware key's
-        # default click to avoid stacking two sounds.
-        ctx.ok_beep = False
+        # Shutter sound is a Settings preference. A muted session leaves the OK
+        # key's buzzer click enabled instead, so the press still has feedback.
+        shutter.set_muted(not config.get_bool("camera.shutter_sound", True))
+        ctx.ok_beep = shutter.muted()
         self.sensor = None
         self.frame_count = 0
         self.last_fps_ms = time.ticks_ms()
@@ -200,7 +202,8 @@ class CameraApp:
         # closing it per shot would add the fixed 1.1 s of stop_stream (measured; see the
         # header of shutter.py).
         self.sfx = shutter.ShutterSfx()
-        self.sfx.open()
+        if not shutter.muted():
+            self.sfx.open()
 
         print("[Camera] ready: preview {}x{} | capture {}x{} | dir={} next={}".format(
             self.img_w, self.img_h, CAPTURE_W, CAPTURE_H, SAVE_DIR, self.save_num))

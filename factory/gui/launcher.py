@@ -342,7 +342,7 @@ APPS = [
     {"id": "touch", "name": "Touch", "icon": "assets/icon_touch.png",
      "symbol": _sym("TOUCHSCREEN", "TOUCH", "EYE_OPEN"), "module": "apps.app_touch"},
     {"id": "settings", "name": "Settings", "icon": "assets/icon_settings.png",
-     "symbol": _sym("SETTINGS"), "module": "apps.app_placeholder"},
+     "symbol": _sym("SETTINGS"), "module": "apps.app_settings"},
     # ---- Page 2 ----
     # Face group: chained face pipeline (detect -> align -> embed). Its pipeline
     # differs from the single-model family in Vision and it has to maintain a local
@@ -488,6 +488,12 @@ from apps.error import AppUnavailable
 # Click sound (passive buzzer on IO43). init/poll failures all degrade silently so
 # they never block startup.
 from ui import beep
+# Panel backlight handle: this file brings the pin up, then hands the PWM over so
+# the Settings app can change brightness without creating a second channel.
+from ui import backlight
+# Persistent user preferences (/data/settings/gui.json). Read at boot for the
+# click tone and brightness, then by each app that owns a setting.
+import config
 # Resident kpu / bitmap-font caches: apps take their resources from these instead of
 # loading them at open, which is what makes the boot preload worth doing.
 import model_pool
@@ -1278,21 +1284,29 @@ class HardwareButtons:
         return False
 
 
-def _backlight_on():
-    """Drive the panel backlight to full brightness.
+def _backlight_on(target_pct=100):
+    """Drive the panel backlight to the stored brightness.
 
     PWM first for a short fade, then a plain GPIO high, then give up loudly: a silent
-    failure here is indistinguishable from a dead board from the user's side.
+    failure here is indistinguishable from a dead board from the user's side. The
+    PWM object is handed to ui.backlight so the Settings app can dim it later; the
+    GPIO fallback cannot dim, and ui.backlight stays detached.
     """
     global _BACKLIGHT
+    target = int(target_pct)
+    if target < 1:
+        target = 1
+    elif target > 100:
+        target = 100
     try:
         pwm = PWM(BACKLIGHT_PIN, freq=BACKLIGHT_PWM_HZ, duty=0)
         for step in range(1, BACKLIGHT_FADE_STEPS + 1):
-            pwm.duty(step * 100 // BACKLIGHT_FADE_STEPS)
+            pwm.duty(step * target // BACKLIGHT_FADE_STEPS)
             time.sleep_ms(BACKLIGHT_FADE_MS)
         _BACKLIGHT = pwm
+        backlight.attach(pwm, target)
         print("[GUI] backlight on: PWM {}Hz {}%, fade {}ms".format(
-            BACKLIGHT_PWM_HZ, 100, BACKLIGHT_FADE_STEPS * BACKLIGHT_FADE_MS))
+            BACKLIGHT_PWM_HZ, target, BACKLIGHT_FADE_STEPS * BACKLIGHT_FADE_MS))
         return
     except BaseException as error:
         print("[GUI] backlight PWM unavailable: {}".format(error))
@@ -2670,16 +2684,20 @@ def boot_load(splash):
 
 
 def main():
+    # Preferences first: brightness and click tone are applied while the panel
+    # comes up, so the first boot frame and the first tap already honour them.
+    config.load()
     # Display rotation is applied at the Display layer.
     Display.init(DISPLAY_TYPE, width=DISPLAY_WIDTH, height=DISPLAY_HEIGHT,
                  flag=DISPLAY_FLAG, to_ide=True)
     # Light the panel as early as possible: everything below can take a second (tile
     # bake) and the user must see that the board booted.
-    _backlight_on()
+    _backlight_on(config.get_int("display.brightness", 100))
     try:
         lvgl_setup()
         # Buzzer before the UI so the very first tap after boot has sound
         beep.init()
+        beep.set_enabled(config.get_bool("ui.click_sound", True))
         # When a worker (connect/scan/NTP) holds the GIL inside a wlan C call, the click
         # sound cannot be muted by its shutdown thread and inevitably becomes a long tone;
         # let beep stay silent for that window instead.

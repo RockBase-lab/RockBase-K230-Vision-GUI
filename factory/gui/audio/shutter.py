@@ -87,12 +87,20 @@ PA_SETTLE_MS = 50             # amplifier power-up wait, avoids a start-up pop (
 # OK press retries anyway.
 OPEN_RETRY_DELAYS_MS = (80, 240, 600)
 
-# TODO(settings): shutter-sound mute switch. Wire it up once the Settings app
-#   lands - persist the user's choice to /data/config/gui.json (as
-#   camera.sfx=0/1), load it into MUTED below at app start; with MUTED=True
-#   play() returns immediately while the WAV and the PCM cache are kept, so
-#   re-enabling the switch needs no re-synthesis.
+# Muted through the Settings app (config key "camera.shutter_sound"). The camera
+# calls set_muted() while constructing, before opening the stream, so a muted
+# session never powers the amplifier. The WAV and PCM cache are kept, so turning
+# the switch back on needs no re-synthesis.
 MUTED = False
+
+
+def set_muted(flag):
+    global MUTED
+    MUTED = bool(flag)
+
+
+def muted():
+    return MUTED
 
 _SILENCE = b"\x00\x00\x00\x00" * SFX_BLOCK
 _PCM_CACHE = None             # differential stereo PCM (module-level resident, kept after app exit)

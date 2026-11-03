@@ -124,6 +124,22 @@ all of it in one change:
 Replacing an existing placeholder needs steps 1 and 6 only when the `id`,
 icon, and accent already exist.
 
+## Adding a setting
+
+User preferences live in one store: `factory/gui/config.py`, a flat JSON
+object at `/data/settings/gui.json` (rule 11). To add one:
+
+1. Add the key and its default to `DEFAULTS` in `config.py`.
+2. Add one row to `GROUPS` in `apps/app_settings.py`. The row types are
+   `toggle`, `stepper`, `info`, and `action`; no new widget code is needed.
+3. Apply the value where it is consumed: the launcher for boot-time values
+   (brightness, click tone), the owning app for per-app switches (the
+   camera reads `camera.shutter_sound` when it starts).
+
+Do not import `launcher.py` from an app to reach a runtime handle. Shared
+hardware a setting needs to touch gets its own small module, as
+`ui/backlight.py` does for the PWM channel.
+
 ## Consistency check
 
 Before an acceptance commit, re-read what you changed and confirm that

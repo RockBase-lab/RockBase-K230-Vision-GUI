@@ -63,6 +63,7 @@
 #   beep.init()                          # once at boot (in main())
 #   beep.on_click(btn, self._on_click)   # replaces btn.add_event(cb, CLICKED, None)
 #   beep.bind(kb, lv.EVENT.VALUE_CHANGED)  # sound only, no callback wrap (keyboard keys)
+#   beep.set_enabled(cfg)                # Settings: click tone on/off
 #   beep.poll()                          # every frame in the main loop
 #   beep.shutdown()                      # on exit
 
@@ -96,6 +97,7 @@ _last_ms = 0
 _stop = False       # off-switch thread exit flag
 _thread_ok = False
 _busy_check = None  # True = a worker holds the GIL in a C call, so tap stays silent
+_enabled = True     # Settings: whether click tones are audible (tone() ignores it)
 
 
 def _worker():
@@ -148,6 +150,18 @@ def ready():
     return _pwm is not None
 
 
+def set_enabled(flag):
+    """Mute or unmute click feedback. Only tap()/on_click() follow this;
+    tone() stays audible because it carries state prompts (calibration), not
+    button feedback."""
+    global _enabled
+    _enabled = bool(flag)
+
+
+def enabled():
+    return _enabled
+
+
 def set_busy_check(fn):
     """Register a "worker holds the GIL exclusively" predicate. tap() asks it
     first and stays silent when it returns True.
@@ -164,6 +178,8 @@ def set_busy_check(fn):
 def tap():
     """Fire one click tone. Only sets duty and the deadline, never blocks."""
     global _off_ms, _last_ms, _pwm
+    if not _enabled:
+        return
     pwm = _pwm
     if pwm is None:
         return
@@ -271,6 +287,10 @@ def on_click(obj, cb, user_data=None):
     methods work unchanged.
     """
     def _wrapped(event, _cb=cb):
+        # Muted: run the callback straight away. Sleeping through a tone that
+        # never plays would only add 35ms of input lag to every tap.
+        if not _enabled:
+            return _cb(event)
         tap()
         # Sleep through the tone window before entering the callback: sleep_ms
         # releases the GIL and yields the CPU. Once BEEP_MS has passed, poll() is

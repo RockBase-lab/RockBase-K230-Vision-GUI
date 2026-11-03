@@ -3,6 +3,7 @@
 #   ui.paging    horizontal paging, snap and drag thresholds
 #   ui.kb_layer  the reusable keyboard overlay
 #   ui.beep      click feedback through the PWM buzzer
+#   ui.backlight panel backlight handle shared with the Settings app
 #
 # beep belongs here rather than under audio/: it drives GPIO43 through PWM and
 # deliberately avoids the codec -> amplifier path, which costs about 47ms per

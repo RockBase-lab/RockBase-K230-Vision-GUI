@@ -17,10 +17,11 @@ board revision, so they are stated as facts rather than as procedures.
   it.** A boot that renders correctly but never touches this pin shows a black
   panel: LVGL reports a healthy frame rate, the boot log has no error, and a
   snapshot still succeeds because it reads the LVGL buffer instead of the
-  panel. Drive it as a PWM at 1 kHz and fade 0 → 100 % (measured: the 10-step,
-  15 ms fade-in is invisible and adds 150 ms to boot), or set the pin high as
-  a fallback. GPIO output state survives a soft reset, so a probe that dimmed
-  the pin leaves the next boot dark until the state is overwritten.
+  panel. Drive it as a PWM at 1 kHz and fade 0 → the stored brightness
+  (default 100 %; measured: the 10-step, 15 ms fade-in is invisible and adds
+  150 ms to boot), or set the pin high as a fallback. GPIO output state
+  survives a soft reset, so a probe that dimmed the pin leaves the next boot
+  dark until the state is overwritten.
 
 ## Physical buttons
 
@@ -45,7 +46,7 @@ PULL_DOWN is required. An earlier note calling GPIO53 a status LED was wrong.
 - Recommended click: 2 kHz, 50 % duty, 60-80 ms, throttled to a 60-120 ms
   minimum interval.
 - There is no volume control, only frequency response. An on/off preference
-  must be persisted to `/data/config/gui.json`.
+  is persisted to `/data/settings/gui.json` (key `ui.click_sound`).
 - Note that the PWM worker cannot silence the tone during a long blocking C
   call: the GIL is held and nothing Python runs. See
   `docs/performance-budget.md`.
@@ -306,6 +307,57 @@ gyro LSB is 15.6 mdps with 0.2-0.5 dps noise, so one decimal suffices.
 - Only one `Sensor()` can be constructed per MicroPython VM lifetime. See
   `docs/reset-matrix.md`.
 
+## Memory as Python sees it
+
+The board has 1 GB of DDR, but MicroPython only reports the GC arena it is
+currently using. That arena **starts at about 4 MB and grows on demand**.
+
+| Figure | Measured | Scope |
+| --- | --- | --- |
+| `gc.mem_alloc() + gc.mem_free()` on an idle VM | **4,145,664 B (3.95 MB)** | The initial GC arena, not a ceiling |
+| Same sum while holding a 3 MB `bytearray` | **6.96 MB** (3.95 + 3.01) | The arena was extended from the system heap |
+| Same sum after `del` + `gc.collect()` | **3.95 MB** again | The extra arena went back to the system |
+| `gc.mem_free()` after the desktop is built | about 1.19 MB | Free space in the *existing* arenas only |
+| Python heap cost of ten resident kmodels | **+10 KB** | Weights and KPU arenas live outside the GC heap |
+
+Growth in detail, measured on board with `_probe_heap_growth.py`: a 64 KB and a
+128 KB allocation fit inside the existing free space and the reported total did
+not move; 256 KB extended the arena by about 1 MB (total 4.94 MB); allocations
+of 768 KB, 1 MB, 1.5 MB, 2 MB and 3 MB all succeeded, with the total tracking the
+requested size. Nothing failed up to the 3 MB the probe tried.
+
+Consequences:
+
+- **`gc.mem_free()` under-reports what can still be allocated.** It counts free
+  space in the arenas that exist now, so a board showing 1.19 MB free can still
+  allocate a 3 MB contiguous block. Do not treat it as "remaining memory".
+- **The real limit is contiguous availability, not the 4 MB figure.** The
+  failures recorded in `docs/board-ai-runtime.md` are `to_numpy()` asking for a
+  705 KB contiguous block in a fragmented heap, which is why `release_home`
+  destroys the desktop before a heavy app starts.
+- **There is no runtime knob for the arena size.** `gc` on this build exposes
+  only `threshold`, `collect`, `enable`, `disable` and `isenabled`; there is no
+  `canmv` or `board` module, and no heap-size setter. The initial size is a
+  firmware build constant (this board runs CanMV `v1.8-70-gd6fe10e`). Changing it
+  means rebuilding firmware, and the growth measured above makes that
+  unnecessary.
+- **Allocation is coarse.** The arena extends in roughly 1 MB steps, so a small
+  request can raise the reported total by about 1 MB.
+
+Memory that Python cannot see:
+
+- **No system-level query exists.** `os.sysconf` does not exist,
+  `/proc/meminfo` opens with `OSError(19)` (ENODEV), and every readable file
+  under `/proc` (`media-mem`, `umap/*`) returns 0 bytes on this build.
+  `image.ALLOC_HEAP/ALLOC_MMZ/ALLOC_VB/ALLOC_MPGC` choose where an `image.Image`
+  allocates; they are not counters.
+- `micropython.mem_info()` prints statistics to stdout and returns nothing, so
+  it cannot feed a widget. Use `gc.mem_free()` and `gc.mem_alloc()` for a number
+  on screen.
+- `micropython.mem_info(1)` and `qstr_info(1)` dump the whole heap or qstr table
+  as ASCII (tens of KB) and flood the serial link. Never call them in a probe
+  that reports over the same port.
+
 ## Storage
 
 Two writable filesystems, and they are not interchangeable:
@@ -331,7 +383,7 @@ choice is purely about capacity.
   | Camera / Gallery | `/data/photos` |
   | Gallery caches | `/data/cache/thumbs`, `/data/cache/full` |
   | Audio | `/data/audio` |
-  | Settings | `/data/config` |
+  | Settings | `/data/settings` |
   | Recognize | `/data/face/recognize` |
   | TTS voice | `/data/face/recognize/voice` |
 

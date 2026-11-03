@@ -126,6 +126,8 @@ nothing points at the cause.
 | Probe reports 9-24 fps for an app that runs at 50 | Sparse `step()` calls are throttled by the cadence gate | Measure through a real launcher loop |
 | A widget reports width 0 | Layout has not resolved yet | Read the context or the snapshot instead |
 | Keypoint arrays are silently skipped as if they were scalars | `hasattr(arr, "__len__")` is **False** for ulab ndarrays, though `len(arr)` works | Test with `try: len(x)`, never `hasattr` |
+| A probe reading and the app behave differently, and values look plausible but belong to an earlier run | `del sys.modules["apps.app_<name>"]` alone does not evict the submodule: `from apps import app_<name>` hands back the stale object, which keeps its own `config` / `beep` binding, so the probe and the app hold two instances | Also `delattr(apps, "app_<name>")` (or `del sys.modules["apps"]`), then assert the app module's binding is the one you configured |
+| "The 1 GB board has only 4 MB of RAM" or "free memory is nearly exhausted, it cannot take any more" | `gc.mem_alloc() + gc.mem_free()` is the **current** GC arena, and `gc.mem_free()` counts free space only in arenas that already exist. Both start small and under-report: measured, the arena began at 3.95 MB, grew to 6.96 MB while a 3 MB block was held, and returned to 3.95 MB after freeing | Treat a low `gc.mem_free()` as fragmentation risk, not as a ceiling; measure with a large contiguous `bytearray` before concluding memory is short |
 
 ### ADC and battery
 
@@ -167,7 +169,10 @@ These do not corrupt anything, they just cost time on every run. Keep them in
 muscle memory.
 
 1. **Soft reset before believing a change.** Module bytecode is cached and
-   `--reset` does not reliably clear it. Delete the module explicitly in probes.
+   `--reset` does not reliably clear it. In a probe, deleting the name from
+   `sys.modules` is only half the job: a package submodule must also be cleared
+   off its parent (`delattr(apps, "app_<name>")`), otherwise `from apps import
+   app_<name>` returns the stale object with its own module bindings.
 2. **Measure repaint cost with invalidate plus refresh now.** Measuring through
    `task_handler()` under-reports because the 30 ms refresh period often means
    no repaint happens at all.

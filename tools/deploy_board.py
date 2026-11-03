@@ -21,7 +21,8 @@
 #                                         no-op when it is absent.
 #
 # Runtime directories created on board: /data/photos /data/cache/thumbs /data/cache/full
-#   /data/audio (CanMV's os module has no path/makedirs, so every level needs os.mkdir)
+#   /data/audio /data/settings (CanMV's os module has no path/makedirs, so every
+#   level needs os.mkdir)
 #
 # Transfer:
 #   chunked base64 (ubinascii.a2b_base64). Sending binary through %r escapes it to \xNN
@@ -127,6 +128,7 @@ BOARD_MKDIRS = [
     "/data/cache/full",
     "/data/audio",
     "/data/face/recognize",
+    "/data/settings",
 ]
 
 SKIP_DIRS = {"__pycache__", ".git"}
@@ -390,9 +392,9 @@ def main():
             out = run(
                 "import sys\n"
                 "sys.path.insert(0, '/sdcard/factory/gui')\n"
-                "mods = ['ui.paging', 'apps.app_touch', 'apps.app_camera',\n"
-                "        'apps.app_gallery', 'apps.app_audio',\n"
-                "        'apps.app_placeholder']\n"
+                "mods = ['ui.paging', 'ui.backlight', 'apps.app_touch',\n"
+                "        'apps.app_camera', 'apps.app_gallery', 'apps.app_audio',\n"
+                "        'apps.app_settings', 'apps.app_placeholder']\n"
                 "for m in mods:\n"
                 "    try:\n"
                 "        __import__(m)\n"

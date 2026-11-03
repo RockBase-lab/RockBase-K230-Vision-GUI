@@ -31,6 +31,12 @@ after the script ends and is not suitable for this purpose.
    constants**, so a deployed one-line fix looks like it did nothing: purge
    `apps.app_<name>`, `apps`, `apps.error`, `ui.beep`, `launcher` and
    `camera_fov` before importing anything under `factory/gui`.
+   **`del sys.modules["apps.app_settings"]` is not enough.** `from apps import
+   app_settings` then returns the stale module object, which keeps its own
+   `config` (or any other) binding, so the probe and the app read two different
+   instances and the numbers look plausible but come from the wrong object.
+   Also `delattr(apps, "app_settings")`, or `del sys.modules["apps"]` as well,
+   and assert `app_module.config is config` before trusting a reading.
 2. Wrap audio and camera teardown in `try`/`finally`. A leaked PDM or AO handle
    cannot be cleared by any reset short of a power cycle. See
    `docs/reset-matrix.md`.
@@ -172,6 +178,10 @@ See `docs/pitfalls.md` for the full trap index.
 | `_start_launcher_cold.py` | Start the GUI with every factory module purged, as a power-on would |
 | `_cap_run.py` | Run a display probe as a subprocess, capture raw output |
 | `_start_launcher.py` | Start the on-board GUI with a single exec |
+| `_probe_settings_app.py` | Settings app: row counts, toggle/stepper behaviour, scroll extent (needs `--lvgl`) |
+| `_probe_settings_shot.py` | Settings app screen capture for layout review (needs `--lvgl`) |
+| `_probe_memory_view.py` | What memory Python can report: GC heap size, and the absence of any system/MMZ query |
+| `_probe_heap_growth.py` | Whether the GC arena grows on demand, and how large a contiguous block still fits |
 
 Snapshot probes print a run-length encoded frame plus base64 blocks. Pipe that
 output through a file, then decode it with
