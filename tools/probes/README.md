@@ -200,6 +200,7 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_seg_orient_apps.py` | Segment and Orient through the real launcher, with the mask buffer state |
 | `_probe_seg_sig.py` | Segment output tensor signature, for the "list is too short" failure |
 | `_probe_seg_clear.py` | Whether `segment_postprocess` clears the buffer it is given |
+| `_probe_segment_shot.py` | Segment mask alignment: separate mask RLE and same-crop preview JPEG (needs `--lvgl`) |
 | `_probe_argb_dsc.py` | ARGB overlay paths: what `as_lvgl_img_src` and `img_dsc_t` accept |
 | `_probe_face_parse.py` | face_parse contract: output shape, A/B coordinate conventions, cost |
 | `_probe_face_parse_write.py` | Whether `face_parse_post_process` writes pixels and clears the buffer |

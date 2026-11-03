@@ -1,31 +1,13 @@
 # Segment: live instance segmentation (yolov8n_seg_320, COCO 80 classes).
 #
-# The decode is aidemo.segment_postprocess, which fills a caller-owned ARGB8888
-# buffer ([1,H,W,4] uint8) with one translucent colour per masked pixel and
-# returns (boxes, class_ids, scores). That buffer is shown as a second img
-# widget stacked over the preview, so the mask tints the picture without being
-# drawn into the sensor frame (which would corrupt the next capture).
+# aidemo.segment_postprocess fills a caller-owned 800x480 ARGB8888 mask and
+# returns boxes, class ids and scores. Output 0 is (1,116,2100): four box rows,
+# 80 class rows and 32 mask coefficients; pass every output untransposed.
 #
-# Preview runs at the full 800x480 like the other camera apps. The masks buffer
-# is display-sized ARGB (W*H*4 = 1.5 MB at this size). That looked too big for
-# the ~1.38 MB gc.mem_free() reported after release_home, but a board test with
-# the model resident allocated 1.5 MB fine: the GC arena grows on demand and
-# mem_free only counts arenas that already exist (see docs/pitfalls.md). preview
-# == widget == mask size, since as_lvgl_img_src attaches without scaling and
-# lv.img.set_size crops rather than scales.
-#
-# Output tensor: (1,116,2100) = [4 box + 1 score + 80 cls + 31 mask-coeffs] per
-# anchor. segment_postprocess takes the results list in this native layout --
-# untransposed, unlike the yolo_obb helper which wants a transposed copy. The
-# mask coefficients are what let it rebuild each instance mask; the detect
-# helper would ignore them.
-#
-# The AI channel emits a stretched 320x320 frame (full FOV, no letterbox), so
-# rgb_size == model input and segment_postprocess maps boxes and masks straight
-# into the display domain with no pad correction. The stretch mildly costs
-# accuracy; it is what keeps the C layer's assumption (rgb_size == model input)
-# true -- feeding a 640x384 frame instead failed with "list is too short"
-# (measured).
+# chn1 and chn2 must both use the 800x480 preview crop. The 800x480 input is
+# letterboxed to 320x320 by ai2d; segment_postprocess removes that padding.
+# A square sensor channel uses a different crop and misaligns masks by ~2.8x.
+# The persistent mask costs 1.5 MB; see docs/pitfalls.md before snapshot probes.
 
 import gc
 import sys
@@ -79,9 +61,9 @@ COCO = ["person", "bicycle", "car", "motorcycle", "airplane", "bus", "train",
 
 MODEL_PATH = "/sdcard/examples/kmodel/yolov8n_seg_320.kmodel"
 MODEL_INPUT = [320, 320]
-AI_W = 320                  # chn1 frame: stretched to the square model input
-AI_H = 320
-CONF = 0.30
+# 800x480 -> 320x192 at scale 0.4, so the letterbox pad is vertical only.
+PAD_Y = (MODEL_INPUT[1] - PREVIEW_H * MODEL_INPUT[0] // PREVIEW_W) // 2
+CONF = 0.70
 NMS = 0.45
 MASK_TH = 0.50
 
@@ -141,6 +123,7 @@ class SegmentApp:
             lab.add_flag(lv.obj.FLAG.HIDDEN)
             lab.set_style_bg_opa(lv.OPA._80, 0)
             lab.set_style_bg_color(lv.color_hex(0x000000), 0)
+            lab.set_style_text_color(lv.color_hex(COL_MODEL), 0)
             lab.set_style_pad_hor(4, 0)
             lab.set_style_pad_ver(1, 0)
             lab.set_style_radius(3, 0)
@@ -197,9 +180,9 @@ class SegmentApp:
         try:
             sensor = Sensor(fps=30)
             sensor.reset()
-            # chn1 is stretched to the square model input: no letterbox, so the
-            # C postprocess needs no pad correction (see module header).
-            set_preview(sensor, CAM_CHN_ID_1, AI_W, AI_H)
+            # Both channels share the crop window so overlays map by output
+            # size alone; chn1 is RGBP888 because ai2d declares NCHW input.
+            set_preview(sensor, CAM_CHN_ID_1, PREVIEW_W, PREVIEW_H)
             sensor.set_pixformat(Sensor.RGBP888, chn=CAM_CHN_ID_1)
             set_preview(sensor, CAM_CHN_ID_2, PREVIEW_W, PREVIEW_H)
             sensor.set_pixformat(Sensor.RGB888, chn=CAM_CHN_ID_2)
@@ -216,8 +199,9 @@ class SegmentApp:
         ai2d = Ai2d()
         ai2d.set_ai2d_dtype(nn.ai2d_format.NCHW_FMT, nn.ai2d_format.NCHW_FMT,
                            np.uint8, np.uint8)
-        # chn1 already matches the model input: pass-through format conversion.
-        ai2d.build([1, 3, AI_H, AI_W], [1, 3, mh, mw])
+        ai2d.pad([0, 0, 0, 0, PAD_Y, PAD_Y, 0, 0], 0, [114, 114, 114])
+        ai2d.resize(nn.interp_method.tf_bilinear, nn.interp_mode.half_pixel)
+        ai2d.build([1, 3, PREVIEW_H, PREVIEW_W], [1, 3, mh, mw])
         self.ai2d = ai2d
 
         # masks buffer: display-sized ARGB, reused every frame; aidemo fills it.
@@ -267,17 +251,17 @@ class SegmentApp:
         if score_max < CONF:
             del outs
             return None
-        # rgb_size == model input (chn1 is already 320x320); display is the
-        # preview rect, and boxes/masks come back mapped into it.
+        # rgb_size is the chn1 frame; the helper removes the ai2d letterbox
+        # pad and maps boxes and masks into the display rect.
         res = aidemo.segment_postprocess(
-            outs, [AI_H, AI_W], MODEL_INPUT,
+            outs, [PREVIEW_H, PREVIEW_W], MODEL_INPUT,
             [PREVIEW_H, PREVIEW_W], CONF, NMS, MASK_TH, self.masks)
         del outs
         return res
 
     def _show(self, res):
-        # res = (boxes, class_ids, scores); boxes are [x,y,w,h] in the AI-frame
-        # domain with the letterbox pad still in y.
+        # res = (boxes, class_ids, scores); segment_postprocess already un-padded
+        # and mapped boxes to [x,y,w,h] in the preview rect.
         n = 0
         if res and res[0]:
             n = min(len(res[0]), BOX_POOL)
