@@ -314,9 +314,10 @@ def _clean(o):
 # member picker layer (_open_folder) instead of an app. Members live in FOLDER_MEMBERS
 # and use the same meta shape as top-level entries, so flags such as
 # immersive/release_home still apply.
-# The top level holds 14 entries = two pages of a 4x2 grid (8 + 6), which keeps
+# The top level holds 13 entries = two pages of a 4x2 grid (8 + 5), which keeps
 # paging meaningful. Placeholder entries point at apps.app_placeholder; swap in
-# apps.app_xxx once the real app exists.
+# apps.app_xxx once the real app exists. Board facts (firmware, heap, model
+# count) live in the Settings app rather than a separate System tile.
 APPS = [
     {"id": "camera", "name": "Camera", "icon": "assets/icon_camera.png",
      "symbol": _sym("CAMERA", "VIDEO"), "module": "apps.app_camera",
@@ -365,11 +366,10 @@ APPS = [
     {"id": "imu", "name": "IMU", "icon": "assets/icon_imu.png",
      "symbol": _sym("MOVE"), "module": "apps.app_imu",
      "immersive": True},
-    # System: chip info / memory / sensor state.
-    {"id": "system", "name": "System", "icon": "assets/icon_system.png",
-     "symbol": _sym("INFORMATION"), "module": "apps.app_placeholder"},
     # Battery: single-cell pack voltage through the ADC5 divider. Sampling runs
     # inside step() one reading at a time so the UI never blocks.
+    # (A separate System tile used to sit after IMU; its board facts are now the
+    # SYSTEM section of the Settings app.)
     {"id": "battery", "name": "Battery", "icon": "assets/icon_battery.png",
      "symbol": _sym("BATTERY_FULL", "BATTERY_3", "BATTERY_2"),
      "module": "apps.app_battery"},

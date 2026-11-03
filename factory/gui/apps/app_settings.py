@@ -1,21 +1,18 @@
-# Settings app: user preferences for the desktop and its apps.
+# Settings app: user preferences plus the board facts the old System tile held.
 #
-# One vertically scrolling column of cards. Every control is described in GROUPS
-# and rendered by a shared row builder, so a new preference is one table entry
-# plus a DEFAULTS key in config.py, not another widget tree.
+# One vertically scrolling column of cards, table-driven from GROUPS below, so a
+# new preference is one entry plus a DEFAULTS key in config.py.
 #
-# Row types:
-#   toggle   switch on the right; a tap anywhere on the row flips it
-#   stepper  - / value / +, clamped; for bounded numbers such as brightness
-#   info     read-only label/value; "live": "heap" refreshes once per second
-#   action   row that runs a named handler (used by "restore defaults")
+# Row types: toggle (switch, whole row taps), stepper (- / value / +, clamped),
+# info (read-only; "live": "heap" or "models" refreshes once per second), and
+# action (runs a named handler, e.g. restore defaults).
 #
-# Persistence: config.set() writes /data/settings/gui.json on every change, so
-# there is no Save button and a power cut cannot leave the UI and the file
-# disagreeing. Values that have a live consumer are applied immediately
-# (click tone, backlight); the rest are read by the owning app when it starts.
+# config.set() persists every change to /data/settings/gui.json, so there is no
+# Save button. Live consumers (click tone, backlight) apply immediately; the rest
+# are read by the owning app when it starts.
 
 import gc
+import os
 import time
 
 import lvgl as lv
@@ -40,6 +37,21 @@ ROW_X = 8
 SECTION_H = 34
 CONFIRM_MS = 3000          # second tap window for a destructive action
 
+
+def _uname(index, fallback):
+    """Read one os.uname() field, falling back when the call is unavailable."""
+    try:
+        return os.uname()[index]
+    except BaseException:
+        return fallback
+
+
+# Static board identity, read once at import. Release and machine come from the
+# running firmware rather than a hard-coded string, so a firmware update shows up
+# without editing this table.
+FW_RELEASE = _uname(2, "unknown")
+FW_MACHINE = _uname(4, "K230")
+
 GROUPS = (
     ("SOUND", (
         {"type": "toggle", "key": "ui.click_sound",
@@ -59,6 +71,10 @@ GROUPS = (
          "value": "in the Network app"},
     )),
     ("SYSTEM", (
+        # This section is the old System tile: that entry was a placeholder, so the
+        # board facts live here instead of behind a second, empty icon.
+        {"type": "info", "label": "Firmware", "value": FW_RELEASE},
+        {"type": "info", "label": "Machine", "value": FW_MACHINE},
         # Scope matters: gc only reports the MicroPython GC arena, whose initial
         # size is about 4 MB but which grows on demand from the system heap
         # (measured: a 3 MB contiguous block succeeds with 1.19 MB reported free).
@@ -66,7 +82,7 @@ GROUPS = (
         # reads as a nearly exhausted 4 MB budget on a 1 GB board.
         {"type": "info", "key": "sys.heap", "label": "Python heap",
          "hint": "GC arena, grows on demand; not DDR", "live": "heap"},
-        {"type": "info", "label": "Model", "value": "RockBase K230 Vision"},
+        {"type": "info", "label": "KPU models", "live": "models"},
         {"type": "info", "label": "Settings file", "value": config.PATH},
     )),
     ("RESET", (
@@ -87,12 +103,25 @@ def _font(*names):
 def _heap_text():
     """Free bytes in the MicroPython GC arena, in MB.
 
-    Reports free only. The arena starts at about 3.95 MB but extends from the
-    system heap when needed (measured: a 3 MB contiguous block succeeds while
-    this figure reads about 1.19 MB), so free/total would imply a ceiling that
-    does not exist.
+    Free only: the arena starts near 3.95 MB but grows on demand (a 3 MB
+    contiguous block succeeds at 1.19 MB reported free), so free/total would
+    imply a ceiling that does not exist.
     """
     return "{:.2f} MB free".format(gc.mem_free() / 1048576.0)
+
+
+def _models_text():
+    """Resident KPU models out of the verified ceiling of ten (model_pool).
+
+    Imported lazily: model_pool pulls in nncase_runtime, and a diagnostic page
+    must still open when that binding is missing. Weights are outside the GC
+    heap, so this tracks preload use, not memory.
+    """
+    try:
+        import model_pool
+        return "{} resident".format(model_pool.loaded_count())
+    except BaseException:
+        return "n/a"
 
 
 class SettingsApp:
@@ -382,11 +411,13 @@ class SettingsApp:
             return
         self._last_live_ms = now
         for kind, label, _key in self._live:
-            if kind == "heap":
-                try:
+            try:
+                if kind == "heap":
                     label.set_text(_heap_text())
-                except BaseException:
-                    pass
+                elif kind == "models":
+                    label.set_text(_models_text())
+            except BaseException:
+                pass
         # Clear a stale "tap again to confirm" after the window expires.
         for name in list(self._confirm.keys()):
             if time.ticks_diff(now, self._confirm[name]) >= 0:
