@@ -35,6 +35,18 @@ ROW_H = 56
 ROW_GAP = 10
 ROW_X = 8
 SECTION_H = 34
+# The stepper gets its own taller row: a 56px card leaves no room for a
+# thumb-sized target plus a readable value. Buttons were 40x36 with a 20px glyph
+# and read as "too small to hit" on the 800x480 panel.
+STEP_ROW_H = 72
+STEP_BTN_W = 62
+STEP_BTN_H = 52
+STEP_BTN_R = 12
+STEP_BTN_GAP = 14            # between the two buttons
+STEP_EDGE = 16               # button group inset from the card's right edge
+VALUE_GAP = 16               # between the value text and the minus button
+# Right-to-left pitch of the control group: one button plus one gap.
+STEP_SLOT = STEP_BTN_W + STEP_BTN_GAP
 CONFIRM_MS = 3000          # second tap window for a destructive action
 
 
@@ -100,6 +112,24 @@ def _font(*names):
     return None
 
 
+def _load_baked(name, fallback):
+    """Return a pre-baked bitmap font, or fallback when it cannot be loaded.
+
+    This firmware's built-in faces stop at montserrat 14/16 (measured: no 20/24/28
+    exists, so every _font("font_montserrat_28", ...) chain silently lands on 16).
+    The baked .bin files are the only larger text available, and boot preloads
+    them, so taking one here costs a dict lookup.
+    """
+    try:
+        import font_pool
+        font = font_pool.get(name)
+        if font is not None:
+            return font
+    except BaseException as error:
+        print("[settings] baked font {} unavailable: {}".format(name, error))
+    return fallback
+
+
 def _heap_text():
     """Free bytes in the MicroPython GC arena, in MB.
 
@@ -128,8 +158,13 @@ class SettingsApp:
     def __init__(self, content, ctx):
         self.ctx = ctx
         self.content = content
-        self.font = _font("font_montserrat_20", "font_montserrat_16")
+        self.font = _font("font_montserrat_16", "font_montserrat_14")
         self.small = _font("font_montserrat_14", "font_montserrat_16")
+        # Stepper glyphs and value: 28px bold, twice the ink height of the 16px
+        # built-in. Measured widths: '+' 17px, '100%' 77px, line_height 31.
+        builtin = _font("font_montserrat_16", "font_montserrat_14")
+        self.step_font = _load_baked("kb_nunito_bold_28.bin", builtin)
+        self.value_font = _load_baked("kb_nunito_bold_28.bin", builtin)
         self._toggles = []    # (key, switch)
         self._steppers = []   # (item, value label)
         self._live = []       # (kind, label, config key or None)
@@ -212,7 +247,9 @@ class SettingsApp:
         self._label(row, item["label"], 16, 8)
         hint = item.get("hint")
         if hint and self.small:
-            self._label(row, hint, 16, 31, COL_MUTED, self.small)
+            # Sits under the label; on the taller stepper row it can breathe a
+            # little more (31 -> 33) without touching the value text.
+            self._label(row, hint, 16, 33, COL_MUTED, self.small)
 
     # ---------- row builders ----------
 
@@ -255,7 +292,7 @@ class SettingsApp:
         return y + ROW_H + ROW_GAP
 
     def _stepper_row(self, item, y):
-        row = self._card(y)
+        row = self._card(y, STEP_ROW_H)
         # Read-only row body: only the two buttons are click targets, so a tap
         # on the card cannot invent an action the user did not ask for.
         row.clear_flag(lv.obj.FLAG.CLICKABLE)
@@ -266,31 +303,44 @@ class SettingsApp:
         vlabel = lv.label(row)
         vlabel.set_text("{}{}".format(value, unit))
         vlabel.set_style_text_color(lv.color_hex(COL_TEXT), 0)
-        if self.font:
-            vlabel.set_style_text_font(self.font, 0)
-        vlabel.align(lv.ALIGN.RIGHT_MID, -116, 0)
+        if self.value_font:
+            vlabel.set_style_text_font(self.value_font, 0)
+        # Anchored to the group's left edge, so a 3-digit value cannot run under
+        # the minus button.
+        vlabel.align(lv.ALIGN.RIGHT_MID, self._value_offset(), 0)
 
-        minus = self._step_btn(row, "-", -60)
-        plus = self._step_btn(row, "+", -18)
+        minus = self._step_btn(row, "-", self._btn_offset(1))
+        plus = self._step_btn(row, "+", self._btn_offset(0))
         beep.on_click(minus, lambda e, _i=item: self._on_step(_i, -1))
         beep.on_click(plus, lambda e, _i=item: self._on_step(_i, 1))
         self._steppers.append((item, vlabel))
-        return y + ROW_H + ROW_GAP
+        return y + STEP_ROW_H + ROW_GAP
+
+    # Control offsets, measured from the card's right edge (negative = leftwards).
+    # Index 0 is the plus button, 1 the minus button; they are laid out right to
+    # left so the pair hugs the edge and the value sits to their left.
+    def _btn_offset(self, index):
+        return -(STEP_EDGE + STEP_SLOT * index)
+
+    def _value_offset(self):
+        # Right edge of the value = left edge of minus, less the gap.
+        return -(STEP_EDGE + STEP_SLOT + STEP_BTN_W + VALUE_GAP)
 
     def _step_btn(self, parent, text, right_offset):
         btn = lv.btn(parent)
-        btn.set_size(40, 36)
+        btn.set_size(STEP_BTN_W, STEP_BTN_H)
         btn.align(lv.ALIGN.RIGHT_MID, right_offset, 0)
         btn.set_style_bg_color(lv.color_hex(0x2A3340), 0)
-        btn.set_style_radius(8, 0)
+        btn.set_style_radius(STEP_BTN_R, 0)
         btn.set_style_border_width(0, 0)
         btn.set_style_pad_all(0, 0)
         btn.clear_flag(lv.obj.FLAG.SCROLLABLE)
+        self._press_feedback(btn)
         lab = lv.label(btn)
         lab.set_text(text)
         lab.set_style_text_color(lv.color_hex(COL_TEXT), 0)
-        if self.font:
-            lab.set_style_text_font(self.font, 0)
+        if self.step_font:
+            lab.set_style_text_font(self.step_font, 0)
         lab.center()
         lab.clear_flag(lv.obj.FLAG.CLICKABLE)
         return btn
