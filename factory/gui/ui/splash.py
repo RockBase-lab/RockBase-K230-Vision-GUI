@@ -12,6 +12,8 @@
 import lvgl as lv
 
 import time
+import font_pool
+from version import GUI_VERSION
 
 COL_BG = 0x12141A
 COL_TEXT = 0xFFFFFF
@@ -40,6 +42,11 @@ BAR_DY = -22
 PCT_DY = 22
 MAIN_DY = 62
 SUB_DY = 92
+VERSION_MARGIN = 12
+# Only 14 and 16 are built into lvgl. This 22 px bin is also one of the boot
+# fonts, so loading it here turns boot_load's later get into a pool hit: the
+# same cost moved earlier, not a second one. Measured: 71 ms load, 0 ms later.
+VERSION_FONT = "ui_nunito_bold_22.bin"
 
 
 def _font(*names):
@@ -120,6 +127,17 @@ class Splash:
         if small is not None:
             self.note_label.set_style_text_font(small, 0)
         self.note_label.align(lv.ALIGN.CENTER, 0, SUB_DY + 26)
+
+        self.version_label = lv.label(self.scr)
+        self.version_label.set_text(GUI_VERSION)
+        self.version_label.set_style_text_color(lv.color_hex(COL_MUTED), 0)
+        version_font = font_pool.get(VERSION_FONT)
+        if version_font is None:
+            version_font = mid
+        if version_font is not None:
+            self.version_label.set_style_text_font(version_font, 0)
+        self.version_label.align(lv.ALIGN.BOTTOM_LEFT,
+                                 VERSION_MARGIN, -VERSION_MARGIN)
 
         self._pct = 0
         self._start = time.ticks_ms()

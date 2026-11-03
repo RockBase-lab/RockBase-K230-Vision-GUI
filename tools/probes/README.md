@@ -178,6 +178,7 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_boot_preload.py` | Whole boot preload plus app open cost with everything resident (needs `--lvgl`) |
 | `_probe_boot_anim.py` | Progress-bar percentage trace: intermediate frames per step and the motion cost (needs `--lvgl`) |
 | `_cap_boot_bar.py` | Captures the progress bar at two percentages, to verify it renders (needs `--lvgl`) |
+| `_probe_splash_version.py` | Splash alone with geometry and a full-screen dump, for the version label (needs `--lvgl`) |
 | `_probe_net_boot_vs_app.py` | Boot connect path against the Wi-Fi app path, in one process |
 | `_start_launcher_cold.py` | Start the GUI with every factory module purged, as a power-on would |
 | `_cap_run.py` | Run a display probe as a subprocess, capture raw output |
