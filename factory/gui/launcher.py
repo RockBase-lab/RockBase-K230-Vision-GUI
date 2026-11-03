@@ -310,10 +310,11 @@ def _clean(o):
 # member picker layer (_open_folder) instead of an app. Members live in FOLDER_MEMBERS
 # and use the same meta shape as top-level entries, so flags such as
 # immersive/release_home still apply.
-# The top level holds 11 entries = two pages of a 4x2 grid (8 + 3), which keeps
-# paging meaningful. Placeholder entries point at apps.app_placeholder; swap in
-# apps.app_xxx once the real app exists. Board facts (firmware, heap, model
-# count) live in the Settings app rather than a separate System tile.
+# The top level holds 11 entries = two pages of a 4x2 grid (8 + 3). Page 1 is the
+# daily set (capture, detect, tune); page 2 keeps the things configured once and
+# then left alone (Network, Settings) plus Battery. Placeholder entries point at
+# apps.app_placeholder; swap in apps.app_xxx once the real app exists. Board facts
+# (firmware, heap, model count) live in the Settings app, not a System tile.
 APPS = [
     {"id": "camera", "name": "Camera", "icon": "assets/icon_camera.png",
      "symbol": _sym("CAMERA", "VIDEO"), "module": "apps.app_camera",
@@ -328,8 +329,11 @@ APPS = [
     {"id": "scan", "name": "Scan", "icon": "assets/icon_scan.png",
      "symbol": _sym("QR_CODE", "BARCODE"), "module": "apps.app_scan",
      "immersive": True},
-    {"id": "network", "name": "Network", "icon": "assets/icon_network.png",
-     "symbol": _sym("WIFI"), "module": "apps.app_network"},
+    # Face group: chained face pipeline (detect -> align -> embed). Its pipeline
+    # differs from the single-model family in Vision and it has to maintain a local
+    # face database, so it stands alone as a group.
+    {"id": "face", "name": "Face", "icon": "assets/icon_face.png",
+     "symbol": _sym("USER"), "folder": True},
     # Vision group: single entry point for every single-model detection app
     # (members in FOLDER_MEMBERS).
     {"id": "vision", "name": "Vision", "icon": "assets/icon_vision.png",
@@ -338,14 +342,6 @@ APPS = [
      "symbol": _sym("MUSIC", "LOUD", "VOLUME_MID"), "module": "apps.app_audio"},
     {"id": "touch", "name": "Touch", "icon": "assets/icon_touch.png",
      "symbol": _sym("TOUCHSCREEN", "TOUCH", "EYE_OPEN"), "module": "apps.app_touch"},
-    {"id": "settings", "name": "Settings", "icon": "assets/icon_settings.png",
-     "symbol": _sym("SETTINGS"), "module": "apps.app_settings"},
-    # ---- Page 2 ----
-    # Face group: chained face pipeline (detect -> align -> embed). Its pipeline
-    # differs from the single-model family in Vision and it has to maintain a local
-    # face database, so it stands alone as a group.
-    {"id": "face", "name": "Face", "icon": "assets/icon_face.png",
-     "symbol": _sym("USER"), "folder": True},
     # IMU: on-board QMI8658A six-axis inertial sensor (I2C3 / GPIO44-45).
     # Three pages: driving dashboard / raw data curves / attitude-angle curves,
     # switched by swiping.
@@ -357,6 +353,13 @@ APPS = [
     {"id": "imu", "name": "IMU", "icon": "assets/icon_imu.png",
      "symbol": _sym("MOVE"), "module": "apps.app_imu",
      "immersive": True},
+    # ---- Page 2 ----
+    # Network and Settings are configured once and then left alone, so they sit
+    # behind a swipe instead of taking a slot on the daily page.
+    {"id": "network", "name": "Network", "icon": "assets/icon_network.png",
+     "symbol": _sym("WIFI"), "module": "apps.app_network"},
+    {"id": "settings", "name": "Settings", "icon": "assets/icon_settings.png",
+     "symbol": _sym("SETTINGS"), "module": "apps.app_settings"},
     # Battery: single-cell pack voltage through the ADC5 divider. Sampling runs
     # inside step() one reading at a time so the UI never blocks.
     # (A separate System tile used to sit after IMU; its board facts are now the
