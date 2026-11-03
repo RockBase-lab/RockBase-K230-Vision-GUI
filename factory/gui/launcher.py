@@ -132,8 +132,9 @@ BOOT_WIFI_TIMEOUT_MS = 15000
 KMODEL_DIR = "/sdcard/examples/kmodel"
 
 # Every model any app can load, minus the three Detect alternates, with its measured
-# load cost. Sixteen resident kpus are verified safe (load + one inference each);
-# the alternates stay on demand in app_vision because nineteen is unmeasured.
+# load cost. Seventeen resident kpus are verified safe when the Sensor is built at
+# sixteen first and the app loads its extra model after (Gesture + handkp_det); the
+# alternates stay on demand in app_vision because nineteen is unmeasured.
 # The per-item costs are what keep the bar honest: the OCR pair alone is 1409 ms, so
 # advancing one tenth per model would stall the bar for over a second at a time.
 BOOT_MODELS = [
@@ -418,8 +419,8 @@ FOLDER_MEMBERS = {
         {"id": "fall", "name": "Fall", "icon": "assets/icon_fall.png",
          "symbol": _sym("WARNING"), "module": "apps.app_fall",
          "immersive": True, "release_home": True},
-        # Gesture: a single-model hand task, so it belongs with the other
-        # one-model detection entries rather than on the desktop.
+        # Gesture: hand_det + handkp_det with an angle-rule classifier; the
+        # second model loads on demand through the pool, not at boot.
         {"id": "gesture", "name": "Gesture", "icon": "assets/icon_gesture.png",
          "symbol": _sym("HAND"), "module": "apps.app_gesture",
          "immersive": True, "release_home": True},

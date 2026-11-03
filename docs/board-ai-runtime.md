@@ -1000,6 +1000,16 @@ Inference also still works with all ten held. `_probe_preload_run.py` ran
 (640 in) back to back: 3/3 succeeded, ai2d 2-3 ms, kpu 25 / 4 / 223 ms, output
 shapes as documented. The ten files total about 32.8 MB.
 
+The current boot set is sixteen models plus one on demand, and seventeen resident
+is safe **when reached in production order**: the Sensor is constructed at sixteen
+resident, then the app loads its extra model. `_probe_17_resident.py` preloads the
+sixteen boot models, opens Gesture through the launcher (handkp_det becomes the
+seventeenth), and runs 8 s of live frames: 71 frames, 0 errors, 8.8 fps, heap
+stable at 3.5 MB, gesture recognised every frame. handkp_det is the largest single
+kmodel at 26.9 MB, so this is the binding case. Two probe variants that deviated
+from that order wedged the board (see `docs/pitfalls.md`); the production path does
+not.
+
 Consequence for design: a boot-time preload is a memory question about the NPU
 side, not about the Python heap, and it is affordable on this board. It does
 **not** replace `release_home`: that flag exists to give `to_numpy()` a
@@ -1024,8 +1034,8 @@ models resident with no growth.
 
 The one app that does not take every model from the pool is Detect, which can
 switch between four models. Its default is pooled; the three alternates are loaded
-and released by the app, because pooling them would put thirteen kpus resident and
-the measured ceiling is ten.
+and released by the app, because with the sixteen boot models resident pooling them
+would put nineteen kpus up and only seventeen is measured safe.
 
 ## Reference numbers (yolov8n_320, 640x360 into 320, 40 frames)
 

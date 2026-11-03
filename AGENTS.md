@@ -270,12 +270,17 @@ corrupts behaviour. Each one links to the measured explanation.
     while another app owns the camera or KPU produced an alternating two-value
     pattern and a false 2.4 V span that did not reproduce once the board was
     idle. See `docs/pitfalls.md`.
-14. **Sixteen resident `nn.kpu` instances are safe; do not probe higher
-    without a fresh measurement.** All 16 GUI kmodels load and each still
-    infers in one process (measured: heap within 1 KB across the whole
-    set, every inference 27-109 ms). An earlier wedge at nine instances
-    did not reproduce once the models were loaded in registry order. See
-    `docs/pitfalls.md`.
+14. **Seventeen resident `nn.kpu` instances are safe when reached in
+    production order; do not probe higher without a fresh measurement.**
+    All 16 boot kmodels load and each still infers in one process
+    (measured: heap within 1 KB across the whole set, every inference
+    27-109 ms). A 17th on-demand model is safe when the Sensor is built at
+    sixteen resident first and the app loads its extra model afterwards —
+    Gesture with handkp_det as the 17th ran 71 frames with 0 errors. Two
+    probe variants that broke that order (loading the 17th before the
+    Sensor, or feeding a non-contiguous `to_numpy_ref()` slice into ai2d)
+    wedged the board. An earlier wedge at nine instances did not reproduce
+    once the models were loaded in registry order. See `docs/pitfalls.md`.
 15. **Never call `release()` on a kpu obtained from `model_pool`.** The
     pool owns every kpu it hands out and shares one instance across apps;
     an app that releases it takes the model away from the next app that
