@@ -920,6 +920,24 @@ free heap stable at 3.69 MB with no downward trend; about 10 fps inside the
 app because the LVGL FULL repaint (28-80 ms) stacks on the 31 ms inference; 12
 stable LVGL objects.
 
+### kmodel weights are native memory, not Python heap
+
+Loading ten models and keeping them all resident changes the MicroPython heap by
+about 1 KB: `load_kmodel` puts the weights and the KPU arenas outside the GC
+heap. Measured with `_probe_preload_budget.py`: ten `nn.kpu()` instances held
+simultaneously, heap 1664 KB before and 1674 KB after.
+
+Inference also still works with all ten held. `_probe_preload_run.py` ran
+`yolov8n_320` (320 in), `face_detection_320` (320 in) and `ocr_det_int16`
+(640 in) back to back: 3/3 succeeded, ai2d 2-3 ms, kpu 25 / 4 / 223 ms, output
+shapes as documented. The ten files total about 32.8 MB.
+
+Consequence for design: a boot-time preload is a memory question about the NPU
+side, not about the Python heap, and it is affordable on this board. It does
+**not** replace `release_home`: that flag exists to give `to_numpy()` a
+contiguous 705 KB block, which is still needed because the home screen leaves
+the heap at 2.3 MB and fragmented.
+
 ## Reference numbers (yolov8n_320, 640x360 into 320, 40 frames)
 
 - kmodel load about 560 ms; free heap about 3.92 MB afterwards.

@@ -161,7 +161,10 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_ocr_poem.py` | Dictionary character inventory and a multi-line scan in reading order (needs `--lvgl`, camera on text) |
 | `_probe_ocr_boxes.py` | Raw `ocr_post_process` box count vs the app's size filter and cap |
 | `_probe_ocr_charset.py` | Prints, as base64, the dict characters outside the GB2312 level-1 range |
+| `_probe_ocr_stall.py` | Per-frame cost after opening an app through the real launcher (needs `--lvgl`) |
 | `_cap_ocr_result.py` | Result view geometry (12 labels, reading order, no overlap) plus a band capture (needs `--lvgl`) |
+| `_probe_preload_budget.py` | Whether every GUI kmodel can stay resident at once, and the heap cost |
+| `_probe_preload_run.py` | Inference still works with all ten GUI models resident |
 | `_cap_run.py` | Run a display probe as a subprocess, capture raw output |
 | `_start_launcher.py` | Start the on-board GUI with a single exec |
 
