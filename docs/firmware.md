@@ -40,7 +40,7 @@ What that defconfig selects (read from the file itself, not from memory):
 | `CONFIG_MPP_ENABLE_CSI_DEV_0/1/2` | `y` | All three CSI ports, with resets on 29, 31 and 13 |
 | `CONFIG_MPP_ENABLE_DSI_LCD` | `y` | DSI panel output |
 | `CONFIG_MPP_DSI_ENABLE_LCD_ST7701` | `y` | The 800x480 panel this project drives |
-| `CONFIG_MPP_DSI_ENABLE_LCD_LI9881` | `y` | Alternate panel |
+| `CONFIG_MPP_DSI_ENABLE_LCD_ILI9881` | `y` | Alternate panel |
 | `CONFIG_MPP_DSI_ENABLE_HDMI_LT9611` | `y` | DSI-to-HDMI bridge |
 | `CONFIG_MPP_ENABLE_SENSOR_AF_DRV_DW9714P` | `y` | Autofocus driver |
 | `CONFIG_CANMV_OPENMV_CFG_FB_ALLOC_SIZE` | `0x1400000` | 20 MB framebuffer pool |
@@ -68,6 +68,8 @@ Requirements:
   [`BUILD.md`](https://github.com/kendryte/k230_rtos_sdk/blob/main/BUILD.md) if you would
   rather not touch the host)
 - Network access to GitHub or the Gitee mirror during `repo sync`
+- About 10 GB of disk for one checkout plus its build output
+  (measured: 4.9 GB of source, 2.9 GB under `output/`)
 
 Host packages:
 
@@ -80,6 +82,19 @@ sudo apt-get install -y --no-install-recommends \
 
 pip3 install pycryptodome gmssl scons==3.1.2
 ```
+
+The `python` command is not optional. U-Boot's firmware-header step calls `python`
+directly, so a host that only provides `python3` stops there with:
+
+```
+/bin/sh: 1: python: not found
+Make uboot.img
+dd: failed to open 'k230-u-boot-spl.bin': No such file or directory
+make[7]: *** [arch/riscv/cpu/k230/config.mk:18: add_firmware_head] Error 1
+```
+
+`python-is-python3` provides it. A `python -> python3` symlink earlier on `PATH`
+achieves the same without root.
 
 The `repo` tool:
 
@@ -116,42 +131,88 @@ CanMV or RT-Smart; tab chooses K230 or K230D; up/down chooses the board). With n
 only prints the list, which is handy for confirming the defconfig name exists in your
 checkout.
 
-Artifacts land in the per-configuration output directory:
+Artifacts land directly in the per-configuration output directory, **not** under
+`images/`:
 
 ```
-output/k230_canmv_rockbase_defconfig/images/
-└── sysimage-sdcard.img          # flash this to the SD card or eMMC
+output/k230_canmv_rockbase_defconfig/
+├── CanMV_K230_RockBase_micropython_local_nncase_v2.11.0.img        640 MiB  flash this
+├── CanMV_K230_RockBase_micropython_local_nncase_v2.11.0.kdimg      540 MiB  Windows tool
+├── CanMV_K230_RockBase_micropython_local_nncase_v2.11.0.img.gz              gzip of the .img
+└── CanMV_K230_RockBase_micropython_local_nncase_v2.11.0_ota.kdimg  9.7 MiB  rtt + rtapp only
 ```
+
+The name is assembled as
+`<CONFIG_BOARD_NAME>_micropython_<canmv_revision>_nncase_v<nncase_version>`, so an
+ordinary local build always reads `..._micropython_local_...`. `images/` holds only the
+intermediate staging trees (`uboot/`, `rtsmart/`, `sdcard/`, ...) that the packer reads;
+the finished image is never written there.
 
 The image is generated from `boards/k230_canmv_rockbase/genimage-sdcard.cfg`, which
-places the boot chain and then two FAT partitions: `BIN` and `SDCARD`. The `SDCARD`
-partition is what the running system mounts as `/sdcard`.
+places the boot chain and then two FAT16 partitions: `BIN` (30 MiB) and `SDCARD`
+(500 MiB, mounted as `/sdcard`). With the reference examples, `libs/` and `res/`
+included, `/sdcard` occupies about 403 MiB and leaves roughly 76 MiB free.
+
+`_ota.kdimg` carries only the `rtt` and `rtapp` partitions. It does **not** contain the
+`SDCARD` partition, so an OTA upgrade never touches `/sdcard`.
+
+## Where the `/sdcard` content comes from
+
+`images/sdcard/` is the staging tree: every file in it ends up in the `SDCARD`
+partition. `src/canmv/Makefile` fills it in this order:
+
+| Step | Source |
+| --- | --- |
+| `copy_micropython` | the stripped `micropython` binary |
+| `copy_libs` | `src/canmv/resources/libs/` |
+| `copy_freetype_fonts` | `src/canmv/resources/font/` |
+| `copy_examples` | `src/canmv/resources/examples/`, plus the kmodels the examples load |
+| `copy_sdcard` | `src/canmv/resources/sdcard/`, only when that directory exists |
+
+`copy_sdcard` runs a top-level `rsync --delete` whose filters protect only `.git`,
+`micropython`, `__pycache__` and `*.pyc`. Anything placed in
+`src/canmv/resources/sdcard/` therefore **deletes** `examples/`, `libs/`, `res/` and
+`revision.txt` from the staging tree unless the same filters also protect them; guard
+those paths before using that hook.
+
+A full `make` starts with `rm -rf output/<defconfig>/images`, so content copied into
+`images/sdcard/` by hand survives only until the next build. To re-pack without
+recompiling, copy into `images/sdcard/` and run `tools/gen_image.sh` with the values
+from `output/<defconfig>/.config` in its environment. That script names its output from
+`MK_IMAGE_NAME`, which comes from `CONFIG_BOARD_NAME`; without it the image is written
+as `_micropython_local_...`.
 
 ## Flashing
 
 Linux:
 
 ```bash
-gunzip -c sysimage-sdcard.img.gz > sysimage-sdcard.img   # only for a .gz download
-sudo dd if=sysimage-sdcard.img of=/dev/sdX bs=1M status=progress oflag=sync
+IMG=CanMV_K230_RockBase_micropython_local_nncase_v2.11.0.img
+gunzip -k "$IMG.gz"       # a source build already leaves the .img uncompressed
+sudo dd if="$IMG" of=/dev/sdX bs=1M status=progress oflag=sync
 ```
 
 Confirm `/dev/sdX` is the card, not the disk you booted from: `lsblk` before and after
 inserting the card is the safe check.
 
-Windows: use Canaan's flashing tool rather than writing raw bytes. The upstream guide is
+Windows: use Canaan's flashing tool rather than writing raw bytes; it takes the
+`.kdimg` and its `.gz`. The upstream guide is
 <https://www.kendryte.com/k230_rtos/zh/main/userguide/how_to_flash.html>.
 
 ## After flashing
 
 The image brings the operating environment and the reference media:
 
-- `/sdcard/examples/kmodel/`, `/sdcard/examples/utils/` — the kmodels and anchor data the
-  vision applications load
+- `/sdcard/examples/kmodel/` — 56 kmodels, about 337 MiB; every vision app in this
+  project loads its models from here
+- `/sdcard/examples/utils/` — anchor and helper data used by the examples
 - `/sdcard/examples/` — the upstream example set
-- `/sdcard/main.py` — the boot entry
+- `/sdcard/libs/`, `/sdcard/res/font/` — the Python libraries and fonts the examples
+  import
 
-It does **not** contain this project's GUI. Deploy that separately, then reset:
+It does **not** contain this project's GUI, and it does **not** contain
+`/sdcard/main.py`: a pristine image boots into the MicroPython REPL with the panel
+dark. Deploy this project, then reset:
 
 ```bash
 python tools/_doctor.py COM9
@@ -167,11 +228,14 @@ releases a sensor the GUI still owns.
 | Symptom | Cause | Fix |
 | --- | --- | --- |
 | `make <defconfig>` says the target does not exist | The checkout predates the RockBase board support (upstream PR #19) | `repo sync` again, or check `git log --oneline -1 -- configs/k230_canmv_rockbase_defconfig` in the SDK tree |
+| Build dies with `/bin/sh: 1: python: not found` right after `Make uboot.img`, then `dd: failed to open 'k230-u-boot-spl.bin'` | `python-is-python3` is missing; U-Boot's firmware-header step calls `python` | Install `python-is-python3`, or put a `python -> python3` symlink earlier on `PATH` |
 | Build fails immediately on Python packages | `scons` version mismatch | `pip3 install scons==3.1.2` |
 | `repo sync` stops on a network error | Mirror or proxy issue | Re-run `repo sync`; it resumes. The Gitee manifest is the alternative to the GitHub one |
+| The build succeeded but `images/sysimage-sdcard.img` does not exist | `images/` only holds intermediate staging trees; the image is written one level up | Flash `output/<defconfig>/CanMV_K230_RockBase_micropython_local_nncase_v<ver>.img` |
 | Flashed image boots but `os.uname()` reports another board | Wrong defconfig was built or the wrong image was flashed | Rebuild with `k230_canmv_rockbase_defconfig` |
 | Image boots, but the panel stays dark | Backlight is a separate GPIO this GUI drives itself; a bare RT-Smart image without this project's code leaves the panel unlit | Deploy this project; see the README |
-| `/sdcard/examples/kmodel/` missing | The image was built with a different defconfig, or only a partial image was written | Re-flash the full `sysimage-sdcard.img` |
+| `/sdcard/examples/kmodel/` missing | The image was built with a different defconfig, or `copy_sdcard` deleted the staging tree | Re-flash a complete image and check the build log for `Copy examples` |
+| `/sdcard` reports no free space | The partition is a fixed 500 MiB FAT16 and the reference examples already take about 403 MiB | Remove unused example directories, or grow `app.vfat` in `genimage-sdcard.cfg` |
 
 ## Upstream references
 
