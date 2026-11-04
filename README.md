@@ -86,8 +86,8 @@ The boot sequence drives a real progress bar weighted by **measured milliseconds
 rather than by item count:
 
 1. Read the tile bitmap cache (on a miss, bake on the board and write it to disk)
-2. Load 6 bitmap fonts (the OCR CJK font alone costs about 7.5 s and dominates the bar;
-   the 47-glyph desktop CJK face costs 163 ms)
+2. Load 7 bitmap fonts (the OCR CJK font alone costs about 7.5 s and dominates the bar;
+   the two UI CJK faces cost 569 ms and 193 ms)
 3. Read the OCR dictionary
 4. Load the 16 resident kmodels
 5. Attempt a Wi-Fi connection (hard 15 s budget; on timeout the desktop still appears
@@ -373,11 +373,12 @@ There is no Save button: every change is written immediately. A missing or corru
 settings file never blocks the GUI from starting; it falls back to the defaults and
 prints one log line.
 
-`ui.language` (`en` / `zh`) localizes the desktop: tile names, folder titles and
-member labels come from `factory/gui/core/i18n.py`. A change applies when the desktop
-is next shown, which needs no reset: the launcher rebuilds the home screen and
-reads the new language's tile cache. Application-internal strings are still
-English.
+`ui.language` (`en` / `zh`) localizes the desktop and app text: tile names,
+folder titles, member labels and every user-visible app string come from
+`factory/gui/core/i18n.py`. A desktop change applies when the home screen is next
+shown, with no reset needed: the launcher rebuilds it and reads the new language's
+tile cache. Settings rebuilds its own page immediately; other apps read their
+strings when they are opened, so an already-running app keeps its language.
 
 ## Application list
 

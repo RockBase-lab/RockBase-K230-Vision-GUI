@@ -37,6 +37,7 @@ from libs.AI2D import Ai2d
 from libs.Utils import letterbox_pad_param
 from media.sensor import Sensor, CAM_CHN_ID_1, CAM_CHN_ID_2
 from ui import beep
+from core import i18n
 from core.errors import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                         close_sensor)
 from hardware.camera_fov import set_preview
@@ -238,8 +239,9 @@ class OcrApp:
             lab.set_text(text)
             lab.set_width(lv.SIZE_CONTENT)
             lab.set_style_text_color(lv.color_hex(color), 0)
-            if bar_font is not None:
-                lab.set_style_text_font(bar_font, 0)
+            f = i18n.font_for(text, bar_font)
+            if f is not None:
+                lab.set_style_text_font(f, 0)
             lab.clear_flag(lv.obj.FLAG.CLICKABLE)
             return lab
 
@@ -247,8 +249,8 @@ class OcrApp:
         self.stat_sep1 = _seg("|", COL_SEP)
         self.stat_fps = _seg("FPS -", COL_HINT)
         self.stat_sep2 = _seg("|", COL_SEP)
-        self.stat_count = _seg("0 lines", COL_COUNT_IDLE)
-        self.stat_hint = _seg("TAP scan", COL_HINT)
+        self.stat_count = _seg(i18n.t("ai.no_lines"), COL_COUNT_IDLE)
+        self.stat_hint = _seg(i18n.t("ai.tap_scan"), COL_HINT)
 
         self._init_ai()
 
@@ -449,7 +451,7 @@ class OcrApp:
         except BaseException as error:
             print("[OCR] detect error:", error)
             sys.print_exception(error)
-            self._show_error("detect error")
+            self._show_error(i18n.t("ai.detect_error"))
             return
         for box in boxes:
             try:
@@ -517,25 +519,25 @@ class OcrApp:
     def _update_stat(self):
         n = len(self.texts)
         if n > 0:
-            self.stat_count.set_text("{} lines".format(n))
+            self.stat_count.set_text(i18n.t("ai.lines").format(n))
             self.stat_count.set_style_text_color(lv.color_hex(COL_COUNT), 0)
         else:
-            self.stat_count.set_text("0 lines")
+            self.stat_count.set_text(i18n.t("ai.no_lines"))
             self.stat_count.set_style_text_color(
                 lv.color_hex(COL_COUNT_IDLE), 0)
         if self.state == "BUSY":
             if not self._font_applied:
                 # First scan: most of the wait is the one-off font load, so say
                 # so instead of "READING..." for five seconds.
-                self.stat_hint.set_text("LOADING...")
+                self.stat_hint.set_text(i18n.t("ai.loading_dots"))
             else:
-                self.stat_hint.set_text("READING...")
+                self.stat_hint.set_text(i18n.t("ai.reading"))
             self.stat_hint.set_style_text_color(lv.color_hex(COL_BUSY), 0)
         elif self.state == "RESULT":
-            self.stat_hint.set_text("TAP resume")
+            self.stat_hint.set_text(i18n.t("ai.tap_resume"))
             self.stat_hint.set_style_text_color(lv.color_hex(COL_HINT), 0)
         else:
-            self.stat_hint.set_text("TAP scan")
+            self.stat_hint.set_text(i18n.t("ai.tap_scan"))
             self.stat_hint.set_style_text_color(lv.color_hex(COL_HINT), 0)
 
     def _show_error(self, text):
@@ -579,7 +581,7 @@ class OcrApp:
             img = self.sensor.snapshot(chn=CAM_CHN_ID_2)
         except BaseException as error:
             print("[OCR] snapshot error:", error)
-            self._show_error("snapshot error")
+            self._show_error(i18n.t("ai.snapshot_error"))
             self._no_signal.on_fail(self.ctx)
             return
         self._no_signal.on_ok()
@@ -588,7 +590,7 @@ class OcrApp:
             img.as_lvgl_img_src(self.img_widget)
             self.img_widget.invalidate()
         except BaseException:
-            self._show_error("display error")
+            self._show_error(i18n.t("ai.display_error"))
             return
 
         self._gc_tick += 1

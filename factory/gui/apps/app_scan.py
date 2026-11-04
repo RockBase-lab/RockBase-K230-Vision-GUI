@@ -28,6 +28,7 @@ import lvgl as lv
 from media.sensor import Sensor, CAM_CHN_ID_1, CAM_CHN_ID_2
 
 from ui import beep
+from core import i18n
 from core.errors import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                        close_sensor)
 from hardware.camera_fov import set_preview
@@ -91,8 +92,12 @@ class ScanApp:
 
         # ---- Top centre status: scanning + FPS ----
         self.stat_label = lv.label(content)
-        self.stat_label.set_text("scan: point at a QR code")
+        hint_text = i18n.t("scan.hint")
+        self.stat_label.set_text(hint_text)
         self.stat_label.set_style_text_color(lv.color_hex(COL_HINT), 0)
+        f = i18n.font_for(hint_text, None)
+        if f is not None:
+            self.stat_label.set_style_text_font(f, 0)
         self.stat_label.align(lv.ALIGN.TOP_MID, 0, 8)
 
         # ---- Top-left exit button (immersive, no status bar, same as Vision) ----
@@ -180,10 +185,12 @@ class ScanApp:
         panel.add_flag(lv.obj.FLAG.CLICKABLE)
 
         title = lv.label(panel)
-        title.set_text("QR Code")
+        title_text = i18n.t("scan.title")
+        title.set_text(title_text)
         title.set_style_text_color(lv.color_hex(COL_TITLE), 0)
         title_font = _font("font_montserrat_24", "font_montserrat_20",
                            "font_montserrat_16")
+        title_font = i18n.font_for(title_text, title_font)
         if title_font is not None:
             title.set_style_text_font(title_font, 0)
         title.align(lv.ALIGN.TOP_MID, 0, 14)
@@ -214,6 +221,8 @@ class ScanApp:
         lab.set_long_mode(lv.label.LONG.WRAP)
         lab.set_style_text_color(lv.color_hex(COL_TEXT), 0)
         body_font = _font("font_montserrat_16", "font_montserrat_14")
+        # A QR payload can itself be CJK text; pick a face that can render it.
+        body_font = i18n.font_for(text, body_font)
         if body_font is not None:
             lab.set_style_text_font(body_font, 0)
         lab.align(lv.ALIGN.TOP_LEFT, 0, 0)
@@ -229,10 +238,12 @@ class ScanApp:
         btn.clear_flag(lv.obj.FLAG.SCROLLABLE)
         btn.add_flag(lv.obj.FLAG.CLICKABLE)
         btn_lab = lv.label(btn)
-        btn_lab.set_text("SCAN AGAIN")
+        again_text = i18n.t("scan.again")
+        btn_lab.set_text(again_text)
         btn_lab.set_style_text_color(lv.color_hex(0xFFFFFF), 0)
-        if body_font is not None:
-            btn_lab.set_style_text_font(body_font, 0)
+        btn_font = i18n.font_for(again_text, body_font)
+        if btn_font is not None:
+            btn_lab.set_style_text_font(btn_font, 0)
         btn_lab.center()
         btn_lab.clear_flag(lv.obj.FLAG.CLICKABLE)   # clicks land on the button
         beep.on_click(btn, lambda e: self._close_result())
@@ -308,7 +319,7 @@ class ScanApp:
             img.as_lvgl_img_src(self.img_widget)
             self.img_widget.invalidate()
         except BaseException as error:
-            self.stat_label.set_text("snapshot error: {}".format(error))
+            self.stat_label.set_text(i18n.t("ai.snapshot_error_fmt").format(error))
             self._no_signal.on_fail(self.ctx)
             return
         self._no_signal.on_ok()
@@ -331,7 +342,7 @@ class ScanApp:
         elapsed = time.ticks_diff(now, self.last_fps_ms)
         if elapsed >= 1000:
             fps = self.frame_count * 1000.0 / elapsed
-            self.stat_label.set_text("scan: point at a QR code | FPS {:.1f}".format(fps))
+            self.stat_label.set_text(i18n.t("scan.hint_fps").format(fps))
             self.frame_count = 0
             self.last_fps_ms = now
 

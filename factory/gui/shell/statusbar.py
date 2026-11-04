@@ -104,8 +104,8 @@ class StatusBar:
         center.set_style_text_color(lv.color_hex(COL_TEXT), 0)
         if center_text and i18n.needs_cjk(center_text):
             # App title in the status bar: the default montserrat_16 has no CJK
-            # glyphs, so a localized title takes the preloaded 16px OCR face.
-            f = tile_cache.cjk_font("ocr_cjk_16.bin")
+            # glyphs, so a localized title takes the preloaded 16px UI face.
+            f = tile_cache.cjk_font(i18n.CJK_FONT_16)
             if f is not None:
                 center.set_style_text_font(f, 0)
         center.align(lv.ALIGN.CENTER, 0, 0)

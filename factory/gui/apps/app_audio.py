@@ -31,6 +31,7 @@ import time
 import lvgl as lv
 
 from audio import device
+from core import i18n
 from ui import beep
 from ui import image
 from ui import paging
@@ -146,7 +147,11 @@ def _timer_imgs():
 
 def _btn_img(name):
     """Button bitmap cache. The data inside dsc must stay referenced, so it lives in a
-    module dict to survive GC."""
+    module dict to survive GC. zh builds pick the <name>_zh variant when baked."""
+    if i18n.lang() == "zh" and not name.endswith("_zh"):
+        dsc = _btn_img(name + "_zh")
+        if dsc is not None:
+            return dsc
     dsc = _BTN_IMGS.get(name)
     if dsc is None:
         dsc = image.load_asset(name + ".png")
@@ -177,6 +182,16 @@ def _safe_font(obj, *names):
             return
         except BaseException:
             continue
+
+
+def _cjk_fit(obj, text):
+    """Switch a label to the UI CJK face when its text is localized."""
+    f = i18n.font_for(text, None)
+    if f is not None:
+        try:
+            obj.set_style_text_font(f, 0)
+        except BaseException:
+            pass
 
 
 # =========================================================================
@@ -329,7 +344,9 @@ class AudioApp:
         beep.on_click(self.btn_img, self._on_click)
 
         self.again = lv.label(page)
-        self.again.set_text("record again")
+        again_text = i18n.t("audio.again")
+        self.again.set_text(again_text)
+        _cjk_fit(self.again, again_text)
         # Use clickable blue instead of grey text: in READY it is the only secondary action,
         # and stacked with the grey hint below it reads as "two lines of explanation".
         self.again.set_style_text_color(lv.color_hex(0x60A5FA), 0)
@@ -512,39 +529,41 @@ class AudioApp:
         self.state = state
         if state == STATE_IDLE:
             self._set_btn("btn_rec")
-            self._set_hint("tap to record, up to {}".format(
+            self._set_hint(i18n.t("audio.hint_rec").format(
                 device.fmt_time(MAX_RECORD_S)))
-            self.sub.set_text("no recording yet")
+            self._set_sub("audio.sub_none")
             self.again.add_flag(lv.obj.FLAG.HIDDEN)
             self._set_timer(0)
             self._set_bar(0, COL_RED)
             self.bar.add_flag(lv.obj.FLAG.HIDDEN)
         elif state == STATE_RECORDING:
             self._set_btn("btn_stop_rec")
-            self._set_hint("tap STOP when done")
-            self.sub.set_text("recording...")
+            self._set_hint(i18n.t("audio.hint_stop_rec"))
+            self._set_sub("audio.sub_rec")
             self.again.add_flag(lv.obj.FLAG.HIDDEN)
             self._set_timer(0)
             self._set_bar(0, COL_RED)
             self.bar.clear_flag(lv.obj.FLAG.HIDDEN)
         elif state == STATE_FINALIZING:
             self._set_btn("btn_stop_rec")
-            self._set_hint("processing, please wait")
-            self.sub.set_text("saving...")
+            self._set_hint(i18n.t("audio.hint_processing"))
+            self._set_sub("audio.sub_saving")
             self.again.add_flag(lv.obj.FLAG.HIDDEN)
             self._set_bar(0, COL_RED)
             self.bar.clear_flag(lv.obj.FLAG.HIDDEN)
         elif state == STATE_READY:
             self._set_btn("btn_play")
             self._set_hint("")
-            self.sub.set_text("recorded {}".format(device.fmt_time(self.duration)))
+            self.sub.set_text(i18n.t("audio.sub_ready").format(
+                device.fmt_time(self.duration)))
+            _cjk_fit(self.sub, i18n.t("audio.sub_ready"))
             self.again.clear_flag(lv.obj.FLAG.HIDDEN)
             self._set_timer(self.duration)
             self.bar.add_flag(lv.obj.FLAG.HIDDEN)
         elif state == STATE_PLAYING:
             self._set_btn("btn_stop_play")
-            self._set_hint("tap STOP to stop")
-            self.sub.set_text("playing...")
+            self._set_hint(i18n.t("audio.hint_stop_play"))
+            self._set_sub("audio.sub_playing")
             self.again.add_flag(lv.obj.FLAG.HIDDEN)
             self._set_bar(0, COL_BLUE)
             self.bar.clear_flag(lv.obj.FLAG.HIDDEN)
@@ -554,8 +573,15 @@ class AudioApp:
         if dsc is not None:
             self.btn_img.set_src(dsc)
 
+    def _set_sub(self, key):
+        text = i18n.t(key)
+        self.sub.set_text(text)
+        _cjk_fit(self.sub, text)
+
     def _set_hint(self, text):
-        self.hint.set_text(self._error or text)
+        shown = self._error or text
+        self.hint.set_text(shown)
+        _cjk_fit(self.hint, shown)
 
     def _set_timer(self, seconds):
         text = _fmt_mmss(seconds)
@@ -607,7 +633,7 @@ class AudioApp:
             self.rec.start()
         except BaseException as error:
             print("[audio] record start failed: {}".format(error))
-            self._error = "mic unavailable: {}".format(error)
+            self._error = i18n.t("audio.err_mic").format(error)
             self.rec.abort()
             self._apply_state(STATE_IDLE)
             return
@@ -624,7 +650,7 @@ class AudioApp:
         except BaseException as error:
             print("[audio] record stop failed: {}".format(error))
             self.rec.abort()
-            self._error = "save failed: {}".format(error)
+            self._error = i18n.t("audio.err_save").format(error)
             self._apply_state(STATE_IDLE)
             return
 
@@ -633,7 +659,7 @@ class AudioApp:
             self.duration, info["frames"], info["peak"]))
 
         if self.duration < 0.3:
-            self._error = "recording too short, try again"
+            self._error = i18n.t("audio.err_short")
             self._apply_state(STATE_IDLE)
             return
 
@@ -642,7 +668,7 @@ class AudioApp:
         except BaseException as error:
             print("[audio] finalize start failed: {}".format(error))
             self.finalizer = None
-            self._error = "save failed: {}".format(error)
+            self._error = i18n.t("audio.err_save").format(error)
             self._apply_state(STATE_IDLE)
             return
 
@@ -658,7 +684,7 @@ class AudioApp:
             self.player.start(gain=device.PLAY_GAIN)
         except BaseException as error:
             print("[audio] play start failed: {}".format(error))
-            self._error = "playback unavailable: {}".format(error)
+            self._error = i18n.t("audio.err_play").format(error)
             self.player.stop()
             self._apply_state(STATE_READY)
             return
@@ -702,7 +728,9 @@ class AudioApp:
             self.tone.start()
         except BaseException as error:
             self._last_readout = ""
-            self.t_readout.set_text("tone start failed: {}".format(error))
+            fail_text = i18n.t("audio.tone_fail").format(error)
+            self.t_readout.set_text(fail_text)
+            _cjk_fit(self.t_readout, fail_text)
             return
         self.tone_running = True
         self._set_tone_btn_img("btn_tone_stop")
@@ -737,14 +765,19 @@ class AudioApp:
         mv = float(self._amp_val)
         dig, clamped = tone.amp_digital(mv)
         pct = dig / 32767.0 * 100.0
-        self.t_freq_lbl.set_text("Frequency: {}".format(self._fmt_freq(f)))
-        self.t_amp_lbl.set_text("Amplitude: {:.0f} mV  ({:.1f}% FS)".format(mv, pct))
-        txt = "digital peak = {}   est Vdiff = {:.3f} V   vol = {}".format(
+        freq_text = i18n.t("audio.tone_freq").format(self._fmt_freq(f))
+        amp_text = i18n.t("audio.tone_amp").format(mv, pct)
+        self.t_freq_lbl.set_text(freq_text)
+        _cjk_fit(self.t_freq_lbl, freq_text)
+        self.t_amp_lbl.set_text(amp_text)
+        _cjk_fit(self.t_amp_lbl, amp_text)
+        txt = i18n.t("audio.tone_readout").format(
             dig, mv / 1000.0, tone.TONE_VOLUME)
         if clamped:
-            txt += "   [CLAMPED: >FS, raise FS_MV]"
+            txt += i18n.t("audio.tone_clamped")
         if txt != self._last_readout:
             self.t_readout.set_text(txt)
+            _cjk_fit(self.t_readout, txt)
             self._last_readout = txt
         self.tone.freq = f
         self.tone.amp_target = float(dig)
@@ -812,7 +845,7 @@ class AudioApp:
                 except BaseException:
                     pass
                 self.finalizer = None
-                self._error = "save failed: {}".format(error)
+                self._error = i18n.t("audio.err_save").format(error)
                 self._apply_state(STATE_IDLE)
                 return
             if not done:

@@ -26,6 +26,7 @@ import aidemo
 from libs.AI2D import Ai2d
 from media.sensor import Sensor, CAM_CHN_ID_1, CAM_CHN_ID_2
 from ui import beep
+from core import i18n
 from core.errors import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                        close_sensor)
 from hardware.camera_fov import set_preview
@@ -182,17 +183,18 @@ class MaskApp:
             lab.set_text(text)
             lab.set_width(lv.SIZE_CONTENT)
             lab.set_style_text_color(lv.color_hex(color), 0)
-            if bar_font is not None:
-                lab.set_style_text_font(bar_font, 0)
+            f = i18n.font_for(text, bar_font)
+            if f is not None:
+                lab.set_style_text_font(f, 0)
             lab.clear_flag(lv.obj.FLAG.CLICKABLE)   # the whole strip is the target
             return lab
 
-        self.seg_title = _seg("Mask", COL_TITLE)
+        self.seg_title = _seg(i18n.name("mask", "Mask"), COL_TITLE)
         self.seg_sep1 = _seg("|", COL_SEP)
-        self.seg_count = _seg("no face", COL_CNT_IDLE)
+        self.seg_count = _seg(i18n.t("ai.no_face"), COL_CNT_IDLE)
         self.seg_sep2 = _seg("|", COL_SEP)
         self.seg_fps = _seg("FPS -", COL_FPS)
-        self.seg_hint = _seg("TAP to freeze", COL_HINT)
+        self.seg_hint = _seg(i18n.t("ai.tap_freeze"), COL_HINT)
 
         self._init_ai()
 
@@ -364,16 +366,16 @@ class MaskApp:
     def _update_stat(self):
         self.seg_fps.set_text("FPS {}".format(self.fps_text))
         if self.last_faces > 0:
-            self.seg_count.set_text("1 face")
+            self.seg_count.set_text(i18n.t("ai.face_one"))
             self.seg_count.set_style_text_color(lv.color_hex(COL_CNT), 0)
         else:
-            self.seg_count.set_text("no face")
+            self.seg_count.set_text(i18n.t("ai.no_face"))
             self.seg_count.set_style_text_color(lv.color_hex(COL_CNT_IDLE), 0)
         if self.frozen:
-            self.seg_hint.set_text("FROZEN")
+            self.seg_hint.set_text(i18n.t("ai.frozen"))
             self.seg_hint.set_style_text_color(lv.color_hex(COL_FROZEN), 0)
         else:
-            self.seg_hint.set_text("TAP to freeze")
+            self.seg_hint.set_text(i18n.t("ai.tap_freeze"))
             self.seg_hint.set_style_text_color(lv.color_hex(COL_HINT), 0)
 
     def _show_error(self, text):
@@ -396,7 +398,7 @@ class MaskApp:
             ai_img = self.sensor.snapshot(chn=CAM_CHN_ID_1)
             img = self.sensor.snapshot(chn=CAM_CHN_ID_2)
         except BaseException as error:
-            self._show_error("snapshot error")
+            self._show_error(i18n.t("ai.snapshot_error"))
             self._no_signal.on_fail(self.ctx)
             return
         self._no_signal.on_ok()
@@ -412,7 +414,7 @@ class MaskApp:
             img.as_lvgl_img_src(self.img_widget)
             self.img_widget.invalidate()
         except BaseException as error:
-            self._show_error("display error")
+            self._show_error(i18n.t("ai.display_error"))
             return
 
         if n > 0:

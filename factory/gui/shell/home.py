@@ -597,9 +597,9 @@ class Launcher:
         lab.set_text(member_name)
         lab.set_style_text_color(lv.color_hex(NAME_COLOR), 0)
         if i18n.needs_cjk(member_name):
-            # 16px CJK: reuse the preloaded OCR face (SourceHanSans 16px) rather
-            # than baking a second CJK size for one label row.
-            f = tile_cache.cjk_font("ocr_cjk_16.bin")
+            # 16px CJK: the UI face baked from i18n's own charset, so coverage of
+            # every member label is guaranteed by construction.
+            f = tile_cache.cjk_font(i18n.CJK_FONT_16)
         else:
             f = None
         if f is None:
@@ -739,7 +739,7 @@ class Launcher:
             # Truncate: the panel height is fixed at 320px and a long exception
             # string would cover the Cancel button.
             startup_error = AppUnavailable(
-                "This app could not start.\n\n{}".format(error)[:160])
+                i18n.t("common.start_failed").format(error)[:160])
 
         self.active_app = app
         self.active_meta = meta
@@ -812,18 +812,25 @@ class Launcher:
         panel.add_flag(lv.obj.FLAG.CLICKABLE)
 
         title = lv.label(panel)
-        title.set_text("{} unavailable".format(tile_cache.tile_name(meta)))
+        title_text = i18n.t("common.unavailable").format(
+            tile_cache.tile_name(meta))
+        title.set_text(title_text)
         title.set_style_text_color(lv.color_hex(COL_TEXT), 0)
         tf = widgets.font("font_montserrat_24", "font_montserrat_20",
                           "font_montserrat_16")
+        tf = i18n.font_for(title_text, tf)
         if tf:
             title.set_style_text_font(tf, 0)
         title.align(lv.ALIGN.TOP_MID, 0, 30)
 
         msg = lv.label(panel)
-        msg.set_text(error.message)
+        # AppUnavailable payloads ship as English constants in the raising module;
+        # translate the known ones at display time.
+        msg_text = i18n.translate_error(error.message)
+        msg.set_text(msg_text)
         msg.set_style_text_color(lv.color_hex(COL_MUTED), 0)
         mf = widgets.font("font_montserrat_20", "font_montserrat_16")
+        mf = i18n.font_for(msg_text, mf)
         if mf:
             msg.set_style_text_font(mf, 0)
         msg.set_style_text_align(lv.TEXT_ALIGN.CENTER, 0)
@@ -859,7 +866,8 @@ class Launcher:
         except BaseException:
             pass
         lab = lv.label(btn)
-        lab.set_text("Cancel")
+        btn_text = i18n.t("common.cancel")
+        lab.set_text(btn_text)
         lab.set_style_text_color(lv.color_hex(COL_TEXT), 0)
         bold = None
         try:
@@ -869,6 +877,8 @@ class Launcher:
             print("[GUI] kb font unavailable: {}".format(error))
         if bold is None:
             bold = widgets.font("font_montserrat_20", "font_montserrat_16")
+        # A CJK label takes the 28px UI face: same size class as the kb font.
+        bold = i18n.font_for(btn_text, bold, i18n.CJK_FONT)
         if bold:
             lab.set_style_text_font(bold, 0)
         lab.center()

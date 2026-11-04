@@ -57,6 +57,7 @@ from machine import FPIOA, I2C
 
 from ui import beep
 from ui import paging
+from core import i18n
 from core import paths
 from core.errors import AppUnavailable
 
@@ -191,6 +192,12 @@ ACC_POSE_PROMPTS = (
     "BOTTOM edge down",      # 6/6  bottom edge down: +X along gravity
     "Face UP on table",      # 7    verification pose (same as 2/6)
 )
+
+
+def _pose_text(idx):
+    """Pose prompt in the UI language; ACC_POSE_PROMPTS itself stays English for
+    the calibration log."""
+    return i18n.t("imu.pose.%d" % idx, ACC_POSE_PROMPTS[idx])
 # (i+, i-, axis): the Z / Y / X pairs. The i+ face's dominant reading points
 # along gravity and the i- face points against it, chosen from the measured axes
 # above (left/right goes with Y, bottom/top goes with X). The ± order is
@@ -411,10 +418,11 @@ COL_TAPE_TICK = 0x8899AA
 COL_ATT = (0x60A5FA, 0x34D399, 0xFBBF24)   # attitude curves: roll blue / pitch green / yaw amber
 COL_ATT_HEAD = (0x3B6EA8, 0x1E7A58, 0x9C7A1A)   # page 3 prefixes: same hues, darkened
 
-# Initial footer text. _refresh_foot overwrites it at runtime with
-# "50Hz ... | 2/3 swipe left | OK:cal CANCEL:exit"; this is only the build-time
-# placeholder, kept the same length so the first layout does not jump.
-FOOT_TEXT = "50Hz  gyro cal | acc cal  |  1/3  swipe left  |  OK:cal  CANCEL:exit"
+# Initial footer text. _refresh_foot overwrites it at runtime; this is only the
+# build-time placeholder, in the current language so the first frame matches.
+def _foot_initial():
+    return i18n.t("imu.footer").format(50, "", 1, PAGE_COUNT,
+                                       i18n.t("imu.swipe_left"))
 
 # Value font (baked by tools/gen_font.py mono16, deployed with assets/).
 # Full ASCII: the readout prefixes A(g)/G(dps)/T(C) and the "|" separators use it
@@ -1366,9 +1374,9 @@ class ImuApp(object):
         # six faces. Skipping the six faces only silences this power cycle
         # (_ACC_PROMPTED); a power cycle asks again.
         if self._zero is None:
-            self._enter_prompt("No gyro calibration data found.")
+            self._enter_prompt(i18n.t("imu.need_gyro"))
         elif self._acc_cal is None and not _ACC_PROMPTED[0]:
-            self._enter_acc_prompt("No accelerometer calibration found.")
+            self._enter_acc_prompt(i18n.t("imu.need_acc"))
         else:
             self._update_info()
 
@@ -1380,6 +1388,7 @@ class ImuApp(object):
             lb.set_width(width)
             lb.set_style_text_align(align, 0)
         lb.set_style_text_color(lv.color_hex(color), 0)
+        font = i18n.font_for(text, font)
         if font is not None:
             try:
                 lb.set_style_text_font(font, 0)
@@ -1548,7 +1557,7 @@ class ImuApp(object):
                                          RD_VAL_W, COL_TEMP,
                                          lv.TEXT_ALIGN.LEFT, value_font))
         self._raw_view.build(box, value_font)
-        self._foots.append(self._label(box, FOOT_TEXT, 20, FOOT_Y, 0,
+        self._foots.append(self._label(box, _foot_initial(), 20, FOOT_Y, 0,
                                        COL_INFO, lv.TEXT_ALIGN.LEFT, small))
 
         # ================= page 3: attitude curves =================
@@ -1567,7 +1576,7 @@ class ImuApp(object):
                 self._label(box, "", gx + 80, READOUT_Y, RD_VAL_W, COL_ATT[i],
                             lv.TEXT_ALIGN.LEFT, value_font))
         self._att_view.build(box, value_font)
-        self._foots.append(self._label(box, FOOT_TEXT, 20, FOOT_Y, 0,
+        self._foots.append(self._label(box, _foot_initial(), 20, FOOT_Y, 0,
                                        COL_INFO, lv.TEXT_ALIGN.LEFT, small))
 
         # All three pages share one pager (the same implementation the audio app uses,
@@ -1834,8 +1843,10 @@ class ImuApp(object):
         """Refresh the calibration segment of the footer row (the chart pages have no
         top info row)."""
         self._cal_status = "{} | {}".format(
-            "gyro cal" if self._zero is not None else "gyro RAW",
-            "acc cal" if self._acc_cal is not None else "acc RAW")
+            i18n.t("imu.gyro_cal") if self._zero is not None
+            else i18n.t("imu.gyro_raw"),
+            i18n.t("imu.acc_cal") if self._acc_cal is not None
+            else i18n.t("imu.acc_raw"))
         self._refresh_foot()
 
     def _refresh_foot(self):
@@ -1850,19 +1861,26 @@ class ImuApp(object):
         compressed to "OK:cal CANCEL:exit".
         """
         page = self._page + 1
-        hint = "swipe right" if page >= PAGE_COUNT else "swipe left"
-        text = "{}Hz  {}  |  {}/{}  {}  |  OK:cal  CANCEL:exit".format(
+        hint = i18n.t("imu.swipe_right") if page >= PAGE_COUNT \
+            else i18n.t("imu.swipe_left")
+        text = i18n.t("imu.footer").format(
             self._rate, self._cal_status, page, PAGE_COUNT, hint)
+        f = i18n.font_for(text, None)
         for lb in self._foots:
             lb.set_text(text)
+            if f is not None:
+                try:
+                    lb.set_style_text_font(f, 0)
+                except BaseException:
+                    pass
 
     def _menu_body(self):
         """Menu body: list the current state of both calibrations."""
-        return ("Gyro:   %s\n"
-                "Accel:  %s\n\n"
-                "Gyro takes ~5 s, accel takes ~1 min." %
-                ("calibrated" if self._zero is not None else "RAW",
-                 "calibrated" if self._acc_cal is not None else "RAW"))
+        return i18n.t("imu.menu_body") % (
+            i18n.t("imu.calibrated") if self._zero is not None
+            else i18n.t("imu.raw_state"),
+            i18n.t("imu.calibrated") if self._acc_cal is not None
+            else i18n.t("imu.raw_state"))
 
     def _build_overlay(self):
         """Build the calibration dialog (backdrop + card + buttons). Built once, then reused.
@@ -1879,6 +1897,8 @@ class ImuApp(object):
         """
         title_font = _dialog_font(DIALOG_TITLE_FONT)
         body_font = _dialog_font(DIALOG_BODY_FONT)
+        self._ov_title_font = title_font
+        self._ov_body_font = body_font
 
         backdrop = lv.obj(self._content)
         backdrop.set_size(self.ctx.width, self.ctx.height)
@@ -1906,10 +1926,11 @@ class ImuApp(object):
         panel.clear_flag(lv.obj.FLAG.SCROLLABLE)
 
         title = lv.label(panel)
-        title.set_text("Gyro calibration")
+        title.set_text(i18n.t("imu.gyro_title"))
         title.set_style_text_color(lv.color_hex(0xFFFFFF), 0)
-        if title_font is not None:
-            title.set_style_text_font(title_font, 0)
+        tf = i18n.font_for(i18n.t("imu.gyro_title"), title_font, i18n.CJK_FONT)
+        if tf is not None:
+            title.set_style_text_font(tf, 0)
         title.align(lv.ALIGN.TOP_MID, 0, 24)
 
         body = lv.label(panel)
@@ -1949,8 +1970,9 @@ class ImuApp(object):
             lb = lv.label(btn)
             lb.set_text(text)
             lb.set_style_text_color(lv.color_hex(0xFFFFFF), 0)
-            if title_font is not None:
-                lb.set_style_text_font(title_font, 0)
+            bf = i18n.font_for(text, title_font, i18n.CJK_FONT)
+            if bf is not None:
+                lb.set_style_text_font(bf, 0)
             lb.center()
             self._btn_labels.append(lb)
             # The action is stored on the Python side (per slot): lv objects are C
@@ -1962,9 +1984,9 @@ class ImuApp(object):
         # All three buttons are always present and switch text/colour/visibility by
         # dialog state (the menu needs three, every other state uses the first two).
         self._btns = (
-            make_btn("Start", 0x16A34A, -182, 0),
-            make_btn("Skip", 0x374151, 0, 1),
-            make_btn("Back", 0x374151, 182, 2))
+            make_btn(i18n.t("imu.btn_start"), 0x16A34A, -182, 0),
+            make_btn(i18n.t("imu.btn_skip"), 0x374151, 0, 1),
+            make_btn(i18n.t("imu.btn_back"), 0x374151, 182, 2))
         self._ov_title = title
         self._ov_body = body
         self._ov_panel = panel
@@ -1994,11 +2016,20 @@ class ImuApp(object):
         if self._overlay is None:
             self._build_overlay()
         self._ov_title.set_text(title)
+        tf = i18n.font_for(title, self._ov_title_font, i18n.CJK_FONT)
+        if tf is not None:
+            self._ov_title.set_style_text_font(tf, 0)
         self._ov_body.set_text(body)
+        bf = i18n.font_for(body, self._ov_body_font, i18n.CJK_FONT_16)
+        if bf is not None:
+            self._ov_body.set_style_text_font(bf, 0)
         for idx, btn in enumerate(self._btns):
             if buttons and idx < len(buttons):
                 text, bg, act = buttons[idx]
                 self._btn_labels[idx].set_text(text)
+                bf = i18n.font_for(text, self._ov_title_font, i18n.CJK_FONT)
+                if bf is not None:
+                    self._btn_labels[idx].set_style_text_font(bf, 0)
                 self._btn_acts[idx] = act
                 btn.set_style_bg_color(lv.color_hex(bg), 0)
                 # Distribute symmetrically by visible button count: fixed x=-182/0/182
@@ -2023,14 +2054,13 @@ class ImuApp(object):
         self._state = ST_PROMPT
         self._from_menu = from_menu
         self._cal_action = None
-        buttons = (("Start", 0x16A34A, "start"),
-                   ("Back" if from_menu else "Skip", 0x374151,
+        buttons = ((i18n.t("imu.btn_start"), 0x16A34A, "start"),
+                   (i18n.t("imu.btn_back") if from_menu
+                    else i18n.t("imu.btn_skip"), 0x374151,
                     "back" if from_menu else "skip"))
         self._set_overlay(
-            "Gyro calibration",
-            "%s\n\n"
-            "Place the board on a flat, still surface.\n"
-            "Takes about 5 seconds." % reason,
+            i18n.t("imu.gyro_title"),
+            i18n.t("imu.gyro_prompt") % reason,
             buttons)
 
     def _enter_menu(self):
@@ -2038,10 +2068,10 @@ class ImuApp(object):
         both)."""
         self._state = ST_MENU
         self._cal_action = None
-        self._set_overlay("Calibrate", self._menu_body(),
-                          (("Gyro", 0x16A34A, "gyro"),
-                           ("Accel", 0x2563EB, "accel"),
-                           ("Back", 0x374151, "back")))
+        self._set_overlay(i18n.t("imu.menu_title"), self._menu_body(),
+                          ((i18n.t("imu.btn_gyro"), 0x16A34A, "gyro"),
+                           (i18n.t("imu.btn_accel"), 0x2563EB, "accel"),
+                           (i18n.t("imu.btn_back"), 0x374151, "back")))
 
     def _close_overlay(self):
         # Every calibration exit passes through here: the log handle must be closed or
@@ -2079,7 +2109,7 @@ class ImuApp(object):
         flag and is not persisted); a power cycle asks again.
         """
         if self._acc_cal is None and not _ACC_PROMPTED[0]:
-            self._enter_acc_prompt("Accelerometer not calibrated yet.")
+            self._enter_acc_prompt(i18n.t("imu.acc_not_yet"))
 
     # ---------- calibration state machine (advanced in step, never blocking the UI) ----------
     def _cal_tick(self, now):
@@ -2111,9 +2141,9 @@ class ImuApp(object):
                 self._cal_deadline = time.ticks_add(now, CAL_COUNTDOWN_MS)
             elif self._state == ST_MENU:
                 if action == "gyro":
-                    self._enter_prompt("Recalibrate the gyro?", True)
+                    self._enter_prompt(i18n.t("imu.recal_gyro"), True)
                 elif action == "accel":
-                    self._enter_acc_prompt("Recalibrate the accelerometer?",
+                    self._enter_acc_prompt(i18n.t("imu.recal_acc"),
                                           True)
                 return True
 
@@ -2125,8 +2155,8 @@ class ImuApp(object):
             if left > 0:
                 secs = (left + 999) // 1000
                 self._set_overlay(
-                    "Hold still",
-                    "Calibrating in %d...\n\nDo not touch the board." % secs,
+                    i18n.t("imu.hold_still"),
+                    i18n.t("imu.countdown") % secs,
                     False)
                 return True
             # Countdown over -> start sampling
@@ -2165,9 +2195,8 @@ class ImuApp(object):
             if step_pct != self._cal_last_pct:
                 self._cal_last_pct = step_pct
                 self._set_overlay(
-                    "Calibrating",
-                    "Collecting samples... %d%%  (%d)\n\nDo not touch the board."
-                    % (pct, self._cal_n),
+                    i18n.t("imu.calibrating"),
+                    i18n.t("imu.collecting") % (pct, self._cal_n),
                     False)
             if time.ticks_diff(self._cal_deadline, now) > 0:
                 return True
@@ -2212,7 +2241,7 @@ class ImuApp(object):
             beep.tone(1000)                # failure: same long beep as the accel calibration
             _cal_log_close()
             self._enter_prompt(
-                "Too much motion (sd %.1f dps).\nKeep the board still." % worst,
+                i18n.t("imu.motion") % worst,
                 self._from_menu)
             return
         self._zero = (gx, gy, gz, temp)
@@ -2232,14 +2261,13 @@ class ImuApp(object):
         self._state = ST_ACC_PROMPT
         self._acc_action = None
         self._from_menu = from_menu
-        buttons = (("Start", 0x16A34A, "start"),
-                   ("Back" if from_menu else "Skip", 0x374151,
+        buttons = ((i18n.t("imu.btn_start"), 0x16A34A, "start"),
+                   (i18n.t("imu.btn_back") if from_menu
+                    else i18n.t("imu.btn_skip"), 0x374151,
                     "back" if from_menu else "skip"))
         self._set_overlay(
-            "Accel calibration",
-            "%s\n\n"
-            "Six faces, ~2 s each. Total about 1 minute.\n"
-            "Keep the board still on each face." % reason,
+            i18n.t("imu.acc_title"),
+            i18n.t("imu.acc_prompt") % reason,
             buttons)
 
     def _acc_reset(self):
@@ -2250,11 +2278,10 @@ class ImuApp(object):
         self._state = ST_ACC_POSE
         self._acc_pose_ms = time.ticks_ms()
         self._set_overlay(
-            "Face 1/6",
-            "%s\n\nPlace the board, then press OK / Sample." %
-            ACC_POSE_PROMPTS[0],
-            (("Sample", 0x16A34A, "sample"),
-             ("Skip all", 0x374151, "skip")))
+            i18n.t("imu.face") % 1,
+            i18n.t("imu.pose_place") % _pose_text(0),
+            ((i18n.t("imu.btn_sample"), 0x16A34A, "sample"),
+             (i18n.t("imu.btn_skip_all"), 0x374151, "skip")))
 
     def _acc_begin_face(self, now):
         """Sample/OK on the current face: short countdown to let the hand leave, then
@@ -2312,9 +2339,8 @@ class ImuApp(object):
         if step_pct != self._acc_last_pct:
             self._acc_last_pct = step_pct
             self._set_overlay(
-                "Face %d/6" % (self._acc_face + 1),
-                "%s\n\nSampling... %d%%\nKeep still." %
-                (ACC_POSE_PROMPTS[self._acc_face], pct),
+                i18n.t("imu.face") % (self._acc_face + 1),
+                i18n.t("imu.sampling") % (_pose_text(self._acc_face), pct),
                 None)
         return time.ticks_diff(self._acc_deadline, now) > 0
 
@@ -2341,15 +2367,15 @@ class ImuApp(object):
                  means[0], means[1], means[2], sds[0], sds[1], sds[2]))
         reason = ""
         if n < ACC_MIN_SAMPLES:
-            reason = "FAIL too few samples (%d < %d)" % (n, ACC_MIN_SAMPLES)
+            reason = i18n.t("imu.fail_samples") % (n, ACC_MIN_SAMPLES)
         elif self._acc_move * 10 > n:
             # More than 10% offending frames rejects (an edge pose allows some wobble).
-            reason = "FAIL motion (%d/%d frames over %g dps)" % (
+            reason = i18n.t("imu.fail_motion") % (
                 self._acc_move, n, ACC_GYRO_STILL_DPS)
         else:
             for i in range(3):
                 if sds[i] > ACC_MAX_SD_G:
-                    reason = "FAIL sd axis %s (%.4f > %.4f g)" % (
+                    reason = i18n.t("imu.fail_sd") % (
                         "XYZ"[i], sds[i], ACC_MAX_SD_G)
                     break
         if not reason:
@@ -2360,7 +2386,7 @@ class ImuApp(object):
             axis, sign = ACC_FACE_EXPECT[face]
             dom = sign * means[axis]
             if dom < ACC_FACE_MIN_DOM_G:
-                reason = ("wrong face? gravity on %s not %s%s (read %+.4f g)"
+                reason = (i18n.t("imu.fail_face")
                           % ("XYZ"[max(range(3), key=lambda i: abs(means[i]))],
                              "XYZ"[axis], "+" if sign > 0 else "-", dom))
         if reason:
@@ -2378,17 +2404,17 @@ class ImuApp(object):
             self._acc_face = 6
             self._state = ST_ACC_POSE
             self._set_overlay(
-                "Verify 7/7",
-                "%s\n\nChecking residual error.\nPress OK / Sample." %
-                ACC_POSE_PROMPTS[6],
-                (("Sample", 0x16A34A, "sample"), ("Skip", 0x374151, "skip")))
+                i18n.t("imu.verify"),
+                i18n.t("imu.verify_body") % _pose_text(6),
+                ((i18n.t("imu.btn_sample"), 0x16A34A, "sample"),
+                 (i18n.t("imu.btn_skip"), 0x374151, "skip")))
             return True
         self._state = ST_ACC_POSE
         self._set_overlay(
-            "Face %d/6" % (self._acc_face + 1),
-            "%s\n\nPlace the board, then press OK / Sample." %
-            ACC_POSE_PROMPTS[self._acc_face],
-            (("Sample", 0x16A34A, "sample"), ("Skip all", 0x374151, "skip")))
+            i18n.t("imu.face") % (self._acc_face + 1),
+            i18n.t("imu.pose_place") % _pose_text(self._acc_face),
+            ((i18n.t("imu.btn_sample"), 0x16A34A, "sample"),
+             (i18n.t("imu.btn_skip_all"), 0x374151, "skip")))
         return True
 
     def _acc_compute(self):
@@ -2402,7 +2428,7 @@ class ImuApp(object):
         m = self._acc_means
         for ip, im, axis in ACC_PAIRS:
             if m[ip] is None or m[im] is None:
-                self._acc_why = "missing face %d/%d" % (ip + 1, im + 1)
+                self._acc_why = i18n.t("imu.why_missing") % (ip + 1, im + 1)
                 _cal_log_line("compute FAIL: " + self._acc_why)
                 return None
         bias = [0.0, 0.0, 0.0]
@@ -2418,7 +2444,7 @@ class ImuApp(object):
                 "scale=%.4f" % ("XYZ"[axis], ip + 1, ap, im + 1, am,
                                 bias[axis], s))
             if s < 0.5 or s > 1.5:
-                self._acc_why = ("axis %s scale out of range (%.4f)" %
+                self._acc_why = (i18n.t("imu.why_scale") %
                                  ("XYZ"[axis], s))
                 _cal_log_line("compute FAIL: " + self._acc_why)
                 return None
@@ -2450,8 +2476,8 @@ class ImuApp(object):
         mag_err, h_err = self._acc_verify(self._acc_means[6]) \
             if self._acc_means[6] is not None else (0.0, 0.0)
         self._set_overlay(
-            "Saved",
-            "Accel calibrated.\n\nResidual: %.1f mg" % (mag_err * 1000.0),
+            i18n.t("imu.saved"),
+            i18n.t("imu.saved_body") % (mag_err * 1000.0),
             None)
 
     def _acc_tick(self, now):
@@ -2511,8 +2537,8 @@ class ImuApp(object):
             if left > 0:
                 secs = (left + 999) // 1000
                 self._set_overlay(
-                    "Face %d/6" % (self._acc_face + 1),
-                    "Hold still... %d" % secs, None)
+                    i18n.t("imu.face") % (self._acc_face + 1),
+                    i18n.t("imu.hold_count") % secs, None)
                 return True
             self._acc_start_sample(now)
             return True
@@ -2529,11 +2555,10 @@ class ImuApp(object):
                     self._state = ST_ACC_POSE
                     self._acc_pose_ms = now
                     self._set_overlay(
-                        "Verify 7/7",
-                        "%s\n\nToo much motion. Press OK / Sample." %
-                        ACC_POSE_PROMPTS[6],
-                        (("Sample", 0x16A34A, "sample"),
-                         ("Skip", 0x374151, "skip")))
+                        i18n.t("imu.verify"),
+                        i18n.t("imu.verify_retry") % _pose_text(6),
+                        ((i18n.t("imu.btn_sample"), 0x16A34A, "sample"),
+                         (i18n.t("imu.btn_skip"), 0x374151, "skip")))
                     beep.tone(1000)
                     return True
                 self._pending = self._acc_compute()
@@ -2542,11 +2567,11 @@ class ImuApp(object):
                     # The specific pair is already in the log.
                     self._state = ST_ACC_RESULT
                     self._set_overlay(
-                        "Check failed",
-                        "%s\n\nRetry all or keep old?" %
-                        getattr(self, "_acc_why", "a face looks wrong"),
-                        (("Retry", 0x16A34A, "retry"),
-                         ("Back", 0x374151, "back")))
+                        i18n.t("imu.check_failed"),
+                        i18n.t("imu.retry_keep") %
+                        getattr(self, "_acc_why", i18n.t("imu.face_wrong")),
+                        ((i18n.t("imu.btn_retry"), 0x16A34A, "retry"),
+                         (i18n.t("imu.btn_back"), 0x374151, "back")))
                     beep.tone(1000)
                     return True
                 mag_err, h_err = self._acc_verify(self._acc_means[6])
@@ -2560,12 +2585,11 @@ class ImuApp(object):
                 else:
                     self._state = ST_ACC_RESULT
                     self._set_overlay(
-                        "Residual high",
-                        "Residual: %.0f mg\n\nRetry all or keep anyway?" %
-                        (mag_err * 1000.0),
-                        (("Retry", 0x16A34A, "retry"),
-                         ("Keep", 0x374151, "keep"),
-                         ("Back", 0x374151, "back")))
+                        i18n.t("imu.residual_high"),
+                        i18n.t("imu.residual_retry") % (mag_err * 1000.0),
+                        ((i18n.t("imu.btn_retry"), 0x16A34A, "retry"),
+                         (i18n.t("imu.btn_keep"), 0x374151, "keep"),
+                         (i18n.t("imu.btn_back"), 0x374151, "back")))
                     beep.tone(1000)
                 return True
             # ordinary face
@@ -2577,11 +2601,11 @@ class ImuApp(object):
             self._state = ST_ACC_POSE
             self._acc_pose_ms = now
             self._set_overlay(
-                "Face %d/6" % (self._acc_face + 1),
-                "%s\n\n%s\nPress OK / Sample to retry." %
-                (ACC_POSE_PROMPTS[self._acc_face], why or "Too much motion."),
-                (("Retry", 0x16A34A, "sample"),
-                 ("Skip all", 0x374151, "skip")))
+                i18n.t("imu.face") % (self._acc_face + 1),
+                i18n.t("imu.face_retry") %
+                (_pose_text(self._acc_face), why or i18n.t("imu.motion_plain")),
+                ((i18n.t("imu.btn_retry"), 0x16A34A, "sample"),
+                 (i18n.t("imu.btn_skip_all"), 0x374151, "skip")))
             return True
 
         if self._state == ST_ACC_RESULT:

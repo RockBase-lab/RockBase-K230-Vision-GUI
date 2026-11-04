@@ -22,6 +22,7 @@ from machine import FPIOA, Pin
 
 from hardware import battery
 from hardware.battery_trace import open_session
+from core import i18n
 from core.errors import AppUnavailable
 
 BATTERY_UNAVAILABLE = ("Battery ADC does not respond.\n"
@@ -138,6 +139,18 @@ STATUS_COLOR = {
     STATUS_ERROR: COL_ERR,
 }
 
+# The constants above are the internal state and the STATUS_COLOR keys; the
+# display text goes through these i18n keys.
+STATUS_I18N = {
+    STATUS_MEASURING: "battery.measuring",
+    STATUS_OK: "battery.present",
+    STATUS_CHARGING: "battery.charging",
+    STATUS_ABSENT: "battery.absent",
+    STATUS_UNSTABLE: "battery.unstable",
+    STATUS_RANGE: "battery.range",
+    STATUS_ERROR: "battery.adc_error",
+}
+
 
 def _font(*names):
     for name in names:
@@ -193,6 +206,7 @@ def _label(parent, text, x, y, width, color, font=None, align=None):
         lb.set_width(width)
         lb.set_style_text_align(align or lv.TEXT_ALIGN.LEFT, 0)
     lb.set_style_text_color(lv.color_hex(color), 0)
+    font = i18n.font_for(text, font)
     if font is not None:
         try:
             lb.set_style_text_font(font, 0)
@@ -310,16 +324,16 @@ class BatteryApp(object):
         right = _card(content, RIGHT_X, CARD_Y, RIGHT_W, CARD_H)
 
         # ---- left: gauge ----
-        _label(left, "CHARGE", 0, 26, LEFT_W, COL_MUTED,
+        _label(left, i18n.t("battery.charge"), 0, 26, LEFT_W, COL_MUTED,
                self._small, lv.TEXT_ALIGN.CENTER)
         self.pct_label = _label(left, "--", 0, 46, LEFT_W, COL_TEXT,
                                 self._big_font, lv.TEXT_ALIGN.CENTER)
         self.volt_label = _label(left, "0.00 V", 0, 282, LEFT_W, COL_ACCENT,
                                  self._value_font, lv.TEXT_ALIGN.CENTER)
-        self.status_label = _label(left, STATUS_MEASURING, 0, 330, LEFT_W,
-                                   COL_MUTED, self._mid_font,
+        self.status_label = _label(left, i18n.t(STATUS_I18N[STATUS_MEASURING]),
+                                   0, 330, LEFT_W, COL_MUTED, self._mid_font,
                                    lv.TEXT_ALIGN.CENTER)
-        _label(left, "charge from pack voltage", 0, 360, LEFT_W,
+        _label(left, i18n.t("battery.charge_note"), 0, 360, LEFT_W,
                COL_MUTED, self._small, lv.TEXT_ALIGN.CENTER)
 
         body = _plain(left, GAUGE_X, GAUGE_Y, GAUGE_W, GAUGE_H)
@@ -352,19 +366,19 @@ class BatteryApp(object):
             self.segs.append(seg)
 
         # ---- right: numeric rows ----
-        _label(right, "MEASUREMENT", 20, 18, RIGHT_W - 40, COL_MUTED,
-               self._small)
+        _label(right, i18n.t("battery.measurement"), 20, 18, RIGHT_W - 40,
+               COL_MUTED, self._small)
         rows = (
-            ("DIVIDER TAP", "--"),
-            ("ADC CODE", "--"),
-            ("SAMPLE SPAN", "--"),
-            ("REJECTED", "--"),
-            ("SAMPLES", "--"),
+            ("battery.row.tap", "--"),
+            ("battery.row.code", "--"),
+            ("battery.row.span", "--"),
+            ("battery.row.rejected", "--"),
+            ("battery.row.samples", "--"),
         )
         self.row_values = []
-        for i, (name, value) in enumerate(rows):
+        for i, (name_key, value) in enumerate(rows):
             y = 56 + i * 38
-            _label(right, name, 20, y, 150, COL_MUTED, self._small)
+            _label(right, i18n.t(name_key), 20, y, 150, COL_MUTED, self._small)
             self.row_values.append(
                 _label(right, value, 170, y - 2, RIGHT_W - 190, COL_TEXT,
                        self._mid_font, lv.TEXT_ALIGN.RIGHT))
@@ -377,7 +391,7 @@ class BatteryApp(object):
         sep.set_style_border_width(0, 0)
         sep.set_style_radius(0, 0)
 
-        _label(right, "LAST {} s".format(HISTORY_POINTS), 20, 258,
+        _label(right, i18n.t("battery.last_secs").format(HISTORY_POINTS), 20, 258,
                RIGHT_W - 40, COL_MUTED, self._small)
         _label(right, "{:.1f} V".format(SPARK_MIN_MV / 1000.0), SPARK_X,
                SPARK_Y + SPARK_H + 4, 60, COL_MUTED, self._small)
@@ -409,7 +423,11 @@ class BatteryApp(object):
     def _set_status(self, status):
         self._status = status
         try:
-            self.status_label.set_text(status)
+            text = i18n.t(STATUS_I18N.get(status, ""), status)
+            self.status_label.set_text(text)
+            f = i18n.font_for(text, self._mid_font)
+            if f is not None:
+                self.status_label.set_style_text_font(f, 0)
             self.status_label.set_style_text_color(
                 lv.color_hex(STATUS_COLOR.get(status, COL_MUTED)), 0)
         except BaseException:

@@ -56,6 +56,7 @@ from libs.AI2D import Ai2d
 from media.sensor import Sensor, CAM_CHN_ID_1, CAM_CHN_ID_2
 from ui import beep
 from core.model_pool import get as model_get
+from core import i18n
 from ui import kb_layer
 from audio import greet
 from core.errors import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
@@ -443,12 +444,13 @@ class FaceRecognizeApp:
             lab.set_text(text)
             lab.set_width(lv.SIZE_CONTENT)
             lab.set_style_text_color(lv.color_hex(color), 0)
-            if bar_font is not None:
-                lab.set_style_text_font(bar_font, 0)
+            f = i18n.font_for(text, bar_font)
+            if f is not None:
+                lab.set_style_text_font(f, 0)
             lab.clear_flag(lv.obj.FLAG.CLICKABLE)
             return lab
 
-        self.seg_title = seg("Recognize", COL_TITLE)
+        self.seg_title = seg(i18n.t("rec.title_plain"), COL_TITLE)
         self.seg_sep1 = seg("|", COL_SEP)
         self.seg_name = seg("-", COL_UNKNOWN)
         self.seg_sep2 = seg("|", COL_SEP)
@@ -457,7 +459,7 @@ class FaceRecognizeApp:
         # PHOTO switch: whether photo-enrolled entries take part in matching.
         # The switch is clickable itself, so a tap here does not fall through to
         # stat_btn and open the manage overlay.
-        self.seg_photo = seg("PHOTO", COL_HINT)
+        self.seg_photo = seg(i18n.t("rec.photo"), COL_HINT)
         self._switch = lv.switch(self.stat_btn)
         self._switch.set_size(46, 24)
         self._switch.clear_flag(lv.obj.FLAG.SCROLLABLE)
@@ -467,7 +469,7 @@ class FaceRecognizeApp:
         self._switch.set_style_bg_color(lv.color_hex(0x1E262E), 0)
         beep.on_click(self._switch, lambda e: self._toggle_photos())
 
-        self.seg_hint = seg("OK: enroll", COL_HINT)
+        self.seg_hint = seg(i18n.t("rec.ok_enroll"), COL_HINT)
         self._sync_switch()
 
     def _sync_switch(self):
@@ -493,8 +495,8 @@ class FaceRecognizeApp:
             self._db_save_index()
         except BaseException as e:
             print("[Recognize] toggle save failed:", e)
-        self._note("photos {}".format("allowed" if self.photos_allowed
-                                      else "excluded"))
+        self._note(i18n.t("rec.note_photos_allowed" if self.photos_allowed
+                          else "rec.note_photos_excluded"))
         # The next match pass re-runs with the new filter; a name that just got
         # excluded drops out on the following frame.
         self._update_stat()
@@ -506,9 +508,9 @@ class FaceRecognizeApp:
         if people != self._shown_people:
             self._shown_people = people
             if people:
-                self.seg_title.set_text("Recognize {}".format(people))
+                self.seg_title.set_text(i18n.t("rec.title").format(people))
             else:
-                self.seg_title.set_text("Recognize")
+                self.seg_title.set_text(i18n.t("rec.title_plain"))
         self.seg_title.set_style_text_color(lv.color_hex(COL_TITLE), 0)
 
         note = ""
@@ -519,32 +521,33 @@ class FaceRecognizeApp:
             self.seg_name.set_text(note)
             self.seg_name.set_style_text_color(lv.color_hex(COL_FPS), 0)
         elif not self.has_face:
-            self.seg_name.set_text("no face")
+            self.seg_name.set_text(i18n.t("ai.no_face"))
             self.seg_name.set_style_text_color(lv.color_hex(COL_UNKNOWN), 0)
         elif self._name:
             self.seg_name.set_text("{} {:.2f}".format(self._name, self._score))
             self.seg_name.set_style_text_color(lv.color_hex(COL_KNOWN), 0)
         else:
-            self.seg_name.set_text("unknown {:.2f}".format(self._score)
-                                   if self._score else "unknown")
+            self.seg_name.set_text(
+                i18n.t("rec.unknown_score").format(self._score)
+                if self._score else i18n.t("rec.unknown"))
             self.seg_name.set_style_text_color(lv.color_hex(COL_UNKNOWN), 0)
 
         self.seg_fps.set_text("FPS {}".format(self.fps_text))
         if self.frozen:
-            self.seg_hint.set_text("FROZEN")
+            self.seg_hint.set_text(i18n.t("ai.frozen"))
             self.seg_hint.set_style_text_color(lv.color_hex(COL_FROZEN), 0)
         elif self._add_name is not None:
-            self.seg_hint.set_text("OK: add {}/{}".format(
+            self.seg_hint.set_text(i18n.t("rec.ok_add").format(
                 self._add_n, SAMPLES_PER_NAME))
             self.seg_hint.set_style_text_color(lv.color_hex(COL_KNOWN), 0)
         elif not self.voice_on:
             # The switch lives in the manage overlay, which is closed most of
             # the time. Without a marker here, a greeting that never speaks
             # looks like a broken app instead of a turned-off switch.
-            self.seg_hint.set_text("VOICE OFF")
+            self.seg_hint.set_text(i18n.t("ai.voice_off"))
             self.seg_hint.set_style_text_color(lv.color_hex(COL_FROZEN), 0)
         else:
-            self.seg_hint.set_text("OK: enroll")
+            self.seg_hint.set_text(i18n.t("rec.ok_enroll"))
             self.seg_hint.set_style_text_color(lv.color_hex(COL_HINT), 0)
 
     def _note(self, text):
@@ -1051,23 +1054,32 @@ class FaceRecognizeApp:
         card.add_flag(lv.obj.FLAG.CLICKABLE)
 
         font = _font("font_montserrat_20", "font_montserrat_16")
+        title_text = i18n.t("rec.no_enrolled_title")
         title = lv.label(card)
-        title.set_text("No face enrolled")
+        title.set_text(title_text)
         title.set_style_text_color(lv.color_hex(COL_TITLE), 0)
-        if font is not None:
-            title.set_style_text_font(font, 0)
+        tf = i18n.font_for(title_text, font)
+        if tf is not None:
+            title.set_style_text_font(tf, 0)
         title.align(lv.ALIGN.TOP_MID, 0, 6)
 
+        body_text = i18n.t("rec.no_enrolled_body")
         body = lv.label(card)
-        body.set_text("Put one face in view, then press OK\n"
-                      "and type a name to enroll it.")
+        body.set_text(body_text)
         body.set_style_text_color(lv.color_hex(0xE6EAF0), 0)
         body.set_style_text_align(lv.TEXT_ALIGN.CENTER, 0)
+        bf = i18n.font_for(body_text, None)
+        if bf is not None:
+            body.set_style_text_font(bf, 0)
         body.align(lv.ALIGN.TOP_MID, 0, 58)
 
+        hint_text = i18n.t("rec.no_enrolled_hint")
         hint = lv.label(card)
-        hint.set_text("OK: enroll      tap here: close")
+        hint.set_text(hint_text)
         hint.set_style_text_color(lv.color_hex(COL_HINT), 0)
+        hf = i18n.font_for(hint_text, None)
+        if hf is not None:
+            hint.set_style_text_font(hf, 0)
         hint.align(lv.ALIGN.BOTTOM_MID, 0, -8)
 
         beep.on_click(panel, lambda e: self._close_empty_panel())
@@ -1088,10 +1100,10 @@ class FaceRecognizeApp:
         if self._empty_panel is not None:
             self._close_empty_panel()
         if not self.has_face or self._pending_feat is None:
-            self._note("no face to enroll")
+            self._note(i18n.t("rec.note_no_face_enroll"))
             return
         if len(self.db_names) >= MAX_ENROLL:
-            self._note("database full")
+            self._note(i18n.t("rec.note_db_full"))
             return
         # One-shot liveness on the current frame decides the source tag. A face
         # that fails it is a printed photo held to the camera: allowed and
@@ -1105,17 +1117,17 @@ class FaceRecognizeApp:
             score = None
         if score is not None and score < LIVE_REAL:
             if not self.photos_allowed:
-                self._note("photo blocked: enable PHOTO")
+                self._note(i18n.t("rec.note_photo_blocked"))
                 self._update_stat()
                 return
             self._pending_src = "photo"
-            self._note("photo face detected")
+            self._note(i18n.t("rec.note_photo_face"))
         self._close_manage()
         self.frozen = True
         self._update_stat()
         self.kb = kb_layer.KbLayer(
-            title="name this face", on_ok=self._enroll_commit,
-            ok_text="save", password=False, max_len=NAME_MAX,
+            title=i18n.t("rec.kb_title"), on_ok=self._enroll_commit,
+            ok_text=i18n.t("rec.kb_save"), password=False, max_len=NAME_MAX,
             text_font=self.bar_font, accent=COL_TITLE)
 
     def _enroll_commit(self):
@@ -1130,13 +1142,13 @@ class FaceRecognizeApp:
         self.frozen = False
         name = (name or "").strip()
         if not name:
-            self._note("empty name, not saved")
+            self._note(i18n.t("rec.note_empty_name"))
             self._update_stat()
             return
         feat = self._pending_feat
         self._pending_feat = None
         if feat is None:
-            self._note("feature lost, retry")
+            self._note(i18n.t("rec.note_feature_lost"))
             self._update_stat()
             return
         # Typing an existing name is a deliberate re-enrollment: drop the old
@@ -1150,11 +1162,11 @@ class FaceRecognizeApp:
         except BaseException as e:
             print("[Recognize] save failed:", e)
             sys.print_exception(e)
-            self._note("save failed")
+            self._note(i18n.t("rec.note_save_failed"))
             self._update_stat()
             return
         if n < 0:
-            self._note("database full")
+            self._note(i18n.t("rec.note_db_full"))
             self._update_stat()
             return
         print("[Recognize] enrolled '{}' [{}] sample {}/{}".format(
@@ -1168,7 +1180,8 @@ class FaceRecognizeApp:
         self._add_src = src
         self._add_n = n
         self._add_ms = time.ticks_ms()
-        self._note("{} {}/{} - turn head".format(name, n, SAMPLES_PER_NAME))
+        self._note(i18n.t("rec.note_enroll_turn").format(
+            name, n, SAMPLES_PER_NAME))
 
     def _end_add_session(self):
         self._add_name = None
@@ -1184,7 +1197,7 @@ class FaceRecognizeApp:
             # No face right now: say so and restart the timer, because the user
             # is probably repositioning rather than walking away.
             self._add_ms = time.ticks_ms()
-            self._note("no face - {}".format(name))
+            self._note(i18n.t("rec.note_no_face_named").format(name))
             return
         try:
             n = self._db_append(name, self._pending_feat, self._add_src)
@@ -1192,24 +1205,26 @@ class FaceRecognizeApp:
             print("[Recognize] add sample failed:", e)
             sys.print_exception(e)
             self._end_add_session()
-            self._note("save failed")
+            self._note(i18n.t("rec.note_save_failed"))
             return
         if n < 0:
             self._end_add_session()
-            self._note("database full")
+            self._note(i18n.t("rec.note_db_full"))
             return
         print("[Recognize] '{}' sample {}/{}".format(name, n, SAMPLES_PER_NAME))
         self._add_n = n
         if n >= SAMPLES_PER_NAME:
             self._end_add_session()
-            self._note("{} {}/{} done".format(name, n, SAMPLES_PER_NAME))
+            self._note(i18n.t("rec.note_enroll_done").format(
+                name, n, SAMPLES_PER_NAME))
             # All angles are in: queue the greeting. It is built on a later
             # frame, not here, so this frame still renders the note.
             if self.voice_on:
                 self._queue_voices([name])
         else:
             self._add_ms = time.ticks_ms()
-            self._note("{} {}/{} - turn".format(name, n, SAMPLES_PER_NAME))
+            self._note(i18n.t("rec.note_enroll_turn_short").format(
+                name, n, SAMPLES_PER_NAME))
 
     # ---------- greeting voice ----------
     def _voice_path(self, name):
@@ -1244,7 +1259,7 @@ class FaceRecognizeApp:
         self._voice_queue = todo
         self._voice_done = 0
         self._voice_total = len(todo)
-        self._note("voice 0/{}".format(self._voice_total))
+        self._note(i18n.t("rec.note_voice_start").format(self._voice_total))
 
     def _step_voice(self):
         """Build one queued greeting. Returns True when it did work.
@@ -1267,12 +1282,12 @@ class FaceRecognizeApp:
             size = 0
         self._voice_done += 1
         if self._voice_queue:
-            self._note("voice {}/{}".format(self._voice_done,
-                                            self._voice_total))
+            self._note(i18n.t("rec.note_voice_progress").format(
+                self._voice_done, self._voice_total))
         else:
             self._close_synth()
-            self._note("voices ready {}/{}".format(self._voice_done,
-                                                   self._voice_total))
+            self._note(i18n.t("rec.note_voices_ready").format(
+                self._voice_done, self._voice_total))
         return True
 
     def _close_synth(self):
@@ -1318,15 +1333,23 @@ class FaceRecognizeApp:
         panel.clear_flag(lv.obj.FLAG.SCROLLABLE)
         panel.add_flag(lv.obj.FLAG.CLICKABLE)
 
+        title_text = i18n.t("rec.enrolled_title").format(
+            len(self._db_names_unique()))
         title = lv.label(panel)
-        title.set_text("Enrolled faces ({})".format(
-            len(self._db_names_unique())))
+        title.set_text(title_text)
         title.set_style_text_color(lv.color_hex(0xE6EAF0), 0)
+        tf = i18n.font_for(title_text, None)
+        if tf is not None:
+            title.set_style_text_font(tf, 0)
         title.align(lv.ALIGN.TOP_MID, 0, 2)
 
+        hint_text = i18n.t("rec.manage_hint")
         hint = lv.label(panel)
-        hint.set_text("tap a row to delete, tap outside to close")
+        hint.set_text(hint_text)
         hint.set_style_text_color(lv.color_hex(0x8A97A3), 0)
+        hf = i18n.font_for(hint_text, None)
+        if hf is not None:
+            hint.set_style_text_font(hf, 0)
         hint.align(lv.ALIGN.TOP_MID, 0, 26)
 
         # VOICE row: speak the matched name. Kept here rather than in the top
@@ -1342,11 +1365,13 @@ class FaceRecognizeApp:
         voice_row.clear_flag(lv.obj.FLAG.SCROLLABLE)
         voice_row.add_flag(lv.obj.FLAG.CLICKABLE)
         vlab = lv.label(voice_row)
-        vlab.set_text("VOICE  say the name")
+        vlab_text = i18n.t("rec.voice_row")
+        vlab.set_text(vlab_text)
         vlab.set_style_text_color(
             lv.color_hex(COL_KNOWN if self.voice_on else COL_UNKNOWN), 0)
-        if self.bar_font is not None:
-            vlab.set_style_text_font(self.bar_font, 0)
+        vf = i18n.font_for(vlab_text, self.bar_font)
+        if vf is not None:
+            vlab.set_style_text_font(vf, 0)
         vlab.align(lv.ALIGN.LEFT_MID, 12, 0)
         vlab.clear_flag(lv.obj.FLAG.CLICKABLE)
         voice_sw = lv.switch(voice_row)
@@ -1373,8 +1398,12 @@ class FaceRecognizeApp:
             fix.clear_flag(lv.obj.FLAG.SCROLLABLE)
             fix.add_flag(lv.obj.FLAG.CLICKABLE)
             flab = lv.label(fix)
-            flab.set_text("make {} missing voice(s)".format(len(missing)))
+            flab_text = i18n.t("rec.voice_missing").format(len(missing))
+            flab.set_text(flab_text)
             flab.set_style_text_color(lv.color_hex(COL_FPS), 0)
+            ff = i18n.font_for(flab_text, None)
+            if ff is not None:
+                flab.set_style_text_font(ff, 0)
             flab.center()
             flab.clear_flag(lv.obj.FLAG.CLICKABLE)
             beep.on_click(fix, lambda e: self._rebuild_voices(missing))
@@ -1382,8 +1411,12 @@ class FaceRecognizeApp:
         names = self._db_names_unique()
         if not names:
             empty = lv.label(panel)
-            empty.set_text("none yet - press OK to enroll")
+            empty_text = i18n.t("rec.empty_db")
+            empty.set_text(empty_text)
             empty.set_style_text_color(lv.color_hex(COL_HINT), 0)
+            ef = i18n.font_for(empty_text, None)
+            if ef is not None:
+                empty.set_style_text_font(ef, 0)
             empty.align(lv.ALIGN.TOP_MID, 0, 104)
         else:
             y = 100 if not missing else 138
@@ -1400,7 +1433,7 @@ class FaceRecognizeApp:
                         has_photo = True
                     else:
                         has_live = True
-                tag = " [photo]" if has_photo else ""
+                tag = i18n.t("rec.tag_photo") if has_photo else ""
                 row = lv.btn(panel)
                 row.set_size(524, 48)
                 row.align(lv.ALIGN.TOP_MID, 0, y)
@@ -1412,15 +1445,16 @@ class FaceRecognizeApp:
                 row.clear_flag(lv.obj.FLAG.SCROLLABLE)
                 row.add_flag(lv.obj.FLAG.CLICKABLE)
                 lab = lv.label(row)
-                lab.set_text("{}{} x{}    (tap to delete)".format(
-                    name, tag, cnt))
+                row_text = i18n.t("rec.row").format(name, tag, cnt)
+                lab.set_text(row_text)
                 # Dim an identity only when every sample is excluded, i.e. it
                 # has no live angle to fall back on.
                 dimmed = has_photo and not has_live and not self.photos_allowed
                 lab.set_style_text_color(
                     lv.color_hex(COL_UNKNOWN if dimmed else 0xE6EAF0), 0)
-                if self.bar_font is not None:
-                    lab.set_style_text_font(self.bar_font, 0)
+                rf = i18n.font_for(row_text, self.bar_font)
+                if rf is not None:
+                    lab.set_style_text_font(rf, 0)
                 lab.center()
                 lab.clear_flag(lv.obj.FLAG.CLICKABLE)
                 beep.on_click(row,
@@ -1442,7 +1476,8 @@ class FaceRecognizeApp:
         except BaseException as e:
             print("[Recognize] voice setting save failed:", e)
         self._close_manage()
-        self._note("voice {}".format("on" if self.voice_on else "off"))
+        self._note(i18n.t("rec.note_voice_on" if self.voice_on
+                          else "rec.note_voice_off"))
 
     def _rebuild_voices(self, names):
         """Start the batch from the manage panel, then get out of the way."""
@@ -1455,7 +1490,7 @@ class FaceRecognizeApp:
             self._db_delete_name(name)
         except BaseException as e:
             print("[Recognize] delete failed:", e)
-            self._note("delete failed")
+            self._note(i18n.t("rec.note_delete_failed"))
         self._update_stat()
         if not self.db_names:
             self._show_empty_panel()
@@ -1523,7 +1558,8 @@ class FaceRecognizeApp:
             name = self._add_name
             n = self._add_n
             self._end_add_session()
-            self._note("{} {}/{} keep".format(name, n, SAMPLES_PER_NAME))
+            self._note(i18n.t("rec.note_keep").format(
+                name, n, SAMPLES_PER_NAME))
 
         if self.frozen:
             return
@@ -1537,7 +1573,7 @@ class FaceRecognizeApp:
             ai_img = self.sensor.snapshot(chn=CAM_CHN_ID_1)
             img = self.sensor.snapshot(chn=CAM_CHN_ID_2)
         except BaseException as error:
-            self._show_error("snapshot error")
+            self._show_error(i18n.t("ai.snapshot_error"))
             self._no_signal.on_fail(self.ctx)
             return
         self._no_signal.on_ok()
@@ -1597,7 +1633,7 @@ class FaceRecognizeApp:
             img.as_lvgl_img_src(self.img_widget)
             self.img_widget.invalidate()
         except BaseException as error:
-            self._show_error("display error")
+            self._show_error(i18n.t("ai.display_error"))
             return
 
         self._draw_box(box, self._name is not None)

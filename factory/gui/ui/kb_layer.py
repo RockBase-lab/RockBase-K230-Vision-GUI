@@ -47,6 +47,7 @@ import time
 
 import lvgl as lv
 
+from core import i18n
 from core import paths
 from ui import beep
 from ui import image
@@ -205,8 +206,9 @@ class KbLayer:
         t = lv.label(panel)
         t.set_text(title)
         t.set_style_text_color(lv.color_hex(accent), 0)
-        if self._font:
-            t.set_style_text_font(self._font, 0)
+        tf = i18n.font_for(title, self._font)
+        if tf:
+            t.set_style_text_font(tf, 0)
         t.set_pos(16, 10)
 
         ta = lv.textarea(panel)
@@ -217,7 +219,8 @@ class KbLayer:
         ta.set_size(604, 42)
         ta.set_pos(16, 40)
         ta.set_password_mode(bool(password))
-        ta.set_placeholder_text("password")
+        placeholder = i18n.t("kb.password")
+        ta.set_placeholder_text(placeholder)
         ta.set_one_line(True)
         ta.set_max_length(max_len)
         # The default theme's light field is harsh on a dark card, so repaint it with
@@ -232,8 +235,11 @@ class KbLayer:
                                     lv.PART.TEXTAREA_PLACEHOLDER)
         except Exception:
             pass
-        if self._font:
-            ta.set_style_text_font(self._font, 0)
+        # The UI CJK face carries the ASCII block too, so it can back both the
+        # zh placeholder and the typed ASCII password.
+        ta_font = i18n.font_for(placeholder, self._font)
+        if ta_font:
+            ta.set_style_text_font(ta_font, 0)
 
         kb = lv.keyboard(panel)
         kb.set_size(784, 300)
@@ -343,13 +349,13 @@ class KbLayer:
         # Use the same 28px bold bitmap font as the keyboard keys (matching the
         # keycaps below); fall back to the card font when loading failed. It is
         # smaller than the 42px-tall button, so it does not overflow.
-        if self._kb_font is not None:
+        ok_font = self._kb_font if self._kb_font is not None else self._font
+        ok_font = i18n.font_for(ok_text, ok_font)
+        if ok_font:
             try:
-                ol.set_style_text_font(self._kb_font, 0)
+                ol.set_style_text_font(ok_font, 0)
             except Exception:
                 pass
-        elif self._font:
-            ol.set_style_text_font(self._font, 0)
         ol.center()
         ol.clear_flag(lv.obj.FLAG.CLICKABLE)
         beep.on_click(ok, lambda e: self._fire_ok())

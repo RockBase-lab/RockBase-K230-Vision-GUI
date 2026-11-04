@@ -10,6 +10,7 @@ CFG = {
     "path": "/sdcard/examples/kmodel/person_detect_yolov5n.kmodel",
     "input": [640, 640],
     "labels": ["person"],
+    "labels_zh": ["行人"],
     "anchors": [10, 13, 16, 30, 33, 23, 30, 61, 62, 45, 59, 119,
                 116, 90, 156, 198, 373, 326],
     "strides": [8, 16, 32],

@@ -31,6 +31,7 @@ import lvgl as lv
 from media.sensor import Sensor, CAM_CHN_ID_0, CAM_CHN_ID_2
 
 from core import config
+from core import i18n
 from audio import shutter
 from hardware.camera_fov import set_preview
 from core.errors import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
@@ -136,8 +137,12 @@ class CameraApp:
 
         # Top centre: resolution | FPS
         self.stat_label = lv.label(content)
-        self.stat_label.set_text("camera init...")
+        init_text = i18n.t("camera.init")
+        self.stat_label.set_text(init_text)
         self.stat_label.set_style_text_color(lv.color_hex(0x00FF00), 0)
+        f = i18n.font_for(init_text, None)
+        if f is not None:
+            self.stat_label.set_style_text_font(f, 0)
         self.stat_label.align(lv.ALIGN.TOP_MID, 0, 8)
 
         # Centre toast: hidden initially, shown for TOAST_MS after a capture
@@ -164,6 +169,7 @@ class CameraApp:
         font = _font("font_montserrat_48", "font_montserrat_32", "font_montserrat_24")
         if font is not None:
             self.toast.set_style_text_font(font, 0)
+        self.toast_font = font
         self.toast.align(lv.ALIGN.CENTER, 0, 0)
         self.toast.add_flag(lv.obj.FLAG.HIDDEN)
 
@@ -231,6 +237,9 @@ class CameraApp:
 
     def _show_toast(self, text):
         self.toast.set_text(text)
+        f = i18n.font_for(text, self.toast_font)
+        if f is not None:
+            self.toast.set_style_text_font(f, 0)
         self.toast.clear_flag(lv.obj.FLAG.HIDDEN)
         self.toast_until = time.ticks_add(time.ticks_ms(), TOAST_MS)
 
@@ -258,7 +267,11 @@ class CameraApp:
             return
         # Show Saving... first and suspend the auto-hide; restart the timer once saving is
         # done
-        self.toast.set_text("Saving...")
+        saving = i18n.t("camera.saving")
+        self.toast.set_text(saving)
+        f = i18n.font_for(saving, self.toast_font)
+        if f is not None:
+            self.toast.set_style_text_font(f, 0)
         self.toast.clear_flag(lv.obj.FLAG.HIDDEN)
         self.toast_until = 0
         t0 = time.ticks_ms()
@@ -272,12 +285,12 @@ class CameraApp:
             size = os.stat(path)[6]
             elapsed = time.ticks_diff(time.ticks_ms(), t0)
             print("[Camera] saved {} ({}KB) in {}ms".format(path, size // 1024, elapsed))
-            self._show_toast("Saved\n{}\n{}x{}  {}KB".format(
+            self._show_toast(i18n.t("camera.saved").format(
                 path, CAPTURE_W, CAPTURE_H, size // 1024))
         except BaseException as error:
             print("[Camera] capture failed: {}".format(error))
             sys.print_exception(error)
-            self._show_toast("Save failed:\n{}".format(error))
+            self._show_toast(i18n.t("camera.save_failed").format(error))
         finally:
             gc.collect()
 
@@ -312,7 +325,11 @@ class CameraApp:
             img.as_lvgl_img_src(self.img_widget)
             self.img_widget.invalidate()
         except BaseException as error:
-            self.stat_label.set_text("snapshot error: {}".format(error))
+            err_text = i18n.t("ai.snapshot_error_fmt").format(error)
+            self.stat_label.set_text(err_text)
+            f = i18n.font_for(err_text, None)
+            if f is not None:
+                self.stat_label.set_style_text_font(f, 0)
             self._no_signal.on_fail(self.ctx)
             return
         self._no_signal.on_ok()

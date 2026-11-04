@@ -38,6 +38,7 @@ from libs.AI2D import Ai2d
 from media.sensor import Sensor, CAM_CHN_ID_1, CAM_CHN_ID_2
 from ui import beep
 from core import paths
+from core import i18n
 from core.errors import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                         close_sensor)
 from hardware.camera_fov import set_preview
@@ -347,8 +348,9 @@ class PlateApp:
             lab.set_text(text)
             lab.set_width(lv.SIZE_CONTENT)
             lab.set_style_text_color(lv.color_hex(color), 0)
-            if bar_font is not None:
-                lab.set_style_text_font(bar_font, 0)
+            f = i18n.font_for(text, bar_font)
+            if f is not None:
+                lab.set_style_text_font(f, 0)
             # clicks must reach the strip, otherwise taps on the padding are lost
             lab.clear_flag(lv.obj.FLAG.CLICKABLE)
             return lab
@@ -357,8 +359,8 @@ class PlateApp:
         self.stat_sep1 = _seg("|", COL_SEP)
         self.stat_fps = _seg("FPS -", COL_FPS)
         self.stat_sep2 = _seg("|", COL_SEP)
-        self.stat_count = _seg("0 plate", COL_COUNT_IDLE)
-        self.stat_hint = _seg("TAP freeze", COL_HINT)
+        self.stat_count = _seg(i18n.t("ai.no_plates"), COL_COUNT_IDLE)
+        self.stat_hint = _seg(i18n.t("ai.tap_freeze_short"), COL_HINT)
 
         self._init_ai()
 
@@ -682,17 +684,17 @@ class PlateApp:
     def _update_stat(self):
         self.stat_fps.set_text("FPS {}".format(self.fps_text))
         if self.plate_count > 0:
-            self.stat_count.set_text("{} plate".format(self.plate_count))
+            self.stat_count.set_text(i18n.t("ai.plates").format(self.plate_count))
             self.stat_count.set_style_text_color(lv.color_hex(COL_COUNT), 0)
         else:
-            self.stat_count.set_text("0 plate")
+            self.stat_count.set_text(i18n.t("ai.no_plates"))
             self.stat_count.set_style_text_color(
                 lv.color_hex(COL_COUNT_IDLE), 0)
         if self.frozen:
-            self.stat_hint.set_text("FROZEN")
+            self.stat_hint.set_text(i18n.t("ai.frozen"))
             self.stat_hint.set_style_text_color(lv.color_hex(COL_FROZEN), 0)
         else:
-            self.stat_hint.set_text("TAP freeze")
+            self.stat_hint.set_text(i18n.t("ai.tap_freeze_short"))
             self.stat_hint.set_style_text_color(lv.color_hex(COL_HINT), 0)
 
     def _show_error(self, text):
@@ -724,7 +726,7 @@ class PlateApp:
             ai_img = self.sensor.snapshot(chn=CAM_CHN_ID_1) if due else None
         except BaseException as error:
             print("[Plate] snapshot error:", error)
-            self._show_error("snapshot error")
+            self._show_error(i18n.t("ai.snapshot_error"))
             self._no_signal.on_fail(self.ctx)
             self._tick += 1
             return
@@ -745,7 +747,7 @@ class PlateApp:
             img.as_lvgl_img_src(self.img_widget)
             self.img_widget.invalidate()
         except BaseException:
-            self._show_error("display error")
+            self._show_error(i18n.t("ai.display_error"))
             return
 
         if due:

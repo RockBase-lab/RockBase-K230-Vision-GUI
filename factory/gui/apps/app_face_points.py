@@ -29,6 +29,7 @@ import aidemo
 from libs.AI2D import Ai2d
 from media.sensor import Sensor, CAM_CHN_ID_1, CAM_CHN_ID_2
 from ui import beep
+from core import i18n
 from core.errors import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                         close_sensor)
 from hardware.camera_fov import set_preview
@@ -333,34 +334,35 @@ class FacePointsApp:
             lab.set_text(text)
             lab.set_width(lv.SIZE_CONTENT)
             lab.set_style_text_color(lv.color_hex(color), 0)
-            if bar_font is not None:
-                lab.set_style_text_font(bar_font, 0)
+            f = i18n.font_for(text, bar_font)
+            if f is not None:
+                lab.set_style_text_font(f, 0)
             lab.clear_flag(lv.obj.FLAG.CLICKABLE)
             return lab
 
-        self.seg_title = seg("Points", COL_TITLE)
+        self.seg_title = seg(i18n.name("landmark", "Points"), COL_TITLE)
         self.seg_sep1 = seg("|", COL_SEP)
-        self.seg_count = seg("no face", COL_CNT_IDLE)
+        self.seg_count = seg(i18n.t("ai.no_face"), COL_CNT_IDLE)
         self.seg_sep2 = seg("|", COL_SEP)
         self.seg_fps = seg("FPS -", COL_FPS)
-        self.seg_hint = seg("TAP: view", COL_HINT)
+        self.seg_hint = seg(i18n.t("ai.tap_view"), COL_HINT)
 
     def _update_stat(self):
-        view = VIEWS[self.view_idx][0]
-        self.seg_title.set_text("Points {}".format(view))
+        view = i18n.t_en(VIEWS[self.view_idx][0])
+        self.seg_title.set_text(i18n.t("points.title").format(view))
         self.seg_title.set_style_text_color(lv.color_hex(COL_TITLE), 0)
         if self.has_face:
-            self.seg_count.set_text("{} pts".format(N_POINTS))
+            self.seg_count.set_text(i18n.t("ai.pts").format(N_POINTS))
             self.seg_count.set_style_text_color(lv.color_hex(COL_CNT), 0)
         else:
-            self.seg_count.set_text("no face")
+            self.seg_count.set_text(i18n.t("ai.no_face"))
             self.seg_count.set_style_text_color(lv.color_hex(COL_CNT_IDLE), 0)
         self.seg_fps.set_text("FPS {}".format(self.fps_text))
         if self.frozen:
-            self.seg_hint.set_text("FROZEN")
+            self.seg_hint.set_text(i18n.t("ai.frozen"))
             self.seg_hint.set_style_text_color(lv.color_hex(COL_FROZEN), 0)
         else:
-            self.seg_hint.set_text("TAP: view")
+            self.seg_hint.set_text(i18n.t("ai.tap_view"))
             self.seg_hint.set_style_text_color(lv.color_hex(COL_HINT), 0)
 
     def _show_error(self, text):
@@ -646,7 +648,7 @@ class FacePointsApp:
             ai_img = self.sensor.snapshot(chn=CAM_CHN_ID_1)
             img = self.sensor.snapshot(chn=CAM_CHN_ID_2)
         except BaseException as error:
-            self._show_error("snapshot error")
+            self._show_error(i18n.t("ai.snapshot_error"))
             self._no_signal.on_fail(self.ctx)
             return
         self._no_signal.on_ok()
@@ -680,7 +682,7 @@ class FacePointsApp:
             img.as_lvgl_img_src(self.img_widget)
             self.img_widget.invalidate()
         except BaseException as error:
-            self._show_error("display error")
+            self._show_error(i18n.t("ai.display_error"))
             return
 
         self._apply_lines()

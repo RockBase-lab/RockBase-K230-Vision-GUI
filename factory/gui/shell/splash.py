@@ -13,6 +13,7 @@ import lvgl as lv
 
 import time
 from core import font_pool
+from core import i18n
 from core.version import GUI_VERSION
 # The panel colours are the desktop's, not this screen's own: taking them from the
 # theme keeps the splash and the home screen from drifting apart after a palette
@@ -72,6 +73,8 @@ class Splash:
         big = _font("font_montserrat_28", "font_montserrat_24", "font_montserrat_20")
         mid = _font("font_montserrat_20", "font_montserrat_16", "font_montserrat_14")
         small = _font("font_montserrat_16", "font_montserrat_14")
+        self._mid = mid
+        self._small = small
 
         self.title = lv.label(self.scr)
         self.title.set_text("RockBase")
@@ -199,6 +202,12 @@ class Splash:
             self._flush()
             time.sleep_ms(frame_ms)
 
+    def _cjk(self, label, text, latin):
+        """Switch a status line to the UI CJK face when its text is localized."""
+        f = i18n.font_for(text, latin)
+        if f is not None:
+            label.set_style_text_font(f, 0)
+
     def set(self, done_ms, total_ms, main, sub):
         """Advance to a fraction of the measured budget (both in milliseconds).
 
@@ -207,8 +216,10 @@ class Splash:
         """
         if main:
             self.main.set_text(main)
+            self._cjk(self.main, main, self._mid)
         if sub is not None:
             self.sub.set_text(sub)
+            self._cjk(self.sub, sub, self._small)
         if total_ms > 0:
             self._animate_to(done_ms * 100 // total_ms)
         self._flush()
@@ -216,11 +227,13 @@ class Splash:
     def note(self, text):
         """Update only the second status slot (the indeterminate network line)."""
         self.note_label.set_text(text)
+        self._cjk(self.note_label, text, self._small)
         self._flush()
 
     def warn(self, text):
         """Write the second slot in the warning colour (boot proceeded anyway)."""
         self.note_label.set_text(text)
+        self._cjk(self.note_label, text, self._small)
         self.note_label.set_style_text_color(lv.color_hex(COL_WARN), 0)
         self._flush()
 
@@ -228,7 +241,9 @@ class Splash:
         """Fill the bar before the screen is deleted, so it never ends at 97%."""
         self._animate_to(100)
         self.main.set_text(main)
+        self._cjk(self.main, main, self._mid)
         self.sub.set_text(sub)
+        self._cjk(self.sub, sub, self._small)
         self._flush()
 
     def elapsed_ms(self):

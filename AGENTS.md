@@ -172,25 +172,31 @@ hardware a setting needs to touch gets its own small module, as
 
 ## Adding a language string
 
-Desktop strings live in `factory/gui/core/i18n.py`: one `NAMES` row per entry id,
-`(en, zh)`. `APPS` / `FOLDER_MEMBERS` keep their English `name` as the fallback
-the launcher uses when an id has no row.
+All user-visible strings live in `factory/gui/core/i18n.py`: `NAMES` holds one
+`(en, zh)` row per entry id, and `STRINGS` one per app string keyed
+`"<app>.<purpose>"` (`"common.*"` when shared). `APPS` / `FOLDER_MEMBERS` keep
+their English `name` as the fallback the launcher uses when an id has no row.
 
-1. Add or edit the row in `NAMES`. Use the entry `id`, not the English name.
-2. Run `python tools/gen_ui_cjk_charset.py`. It rewrites
-   `tools/ui_cjk_charset.txt` from the zh half and fails loudly when a character
-   is not covered by `ocr_charset.txt` (the preloaded 16 px face the folder
-   member labels use).
-3. Bake the 28 px face: `python tools/gen_font.py ui28cjk`.
-4. Re-bake the tile bitmaps: `python tools/gen_tile_cache.py`. It writes both
-   languages, so a switch needs no slow on-board bake.
-5. Deploy and check both languages on board. A missing glyph renders as a box
+1. Add or edit the row. Use the entry `id` for `NAMES`, and a stable dotted key
+   for `STRINGS`. Templates keep their `{}` placeholders in both halves.
+2. Resolve it at build time with `i18n.t(key)` / `i18n.name(id)`, and pass the
+   result through `i18n.font_for(text, latin_font)` before setting it on a
+   label: the Latin faces carry no CJK glyphs.
+3. Run `python tools/gen_ui_cjk_charset.py`. It rewrites both charset files from
+   the tables: `tools/ui_cjk_charset.txt` (16 px app face) and
+   `tools/ui_cjk_desktop_charset.txt` (28 px tile-name face, `NAMES` only).
+4. Bake both faces: `python tools/gen_font.py ui16cjk ui28cjk`.
+5. Re-bake the tile bitmaps when `NAMES` changed: `python tools/gen_tile_cache.py`.
+   It writes both languages, so a switch needs no slow on-board bake.
+6. Deploy and check both languages on board. A missing glyph renders as a box
    with no error, so read the screenshot rather than trusting exit status.
 
-The language is hot: `i18n.set_lang()` persists `ui.language` and raises a flag;
-the launcher rebuilds the home screen on the next `build_home()`. Tile caches
-are per language (`tile_<id>.bin` for en, `tile_<id>_zh.bin` for zh), and only
-the desktop is localized so far — app-internal strings stay English.
+The language is hot for the desktop: `i18n.set_lang()` persists `ui.language`
+and raises a flag; the launcher rebuilds the home screen on the next
+`build_home()`, and Settings rebuilds its own page immediately. Every other app
+reads strings when it is opened, so an already-running app keeps its language
+until it is reopened. Tile caches are per language (`tile_<id>.bin` for en,
+`tile_<id>_zh.bin` for zh).
 
 ## Consistency check
 
@@ -224,8 +230,8 @@ Check, in this order:
 | A `tools/` command-line flag | The usage line in the script and the skill that documents it |
 | `tools/deploy_board.py` `MANIFEST` | The directory layout on the board |
 | `tools/bake_factory_image.py` `EXCLUDES` | The same skip set as `deploy_board.py`, so a baked image and an incremental deploy carry identical Python |
-| A string in `factory/gui/core/i18n.py` `NAMES` | `python tools/gen_ui_cjk_charset.py` (regenerates the glyph list and checks `ocr_charset.txt` coverage), then `python tools/gen_tile_cache.py`. Every zh character must be inside `tools/ui_cjk_charset.txt`, or it renders as a box |
-| A desktop visual constant, or `core/i18n.py` `NAMES` | `BAKE_VER` + 1 in `shell/theme.py`; `gen_tile_cache.py` bakes both languages (`tile_<id>.bin` / `tile_<id>_zh.bin`) |
+| A string in `factory/gui/core/i18n.py` (either table) | `python tools/gen_ui_cjk_charset.py`, then `python tools/gen_font.py ui16cjk ui28cjk`. Every zh character must be in the matching charset file, or it renders as a box |
+| A `NAMES` row, or a desktop visual constant | `BAKE_VER` + 1 in `shell/theme.py`; `gen_tile_cache.py` bakes both languages (`tile_<id>.bin` / `tile_<id>_zh.bin`) |
 | A constant parsed by a generator | The generator's own default and any `docs/` value |
 | Any rule, path, or command name | The four places rules live: `AGENTS.md`, `.github/copilot-instructions.md`, `.github/skills/**`, `docs/*.md` |
 | A new file anywhere under `factory/gui/` | The layer map in `factory/gui/README.md`, plus that directory's own README |

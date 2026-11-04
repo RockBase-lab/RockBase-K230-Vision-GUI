@@ -24,12 +24,17 @@ def _dirname(path):
     return path.rsplit("/", 1)[0]
 
 
-def _is_dir(path):
+def _exists(path):
     try:
         os.stat(path)
         return True
     except OSError:
         return False
+
+
+# Role groups under assets/. Order matters only if a name exists in two groups,
+# which the generators never produce.
+ASSET_GROUPS = ("icons", "widgets", "glyphs", "status", "fonts", "src", "cache")
 
 
 def gui_root():
@@ -52,7 +57,7 @@ def gui_root():
     # a host interpreter, which is the only way to test it off the board.
     current = _dirname(path.replace("\\", "/"))
     while current:
-        if _is_dir(current + "/assets"):
+        if _exists(current + "/assets"):
             _root = current
             return _root
         parent = _dirname(current)
@@ -65,10 +70,24 @@ def gui_root():
 
 
 def asset_path(*parts):
-    """Absolute path under assets/. Use this instead of joining from a module dir."""
-    path = gui_root() + "/assets"
+    """Absolute path under assets/. Use this instead of joining from a module dir.
+
+    Assets are grouped by role (icons/, widgets/, glyphs/, status/, fonts/, ...), but
+    callers name a file without its group. A bare name is looked up at the assets
+    root first, then in ASSET_GROUPS, so regrouping a file does not silently break
+    every caller (the PNG loader turns a miss into None, with no log line).
+    """
+    base = gui_root() + "/assets"
+    path = base
     for part in parts:
         path += "/" + part
+    if _exists(path):
+        return path
+    name = parts[-1]
+    for group in ASSET_GROUPS:
+        candidate = base + "/" + group + "/" + name
+        if _exists(candidate):
+            return candidate
     return path
 
 

@@ -25,6 +25,7 @@ import aidemo
 from libs.AI2D import Ai2d
 from media.sensor import Sensor, CAM_CHN_ID_1, CAM_CHN_ID_2
 from ui import beep
+from core import i18n
 from core.errors import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                        close_sensor)
 from hardware.camera_fov import set_preview
@@ -152,17 +153,18 @@ class OrientApp:
             lab.set_text(text)
             lab.set_width(lv.SIZE_CONTENT)
             lab.set_style_text_color(lv.color_hex(color), 0)
-            if bar_font is not None:
-                lab.set_style_text_font(bar_font, 0)
+            f = i18n.font_for(text, bar_font)
+            if f is not None:
+                lab.set_style_text_font(f, 0)
             lab.clear_flag(lv.obj.FLAG.CLICKABLE)
             return lab
 
-        self.stat_model = _seg("loading", COL_MODEL)
+        self.stat_model = _seg(i18n.t("ai.loading"), COL_MODEL)
         self.stat_sep1 = _seg("|", COL_SEP)
         self.stat_fps = _seg("FPS -", COL_FPS)
         self.stat_sep2 = _seg("|", COL_SEP)
-        self.stat_objs = _seg("obj -", COL_OBJS_IDLE)
-        self.stat_hint = _seg("TAP to freeze", COL_HINT)
+        self.stat_objs = _seg(i18n.t("ai.objs").format("-"), COL_OBJS_IDLE)
+        self.stat_hint = _seg(i18n.t("ai.tap_freeze"), COL_HINT)
         self.stat_label = self.stat_model
 
         self._init_ai()
@@ -282,14 +284,14 @@ class OrientApp:
         self.stat_model.set_text("OBB Y11n")
         self.stat_model.set_style_text_color(lv.color_hex(COL_MODEL), 0)
         self.stat_fps.set_text("FPS {}".format(self.fps_text))
-        self.stat_objs.set_text("obj {}".format(self.last_objs))
+        self.stat_objs.set_text(i18n.t("ai.objs").format(self.last_objs))
         self.stat_objs.set_style_text_color(
             lv.color_hex(COL_OBJS if self.last_objs > 0 else COL_OBJS_IDLE), 0)
         if self.frozen:
-            self.stat_hint.set_text("FROZEN")
+            self.stat_hint.set_text(i18n.t("ai.frozen"))
             self.stat_hint.set_style_text_color(lv.color_hex(COL_FROZEN), 0)
         else:
-            self.stat_hint.set_text("TAP to freeze")
+            self.stat_hint.set_text(i18n.t("ai.tap_freeze"))
             self.stat_hint.set_style_text_color(lv.color_hex(COL_HINT), 0)
 
     def _show_error(self, text):
@@ -311,7 +313,7 @@ class OrientApp:
             ai_img = self.sensor.snapshot(chn=CAM_CHN_ID_1)
             img = self.sensor.snapshot(chn=CAM_CHN_ID_2)
         except BaseException as error:
-            self._show_error("snapshot error")
+            self._show_error(i18n.t("ai.snapshot_error"))
             self._no_signal.on_fail(self.ctx)
             return
         self._no_signal.on_ok()
@@ -327,7 +329,7 @@ class OrientApp:
             img.as_lvgl_img_src(self.img_widget)
             self.img_widget.invalidate()
         except BaseException as error:
-            self._show_error("display error")
+            self._show_error(i18n.t("ai.display_error"))
             return
 
         n = self._show_boxes(dets)

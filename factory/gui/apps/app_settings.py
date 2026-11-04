@@ -1,15 +1,14 @@
 # Settings app: user preferences plus the board facts the old System tile held.
 #
 # One vertically scrolling column of cards, table-driven from GROUPS below, so a
-# new preference is one entry plus a DEFAULTS key in config.py.
-#
-# Row types: toggle (switch, whole row taps), stepper (- / value / +, clamped),
-# info (read-only; "live": "heap" or "models" refreshes once per second), and
-# action (runs a named handler, e.g. restore defaults).
+# new preference is one entry plus a DEFAULTS key in config.py. Row types:
+# toggle (switch, whole row taps), stepper (- / value / +, clamped), info
+# (read-only; "live": "heap" or "models" refreshes once per second), and action
+# (runs a named handler, e.g. restore defaults).
 #
 # config.set() persists every change to /data/settings/gui.json, so there is no
-# Save button. Live consumers (click tone, backlight) apply immediately; the rest
-# are read by the owning app when it starts.
+# Save button. User-visible text is an i18n.STRINGS key resolved at build time;
+# a language switch rebuilds the page in place on the next step().
 
 import gc
 import os
@@ -67,51 +66,50 @@ FW_RELEASE = _uname(2, "unknown")
 FW_MACHINE = _uname(4, "K230")
 
 GROUPS = (
-    ("SOUND", (
+    ("settings.section.sound", (
         {"type": "toggle", "key": "ui.click_sound",
-         "label": "Button feedback",
-         "hint": "click when a button, key or tile is pressed"},
+         "label": "settings.click_sound",
+         "hint": "settings.click_sound.hint"},
         {"type": "toggle", "key": "camera.shutter_sound",
-         "label": "Camera shutter",
-         "hint": "synthesised shutter sound on every photo"},
+         "label": "settings.shutter_sound",
+         "hint": "settings.shutter_sound.hint"},
     )),
-    ("DISPLAY", (
+    ("settings.section.display", (
         {"type": "stepper", "key": "display.brightness",
-         "label": "Brightness",
-         "hint": "panel backlight, {}-{}%".format(
-             backlight.MIN_PERCENT, backlight.MAX_PERCENT),
+         "label": "settings.brightness",
+         "hint": "settings.brightness.hint",
+         "hint_args": (backlight.MIN_PERCENT, backlight.MAX_PERCENT),
          "min": backlight.MIN_PERCENT, "max": backlight.MAX_PERCENT,
          "step": 10, "unit": "%"},
-        # Language cycles on tap. Only the home screen is localized so far, so the
-        # hint says the change lands when you return to the desktop.
+        # Language cycles on tap; the option names stay native on purpose.
         {"type": "choice", "key": "ui.language",
-         "label": "Language",
-         "hint": "desktop text; applies on returning home",
-         "options": (("en", "English"), ("zh", "涓枃"))},
+         "label": "settings.language",
+         "hint": "settings.language.hint",
+         "options": (("en", "English"), ("zh", "中文"))},
     )),
-    ("NETWORK", (
-        {"type": "info", "label": "Wi-Fi and timezone",
-         "value": "in the Network app"},
+    ("settings.section.network", (
+        {"type": "info", "label": "settings.wifi_tz",
+         "value_key": "settings.wifi_tz.value"},
     )),
-    ("SYSTEM", (
+    ("settings.section.system", (
         # This section is the old System tile: that entry was a placeholder, so the
         # board facts live here instead of behind a second, empty icon.
-        {"type": "info", "label": "GUI version", "value": GUI_VERSION},
-        {"type": "info", "label": "Firmware", "value": FW_RELEASE},
-        {"type": "info", "label": "Machine", "value": FW_MACHINE},
+        {"type": "info", "label": "settings.gui_version", "value": GUI_VERSION},
+        {"type": "info", "label": "settings.firmware", "value": FW_RELEASE},
+        {"type": "info", "label": "settings.machine", "value": FW_MACHINE},
         # Scope matters: gc only reports the MicroPython GC arena, whose initial
         # size is about 4 MB but which grows on demand from the system heap
         # (measured: a 3 MB contiguous block succeeds with 1.19 MB reported free).
         # So show free bytes and say it grows, rather than "free / total", which
         # reads as a nearly exhausted 4 MB budget on a 1 GB board.
-        {"type": "info", "key": "sys.heap", "label": "Python heap",
-         "hint": "GC arena, grows on demand; not DDR", "live": "heap"},
-        {"type": "info", "label": "KPU models", "live": "models"},
-        {"type": "info", "label": "Settings file", "value": config.PATH},
+        {"type": "info", "key": "sys.heap", "label": "settings.heap",
+         "hint": "settings.heap.hint", "live": "heap"},
+        {"type": "info", "label": "settings.models", "live": "models"},
+        {"type": "info", "label": "settings.file", "value": config.PATH},
     )),
-    ("RESET", (
-        {"type": "action", "label": "Restore defaults",
-         "hint": "tap twice to confirm", "action": "reset"},
+    ("settings.section.reset", (
+        {"type": "action", "label": "settings.reset",
+         "hint": "settings.reset.hint", "action": "reset"},
     )),
 )
 
@@ -149,7 +147,7 @@ def _heap_text():
     contiguous block succeeds at 1.19 MB reported free), so free/total would
     imply a ceiling that does not exist.
     """
-    return "{:.2f} MB free".format(gc.mem_free() / 1048576.0)
+    return i18n.t("settings.heap.value").format(gc.mem_free() / 1048576.0)
 
 
 def _models_text():
@@ -161,9 +159,17 @@ def _models_text():
     """
     try:
         from core import model_pool
-        return "{} resident".format(model_pool.loaded_count())
+        return i18n.t("settings.models.value").format(model_pool.loaded_count())
     except BaseException:
-        return "n/a"
+        return i18n.t("settings.models.na")
+
+
+def _live_text(kind):
+    if kind == "heap":
+        return _heap_text()
+    if kind == "models":
+        return _models_text()
+    return ""
 
 
 class SettingsApp:
@@ -184,8 +190,17 @@ class SettingsApp:
         self._actions = {}    # action name -> value label
         self._confirm = {}    # action name -> ticks_ms deadline
         self._last_live_ms = 0
+        self._need_rebuild = False
+        self._flash_done = False
 
-        self.scroll = lv.obj(content)
+        self._build_scroll()
+        self._build_rows()
+        self._refresh_live(force=True)
+        print("[settings] ready: {} toggle(s), {} stepper(s)".format(
+            len(self._toggles), len(self._steppers)))
+
+    def _build_scroll(self):
+        self.scroll = lv.obj(self.content)
         self.scroll.set_size(SCROLL_W, SCROLL_H)
         self.scroll.align(lv.ALIGN.TOP_MID, 0, 8)
         self.scroll.set_style_bg_opa(lv.OPA.TRANSP, 0)
@@ -197,6 +212,7 @@ class SettingsApp:
             pass
         self.scroll.add_flag(lv.obj.FLAG.SCROLLABLE)
 
+    def _build_rows(self):
         y = 2
         for title, items in GROUPS:
             y = self._section(y, title)
@@ -212,9 +228,20 @@ class SettingsApp:
         spacer.clear_flag(lv.obj.FLAG.SCROLLABLE)
         spacer.clear_flag(lv.obj.FLAG.CLICKABLE)
 
+    def _rebuild(self):
+        """Rebuild the whole page in the current language. Deferred to step():
+        deleting the scroll view inside its own child's click event risks
+        freeing the object LVGL is still dispatching on."""
+        self._toggles = []
+        self._steppers = []
+        self._choices = []
+        self._live = []
+        self._actions = {}
+        self._confirm = {}
+        self.scroll.delete()
+        self._build_scroll()
+        self._build_rows()
         self._refresh_live(force=True)
-        print("[settings] ready: {} toggle(s), {} stepper(s)".format(
-            len(self._toggles), len(self._steppers)))
 
     # ---------- layout helpers ----------
 
@@ -222,18 +249,20 @@ class SettingsApp:
         lab = lv.label(parent)
         lab.set_text(text)
         lab.set_style_text_color(lv.color_hex(color), 0)
-        f = font or self.font
+        f = i18n.font_for(text, font or self.font)
         if f:
             lab.set_style_text_font(f, 0)
         lab.set_pos(x, y)
         return lab
 
     def _section(self, y, title):
+        text = i18n.t(title)
         lab = lv.label(self.scroll)
-        lab.set_text(title)
+        lab.set_text(text)
         lab.set_style_text_color(lv.color_hex(COL_ACCENT), 0)
-        if self.small:
-            lab.set_style_text_font(self.small, 0)
+        f = i18n.font_for(text, self.small)
+        if f:
+            lab.set_style_text_font(f, 0)
         lab.set_pos(ROW_X + 2, y + 8)
         return y + SECTION_H
 
@@ -257,12 +286,16 @@ class SettingsApp:
             pass
 
     def _rows_label(self, row, item):
-        self._label(row, item["label"], 16, 8)
+        self._label(row, i18n.t(item["label"]), 16, 8)
         hint = item.get("hint")
         if hint and self.small:
+            text = i18n.t(hint)
+            args = item.get("hint_args")
+            if args:
+                text = text.format(*args)
             # Sits under the label; on the taller stepper row it can breathe a
             # little more (31 -> 33) without touching the value text.
-            self._label(row, hint, 16, 33, COL_MUTED, self.small)
+            self._label(row, text, 16, 33, COL_MUTED, self.small)
 
     # ---------- row builders ----------
 
@@ -361,9 +394,8 @@ class SettingsApp:
         return btn
 
     def _choice_row(self, item, y):
-        """Whole-row tap cycles through the option list; the current label sits on
-        the right. A CJK option takes the preloaded 16px OCR face, which covers
-        the two language names."""
+        """Whole-row tap cycles through the option list; the current label sits
+        on the right. font_for covers a CJK option name (the language row)."""
         row = self._card(y)
         row.add_flag(lv.obj.FLAG.CLICKABLE)
         self._press_feedback(row)
@@ -372,13 +404,7 @@ class SettingsApp:
         text = self._choice_text(item)
         vlabel.set_text(text)
         vlabel.set_style_text_color(lv.color_hex(COL_TEXT), 0)
-        f = self.small
-        if i18n.needs_cjk(text):
-            try:
-                from core import font_pool
-                f = font_pool.get("ocr_cjk_16.bin") or self.small
-            except BaseException:
-                pass
+        f = i18n.font_for(text, self.small)
         if f:
             vlabel.set_style_text_font(f, 0)
         vlabel.align(lv.ALIGN.RIGHT_MID, -18, 0)
@@ -403,8 +429,11 @@ class SettingsApp:
             idx = -1
         code = codes[(idx + 1) % len(codes)]
         config.set(item["key"], code)
-        if item["key"] == "ui.language":
-            i18n.set_lang(code)
+        if item["key"] == "ui.language" and i18n.set_lang(code):
+            # Rebuild in place so the switch is visible immediately; the desktop
+            # and other apps pick the language up on their next build.
+            self._need_rebuild = True
+            return
         for _item, label in self._choices:
             if _item is item:
                 label.set_text(self._choice_text(_item))
@@ -414,14 +443,21 @@ class SettingsApp:
         row = self._card(y)
         row.clear_flag(lv.obj.FLAG.CLICKABLE)
         self._rows_label(row, item)
-        value = item.get("value", "")
+        live = item.get("live")
+        value_key = item.get("value_key")
+        if value_key:
+            value = i18n.t(value_key)
+        elif live:
+            value = _live_text(live)
+        else:
+            value = item.get("value", "")
         vlabel = lv.label(row)
         vlabel.set_text(value)
         vlabel.set_style_text_color(lv.color_hex(COL_MUTED), 0)
-        if self.small:
-            vlabel.set_style_text_font(self.small, 0)
+        f = i18n.font_for(value, self.small)
+        if f:
+            vlabel.set_style_text_font(f, 0)
         vlabel.align(lv.ALIGN.RIGHT_MID, -18, 0)
-        live = item.get("live")
         if live:
             self._live.append((live, vlabel, item.get("key")))
         return y + ROW_H + ROW_GAP
@@ -432,10 +468,12 @@ class SettingsApp:
         self._press_feedback(row)
         self._rows_label(row, item)
         value = lv.label(row)
-        value.set_text("tap to run")
+        text = i18n.t("settings.action.run")
+        value.set_text(text)
         value.set_style_text_color(lv.color_hex(COL_MUTED), 0)
-        if self.small:
-            value.set_style_text_font(self.small, 0)
+        f = i18n.font_for(text, self.small)
+        if f:
+            value.set_style_text_font(f, 0)
         value.align(lv.ALIGN.RIGHT_MID, -18, 0)
         name = item.get("action", "")
         self._actions[name] = value
@@ -491,7 +529,7 @@ class SettingsApp:
             self._confirm[name] = time.ticks_add(now, CONFIRM_MS)
             label = self._actions.get(name)
             if label is not None:
-                label.set_text("tap again to confirm")
+                label.set_text(i18n.t("settings.action.confirm"))
                 label.set_style_text_color(lv.color_hex(COL_WARN), 0)
 
     def _run(self, name, item):
@@ -500,30 +538,13 @@ class SettingsApp:
             beep.set_enabled(config.get_bool("ui.click_sound", True))
             backlight.set_percent(
                 config.get_int("display.brightness", backlight.MIN_PERCENT))
-            # Restoring defaults also restores the language: re-read it and rebuild
-            # the desktop tiles to match.
+            # Restoring defaults also restores the language: re-read it, then
+            # rebuild this page and the desktop tiles to match.
             i18n.init()
             i18n.mark_home_dirty()
-            self._refresh_controls()
-            self._refresh_live(force=True)
-            label = self._actions.get(name)
-            if label is not None:
-                label.set_text("defaults restored")
-                label.set_style_text_color(lv.color_hex(COL_ACCENT), 0)
+            self._need_rebuild = True
+            self._flash_done = True
             print("[settings] defaults restored")
-
-    def _refresh_controls(self):
-        for key, sw in self._toggles:
-            if config.get_bool(key):
-                sw.add_state(lv.STATE.CHECKED)
-            else:
-                sw.clear_state(lv.STATE.CHECKED)
-        for item, label in self._steppers:
-            label.set_text("{}{}".format(
-                config.get_int(item["key"], item.get("max", 100)),
-                item.get("unit", "")))
-        for item, label in self._choices:
-            label.set_text(self._choice_text(item))
 
     # ---------- per-frame ----------
 
@@ -534,10 +555,7 @@ class SettingsApp:
         self._last_live_ms = now
         for kind, label, _key in self._live:
             try:
-                if kind == "heap":
-                    label.set_text(_heap_text())
-                elif kind == "models":
-                    label.set_text(_models_text())
+                label.set_text(_live_text(kind))
             except BaseException:
                 pass
         # Clear a stale "tap again to confirm" after the window expires.
@@ -546,10 +564,21 @@ class SettingsApp:
                 self._confirm.pop(name, None)
                 label = self._actions.get(name)
                 if label is not None:
-                    label.set_text("tap to run")
+                    label.set_text(i18n.t("settings.action.run"))
                     label.set_style_text_color(lv.color_hex(COL_MUTED), 0)
 
     def step(self):
+        if self._need_rebuild:
+            self._need_rebuild = False
+            self._rebuild()
+        if self._flash_done:
+            # Set after the rebuild: the rebuild recreates every label, so the
+            # confirmation would otherwise land on a destroyed widget.
+            self._flash_done = False
+            label = self._actions.get("reset")
+            if label is not None:
+                label.set_text(i18n.t("settings.action.done"))
+                label.set_style_text_color(lv.color_hex(COL_ACCENT), 0)
         self._refresh_live()
 
     def destroy(self):

@@ -144,6 +144,22 @@ SPECS = {
              [(0x20, 0x7E)] + [(ord(c), ord(c)) for c in PLATE_CJK]),
         ],
     },
+    # UI string face: every CJK character the desktop and the apps can show
+    # (i18n NAMES + STRINGS, collected into tools/ui_cjk_charset.txt by
+    # gen_ui_cjk_charset.py). 16px is the app body-text size, so this face is
+    # the CJK fallback everywhere montserrat_16 would otherwise box a glyph.
+    # Kept separate from ocr_cjk_16: that face is dictionary-generated and must
+    # not drift with UI wording.
+    "ui16cjk": {
+        "out": "ui_cjk_16.bin",
+        "size": 16,
+        "bpp": 4,
+        "charset": "ui_cjk_charset.txt",
+        "parts": [
+            ("SourceHanSansCN-Regular.ttf", [(0x20, 0x7E)]),
+            ("SourceHanSansCN-Regular.ttf", None),
+        ],
+    },
     # Desktop language labels: the zh tile names bake into the tile bitmaps at
     # TILE_FONT_SIZE (28px), so the on-board fallback bake and the folder flyout
     # title need a 28px CJK face. The charset is only the characters i18n.NAMES
@@ -153,7 +169,7 @@ SPECS = {
         "out": "ui_cjk_28.bin",
         "size": 28,
         "bpp": 4,
-        "charset": "ui_cjk_charset.txt",
+        "charset": "ui_cjk_desktop_charset.txt",
         "parts": [
             ("SourceHanSansCN-Regular.ttf", [(0x20, 0x7E)]),
             # Second section of the same font: gen() passes the charset literally

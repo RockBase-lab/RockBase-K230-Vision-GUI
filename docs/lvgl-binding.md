@@ -69,14 +69,29 @@ table defines size and glyph set. The assets land in
 
 ### localized UI text uses a glyph subset, not a whole CJK font
 
-The home screen carries Chinese labels, and the Latin faces (`Nunito`,
-`montserrat`, `mono_dejavu`) have no CJK glyphs. The zh strings are baked into
-`ui_cjk_28.bin` from Source Han Sans at 28 px, bpp 4, covering only the
-characters `i18n.NAMES` actually uses (47 glyphs plus ASCII, 30 KB).
+All user-visible strings come from `core/i18n.py`, and the Latin faces
+(`Nunito`, `montserrat`, `mono_dejavu`) have no CJK glyphs. Two faces cover the
+Chinese half, both baked from Source Han Sans with bpp 4 and only the characters
+the tables actually use:
 
-Measured on board: `lv.font_load("A:/sdcard/factory/gui/assets/fonts/ui_cjk_28.bin")`
-costs 163 ms and 30 KB of LVGL heap, and a full-screen repaint with four mixed
-ASCII/CJK labels costs under 1 ms (`refr_now` x10).
+| Face | Charset | Glyphs | File | Load |
+| --- | --- | --- | --- | --- |
+| `ui_cjk_16.bin` | `NAMES` + `STRINGS` | 374 | 54 KB | 569 ms |
+| `ui_cjk_28.bin` | `NAMES` only | 47 | 30 KB | 193 ms |
+
+`tools/gen_ui_cjk_charset.py` regenerates both charset files from `i18n.py`, so
+coverage is guaranteed by construction: a character that is not in the table
+cannot be displayed. Keep the 28 px face on `NAMES` alone — folding the app
+strings in grew it from 30 KB to 138 KB for glyphs it never renders.
+
+`i18n.font_for(text, latin)` returns the CJK face when the string has a
+non-ASCII code point, so a label that may be localized must pass its text
+through it. A label created before the language is known keeps whichever font it
+was built with: apps read strings at construction, Settings rebuilds itself on a
+language change.
+
+A full-screen repaint with four mixed ASCII/CJK labels costs under 1 ms
+(`refr_now` x10).
 
 The same size is required on both bake paths: the offline
 `tools/gen_tile_cache.py` rasterises tile names with Source Han Sans at 28 px,

@@ -44,6 +44,7 @@ import aicube
 from libs.AI2D import Ai2d
 from media.sensor import Sensor, CAM_CHN_ID_1, CAM_CHN_ID_2
 from ui import beep
+from core import i18n
 from core.errors import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                         close_sensor)
 from hardware.camera_fov import set_preview
@@ -226,17 +227,18 @@ class GestureApp:
             lab.set_text(text)
             lab.set_width(lv.SIZE_CONTENT)
             lab.set_style_text_color(lv.color_hex(color), 0)
-            if bar_font is not None:
-                lab.set_style_text_font(bar_font, 0)
+            f = i18n.font_for(text, bar_font)
+            if f is not None:
+                lab.set_style_text_font(f, 0)
             lab.clear_flag(lv.obj.FLAG.CLICKABLE)
             return lab
 
-        self.stat_title = _seg("Gesture", COL_TITLE)
+        self.stat_title = _seg(i18n.name("gesture", "Gesture"), COL_TITLE)
         self.stat_sep1 = _seg("|", COL_SEP)
         self.stat_gesture = _seg("--", COL_GESTURE_IDLE)
         self.stat_sep2 = _seg("|", COL_SEP)
         self.stat_fps = _seg("FPS -", COL_FPS)
-        self.stat_hint = _seg("show a hand", COL_HINT)
+        self.stat_hint = _seg(i18n.t("ai.show_hand"), COL_HINT)
 
         self._init_ai()
 
@@ -436,17 +438,20 @@ class GestureApp:
     def _update_stat(self):
         self.stat_fps.set_text("FPS {}".format(self.fps_text))
         if self.last_gesture:
-            self.stat_gesture.set_text(self.last_gesture)
+            # classify() emits English tokens, so the display name is looked up per
+            # token; an unknown token falls back to itself.
+            self.stat_gesture.set_text(
+                i18n.t("gesture." + self.last_gesture, self.last_gesture))
             self.stat_gesture.set_style_text_color(lv.color_hex(COL_GESTURE), 0)
         else:
             self.stat_gesture.set_text("--")
             self.stat_gesture.set_style_text_color(
                 lv.color_hex(COL_GESTURE_IDLE), 0)
         if self.frozen:
-            self.stat_hint.set_text("FROZEN")
+            self.stat_hint.set_text(i18n.t("ai.frozen"))
             self.stat_hint.set_style_text_color(lv.color_hex(COL_FROZEN), 0)
         else:
-            self.stat_hint.set_text("show a hand")
+            self.stat_hint.set_text(i18n.t("ai.show_hand"))
             self.stat_hint.set_style_text_color(lv.color_hex(COL_HINT), 0)
 
     def _show_error(self, text):
@@ -473,7 +478,7 @@ class GestureApp:
             img = self.sensor.snapshot(chn=CAM_CHN_ID_2)
         except BaseException as error:
             print("[Gesture] snapshot error:", error)
-            self._show_error("snapshot error")
+            self._show_error(i18n.t("ai.snapshot_error"))
             self._no_signal.on_fail(self.ctx)
             return
         self._no_signal.on_ok()
@@ -497,7 +502,7 @@ class GestureApp:
             img.as_lvgl_img_src(self.img_widget)
             self.img_widget.invalidate()
         except BaseException:
-            self._show_error("display error")
+            self._show_error(i18n.t("ai.display_error"))
             return
 
         if pts is not None:

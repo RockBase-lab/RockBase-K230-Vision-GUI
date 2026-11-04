@@ -22,6 +22,7 @@ from core import i18n
 from core import font_pool
 from shell import tile_cache
 from shell.registry import APPS
+from shell.home import Launcher
 
 
 def shot(tag):
@@ -62,14 +63,14 @@ def shot(tag):
 
 
 config.load()
-launcher = __import__("launcher")
-launcher._ensure_cache_dir()
+tile_cache.ensure_cache_dir()
 
-# Preload the CJK face so the flyout title/member labels and any fallback bake use it.
+# Preload both UI faces: the 28px one for tile names and flyout titles, the 16px
+# one for the member labels.
 f = font_pool.get("ui_cjk_28.bin")
 print("[I18N] ui_cjk_28 loaded:", f is not None)
-f16 = font_pool.get("ocr_cjk_16.bin")
-print("[I18N] ocr_cjk_16 loaded:", f16 is not None)
+f16 = font_pool.get("ui_cjk_16.bin")
+print("[I18N] ui_cjk_16 loaded:", f16 is not None)
 
 parent = lv.obj()
 
@@ -80,20 +81,20 @@ def render(lang):
     print("[I18N] rendering lang={} -> {}".format(lang, i18n.lang()))
     tile_cache.BAKED_TILES.clear()
     tile_cache.bake_all_tiles(parent)
-    L = launcher.Launcher()
+    L = Launcher()
     L.build_home()
     shot("desk_" + lang)
     vision = [m for m in APPS if m["id"] == "vision"][0]
     L._open_folder(vision)
     shot("folder_" + lang)
     L._close_folder()
-    # Tear the home down so the next language rebuilds cleanly.
+    # Tear the home down so the next language rebuilds cleanly. The empty screen
+    # stays loaded: deleting the active screen leaves a dangling pointer and the
+    # next build stalls with no output.
     if L.home_scr is not None:
-        scratch = lv.obj()
-        lv.scr_load(scratch)
+        lv.scr_load(lv.obj())
         L.home_scr.delete()
         L.home_scr = None
-        scratch.delete()
 
 
 render("en")

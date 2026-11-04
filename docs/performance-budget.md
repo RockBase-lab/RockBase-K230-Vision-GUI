@@ -23,18 +23,19 @@ instead of a load. Measured cold, one process, cache-purged:
 | Boot step | Cost |
 |---|---|
 | tile cache read (15 tiles) | 710-1036 ms |
-| bitmap fonts, 6 files | 8132-8498 ms |
+| bitmap fonts, 7 files | 8730-9066 ms |
 | OCR dictionary (6549 entries) | 132-346 ms |
 | ten kmodels | 3977-4308 ms |
 | progress-bar animation | 640 ms total |
-| **assets subtotal** | **13.6-13.7 s** |
+| **assets subtotal** | **14.4-14.5 s** |
 | Wi-Fi (connected) | 5.6 s, overlapped with nothing |
-| **total, Wi-Fi connected** | **13.6-13.7 s** |
+| **total, Wi-Fi connected** | **14.4-14.5 s** |
 | **total, Wi-Fi unreachable** | **about 30 s** (the failing `connect()` blocks ~15 s in the C layer) |
 
-The fonts are 8.1-8.5 s of that, and 7.5 s of the fonts is the 6549-glyph OCR font
-alone. The desktop CJK face is the cheap end of the set: 47 glyphs plus ASCII
-measured 163 ms and 30 KB. That font covers the whole recognition vocabulary on
+The fonts are 8.7-9.1 s of that, and 7.5 s of the fonts is the 6549-glyph OCR font
+alone. The two UI CJK faces are the cheap end of the set: the 16 px app face
+(374 glyphs) measured 569 ms and the 28 px tile-name face (47 glyphs) 193 ms.
+The OCR font covers the whole recognition vocabulary on
 purpose: a narrower
 subset saved 2.6 s of boot but boxed characters the model had read correctly
 (measured: the GB2312 level-1 intersection is 3743 of 6255 hanzi, and the 2512

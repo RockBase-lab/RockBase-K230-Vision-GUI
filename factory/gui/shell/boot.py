@@ -15,6 +15,7 @@
 import time
 
 from core import font_pool
+from core import i18n
 from core import model_pool
 from core import ocr_dict
 from net import service as net_mgr
@@ -70,7 +71,8 @@ BOOT_FONTS = [
     ("mono_dejavu_16.bin", 106),
     ("ui_nunito_bold_22.bin", 110),
     ("kb_nunito_bold_28.bin", 119),
-    ("ui_cjk_28.bin", 60),
+    ("ui_cjk_16.bin", 569),
+    ("ui_cjk_28.bin", 193),
     ("plate_cjk_30.bin", 164),
     ("ocr_cjk_16.bin", 7469),
 ]
@@ -90,14 +92,14 @@ def boot_load(splash):
         for _name, ms in BOOT_MODELS:
             span += ms
     done = 0
-    splash.set(0, span, "Preparing desktop", "tile cache")
+    splash.set(0, span, i18n.t("boot.preparing"), i18n.t("boot.tiles"))
 
     # ---- 1. tiles ----
     t0 = time.ticks_ms()
     tile_cache.bake_all_tiles(splash.scr)
     print("[BOOT] tiles {}ms".format(time.ticks_diff(time.ticks_ms(), t0)))
     done += BOOT_TILES_MS
-    splash.set(done, span, "Preparing desktop", "tiles ready")
+    splash.set(done, span, i18n.t("boot.preparing"), i18n.t("boot.tiles_done"))
 
     # ---- 2. fonts ----
     t_step = time.ticks_ms()
@@ -105,21 +107,21 @@ def boot_load(splash):
     if BOOT_PRELOAD_FONTS:
         for i in range(len(BOOT_FONTS)):
             name, ms = BOOT_FONTS[i]
-            splash.set(done, span, "Loading fonts {}/{}".format(
+            splash.set(done, span, i18n.t("boot.fonts").format(
                 i + 1, len(BOOT_FONTS)), name)
             if font_pool.get(name) is not None:
                 fonts_ok += 1
             done += ms
-            splash.set(done, span, "Loading fonts {}/{}".format(
+            splash.set(done, span, i18n.t("boot.fonts").format(
                 i + 1, len(BOOT_FONTS)), name)
     else:
-        splash.note("fonts: on demand")
+        splash.note(i18n.t("boot.fonts_ondemand"))
     print("[BOOT] fonts {}ms loaded={}/{}".format(
         time.ticks_diff(time.ticks_ms(), t_step), fonts_ok, len(BOOT_FONTS)))
 
     # ---- 3. OCR dictionary ----
     t_step = time.ticks_ms()
-    splash.set(done, span, "Loading text dictionary", "dict.txt")
+    splash.set(done, span, i18n.t("boot.dict"), "dict.txt")
     dict_ok = ocr_dict.words() is not None
     done += BOOT_DICT_MS
     print("[BOOT] dict {}ms ok={} entries={}".format(
@@ -130,7 +132,7 @@ def boot_load(splash):
     if BOOT_PRELOAD_MODELS:
         for i in range(len(BOOT_MODELS)):
             name, ms = BOOT_MODELS[i]
-            splash.set(done, span, "Loading models {}/{}".format(
+            splash.set(done, span, i18n.t("boot.models").format(
                 i + 1, len(BOOT_MODELS)), name)
             try:
                 model_pool.get(KMODEL_DIR + "/" + name)
@@ -139,7 +141,7 @@ def boot_load(splash):
                 # the existing "unavailable" panel instead.
                 print("[BOOT] model skipped {}: {}".format(name, error))
             done += ms
-            splash.set(done, span, "Loading models {}/{}".format(
+            splash.set(done, span, i18n.t("boot.models").format(
                 i + 1, len(BOOT_MODELS)), name)
     print("[BOOT] assets done {}ms resident_models={}".format(
         time.ticks_diff(time.ticks_ms(), t_all), model_pool.loaded_count()))
@@ -152,20 +154,20 @@ def boot_load(splash):
     except BaseException as error:
         print("[BOOT] wifi start failed: {}".format(error))
     if wifi_waiting:
-        splash.set(done, span, "Connecting to Wi-Fi",
-                   "one attempt, up to {} s".format(BOOT_WIFI_TIMEOUT_MS // 1000))
+        splash.set(done, span, i18n.t("boot.wifi"),
+                   i18n.t("boot.wifi_hint").format(BOOT_WIFI_TIMEOUT_MS // 1000))
         outcome = net_mgr.boot_wait(BOOT_WIFI_TIMEOUT_MS)
         if outcome == "connected":
-            splash.note("Wi-Fi: connected " + net_mgr.ip())
+            splash.note(i18n.t("boot.wifi_connected").format(net_mgr.ip()))
         elif outcome == "idle":
-            splash.note("Wi-Fi: not configured")
+            splash.note(i18n.t("boot.wifi_notconfig"))
         else:
             # Warning colour: the boot continues, the desktop just has no network
             # until the user connects from the Wi-Fi app.
-            splash.warn("Wi-Fi: not connected")
+            splash.warn(i18n.t("boot.wifi_failed"))
     else:
-        splash.note("Wi-Fi: " + ("connected" if net_mgr.state == net_mgr.CONNECTED
-                                 else "not configured"))
+        splash.note(i18n.t("boot.wifi_ok") if net_mgr.state == net_mgr.CONNECTED
+                    else i18n.t("boot.wifi_notconfig"))
     # Measured: the failing path is ~9 s inside wlan.connect() plus radio bring-up,
     # and none of it can be interrupted from Python. Logged separately so a slow boot
     # can be attributed to the network instead of the assets.
@@ -173,5 +175,5 @@ def boot_load(splash):
         time.ticks_diff(time.ticks_ms(), t_wifi)))
 
     done += BOOT_HOME_MS
-    splash.set(done, span, "Preparing desktop", "building home")
+    splash.set(done, span, i18n.t("boot.preparing"), i18n.t("boot.building"))
     print("[BOOT] total {}ms".format(time.ticks_diff(time.ticks_ms(), t_all)))

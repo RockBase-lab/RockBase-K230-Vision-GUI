@@ -39,6 +39,7 @@ from libs.AI2D import Ai2d
 from media.sensor import Sensor, CAM_CHN_ID_1, CAM_CHN_ID_2
 from ui import beep
 from core.model_pool import get as model_get
+from core import i18n
 from core.errors import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                         close_sensor)
 
@@ -211,6 +212,8 @@ class FaceLivenessApp:
         self.box_label.set_style_pad_ver(1, 0)
         self.box_label.set_style_radius(3, 0)
         label_font = _font("font_montserrat_14", "font_montserrat_12")
+        # zh verdict text (真人/假体/测量中) needs the UI CJK face.
+        label_font = i18n.font_for(i18n.t("ai.measuring"), label_font)
         if label_font is not None:
             self.box_label.set_style_text_font(label_font, 0)
 
@@ -250,46 +253,47 @@ class FaceLivenessApp:
             lab.set_text(text)
             lab.set_width(lv.SIZE_CONTENT)
             lab.set_style_text_color(lv.color_hex(color), 0)
-            if bar_font is not None:
-                lab.set_style_text_font(bar_font, 0)
+            f = i18n.font_for(text, bar_font)
+            if f is not None:
+                lab.set_style_text_font(f, 0)
             lab.clear_flag(lv.obj.FLAG.CLICKABLE)
             return lab
 
-        self.seg_title = seg("Liveness", COL_TITLE)
+        self.seg_title = seg(i18n.name("liveness", "Liveness"), COL_TITLE)
         self.seg_sep1 = seg("|", COL_SEP)
-        self.seg_verdict = seg("no face", COL_IDLE)
+        self.seg_verdict = seg(i18n.t("ai.no_face"), COL_IDLE)
         self.seg_sep2 = seg("|", COL_SEP)
         self.seg_fps = seg("FPS -", COL_FPS)
-        self.seg_hint = seg("OK: freeze", COL_HINT)
+        self.seg_hint = seg(i18n.t("ai.ok_freeze"), COL_HINT)
 
     def _update_stat(self):
         self.seg_title.set_text(
-            "Liveness {:.2f}".format(THRESHOLDS[self.th_idx][1]))
+            i18n.t("liveness.title").format(THRESHOLDS[self.th_idx][1]))
         self.seg_title.set_style_text_color(lv.color_hex(COL_TITLE), 0)
 
         if not self.has_face:
-            self.seg_verdict.set_text("no face")
+            self.seg_verdict.set_text(i18n.t("ai.no_face"))
             self.seg_verdict.set_style_text_color(lv.color_hex(COL_IDLE), 0)
         elif self.score is None:
             # A face is there but no score yet: say so rather than guessing.
-            self.seg_verdict.set_text("measuring")
+            self.seg_verdict.set_text(i18n.t("ai.measuring"))
             self.seg_verdict.set_style_text_color(lv.color_hex(COL_IDLE), 0)
         elif self.is_real:
-            self.seg_verdict.set_text("REAL {:.2f}".format(self.score))
+            self.seg_verdict.set_text(i18n.t("liveness.real").format(self.score))
             self.seg_verdict.set_style_text_color(lv.color_hex(COL_REAL), 0)
         else:
-            self.seg_verdict.set_text("SPOOF {:.2f}".format(self.score))
+            self.seg_verdict.set_text(i18n.t("liveness.spoof").format(self.score))
             self.seg_verdict.set_style_text_color(lv.color_hex(COL_SPOOF), 0)
 
         self.seg_fps.set_text("FPS {}".format(self.fps_text))
         if self.picker is not None:
-            self.seg_hint.set_text("FROZEN")
+            self.seg_hint.set_text(i18n.t("ai.frozen"))
             self.seg_hint.set_style_text_color(lv.color_hex(COL_FROZEN), 0)
         elif self.frozen:
-            self.seg_hint.set_text("FROZEN")
+            self.seg_hint.set_text(i18n.t("ai.frozen"))
             self.seg_hint.set_style_text_color(lv.color_hex(COL_FROZEN), 0)
         else:
-            self.seg_hint.set_text("TAP: threshold")
+            self.seg_hint.set_text(i18n.t("ai.tap_threshold"))
             self.seg_hint.set_style_text_color(lv.color_hex(COL_HINT), 0)
 
     def _show_error(self, text):
@@ -494,13 +498,21 @@ class FaceLivenessApp:
         panel.add_flag(lv.obj.FLAG.CLICKABLE)
 
         title = lv.label(panel)
-        title.set_text("Liveness threshold")
+        title_text = i18n.t("ai.liveness_threshold")
+        title.set_text(title_text)
         title.set_style_text_color(lv.color_hex(0xE6EAF0), 0)
+        tf = i18n.font_for(title_text, None)
+        if tf is not None:
+            title.set_style_text_font(tf, 0)
         title.align(lv.ALIGN.TOP_MID, 0, 2)
 
         hint = lv.label(panel)
-        hint.set_text("tap a row to apply, tap outside to close")
+        hint_text = i18n.t("ai.row_apply")
+        hint.set_text(hint_text)
         hint.set_style_text_color(lv.color_hex(0x8A97A3), 0)
+        hf = i18n.font_for(hint_text, None)
+        if hf is not None:
+            hint.set_style_text_font(hf, 0)
         hint.align(lv.ALIGN.TOP_MID, 0, 24)
 
         font = _font("font_montserrat_16", "font_montserrat_14")
@@ -519,11 +531,13 @@ class FaceLivenessApp:
             row.add_flag(lv.obj.FLAG.CLICKABLE)
             lab = lv.label(row)
             mark = "> " if idx == self.th_idx else "  "
-            lab.set_text("{}{}".format(mark, name))
+            row_text = "{}{}".format(mark, i18n.t_en(name))
+            lab.set_text(row_text)
             lab.set_style_text_color(
                 lv.color_hex(0x00C853 if idx == self.th_idx else 0xE6EAF0), 0)
-            if font is not None:
-                lab.set_style_text_font(font, 0)
+            rf = i18n.font_for(row_text, font)
+            if rf is not None:
+                lab.set_style_text_font(rf, 0)
             lab.center()
             lab.clear_flag(lv.obj.FLAG.CLICKABLE)
             beep.on_click(row, lambda e, i=idx: self._pick(i))
@@ -563,13 +577,13 @@ class FaceLivenessApp:
         x, y, w, h = box
         if self.is_real is None:
             color_hex = COL_IDLE
-            text = "measuring"
+            text = i18n.t("ai.measuring")
         elif self.is_real:
             color_hex = COL_REAL
-            text = "REAL  {:.2f}".format(self.score)
+            text = i18n.t("liveness.real").format(self.score)
         else:
             color_hex = COL_SPOOF
-            text = "SPOOF  {:.2f}".format(self.score)
+            text = i18n.t("liveness.spoof").format(self.score)
         color = lv.color_hex(color_hex)
         self.box.clear_flag(lv.obj.FLAG.HIDDEN)
         self.box.set_pos(x, y)
@@ -595,7 +609,7 @@ class FaceLivenessApp:
             ai_img = self.sensor.snapshot(chn=CAM_CHN_ID_1)
             img = self.sensor.snapshot(chn=CAM_CHN_ID_2)
         except BaseException as error:
-            self._show_error("snapshot error")
+            self._show_error(i18n.t("ai.snapshot_error"))
             self._no_signal.on_fail(self.ctx)
             return
         self._no_signal.on_ok()
@@ -626,7 +640,7 @@ class FaceLivenessApp:
             img.as_lvgl_img_src(self.img_widget)
             self.img_widget.invalidate()
         except BaseException as error:
-            self._show_error("display error")
+            self._show_error(i18n.t("ai.display_error"))
             return
 
         self._draw_box(box)

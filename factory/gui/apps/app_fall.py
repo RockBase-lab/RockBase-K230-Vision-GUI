@@ -10,6 +10,7 @@ CFG = {
     "path": "/sdcard/examples/kmodel/yolov5n-falldown.kmodel",
     "input": [640, 640],
     "labels": ["Fall", "NoFall"],
+    "labels_zh": ["摔倒", "站立"],
     "anchors": [10, 13, 16, 30, 33, 23, 30, 61, 62, 45, 59, 119,
                 116, 90, 156, 198, 373, 326],
     "strides": [8, 16, 32],

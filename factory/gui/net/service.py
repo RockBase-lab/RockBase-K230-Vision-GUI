@@ -66,6 +66,8 @@ import hashlib
 import json
 import time
 
+from core import i18n
+
 
 CFG_PATH = "/sdcard/factory/net.json"
 CFG_VER = 2                    # on-disk format version (v1 = plain-text password)
@@ -418,7 +420,7 @@ def _connect_worker(ssid, password, scan_first=True, require_ap=False,
         if ssid not in names:
             print("[net] boot: AP '{}' not in scan ({} seen) after {}ms".format(
                 ssid, len(names), t_scan))
-            last_error = "saved network not in range"
+            last_error = i18n.t("net.err.not_in_range")
             _connect_result = False
             _worker_busy = False
             return
@@ -453,7 +455,7 @@ def _connect_worker(ssid, password, scan_first=True, require_ap=False,
     if ok:
         last_error = ""
     elif not err:
-        err = "assoc failed (AP seen? check password/router)"
+        err = i18n.t("net.err.assoc")
     if not ok:
         last_error = err
     if boot:
@@ -773,7 +775,7 @@ def _ntp_worker(start_idx):
                     result = (idx, epoch)
                     break
         except Exception as e:
-            last_error = "ntp {}: {}".format(host, e)
+            last_error = i18n.t("net.err.ntp").format(host, e)
         finally:
             if s is not None:
                 try:
@@ -978,7 +980,7 @@ def _scan_worker():
                         time.ticks_diff(time.ticks_ms(), t_link), ip()))
                 else:
                     state = IDLE
-                    last_error = "scan: link restore failed"
+                    last_error = i18n.t("net.err.restore")
                     print("[net] scan: link restore FAILED, radio left "
                           "disconnected")
 
@@ -997,7 +999,7 @@ def _scan_worker():
             print("[net] scan: empty result")
     except Exception as e:
         _scan_result = None
-        last_error = "scan: {}".format(e)
+        last_error = i18n.t("net.err.scan").format(e)
         print("[net] scan failed:", e)
     finally:
         _scan_force = False

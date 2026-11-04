@@ -41,6 +41,7 @@ import lvgl as lv
 
 from ui import paging
 from ui import beep
+from core import i18n
 
 # Photo directory: must match SAVE_DIR in app_camera.py.
 # Keep it on /data (6.4 GB data partition), not /sdcard (500 MB, GUI assets only).
@@ -181,8 +182,12 @@ class GalleryApp:
 
         # ---- Empty gallery hint ----
         self.empty = lv.label(content)
-        self.empty.set_text("No photos\n\n" + PHOTO_DIR)
+        empty_text = i18n.t("gallery.empty") + PHOTO_DIR
+        self.empty.set_text(empty_text)
         self.empty.set_style_text_color(lv.color_hex(0x9CA3AF), 0)
+        f = i18n.font_for(empty_text, None)
+        if f is not None:
+            self.empty.set_style_text_font(f, 0)
         self.empty.set_style_text_align(lv.TEXT_ALIGN.CENTER, 0)
         self.empty.align(lv.ALIGN.CENTER, 0, 0)
         self.empty.add_flag(lv.obj.FLAG.HIDDEN)
@@ -466,11 +471,15 @@ class GalleryApp:
         start = self.grid_page * PER_PAGE
         last = min(start + PER_PAGE, len(self.photos))
         if self.pages > 1:
-            self.title.set_text("{}-{} / {}   ({}/{})".format(
+            text = "{}-{} / {}   ({}/{})".format(
                 start + 1, last, len(self.photos),
-                self.grid_page + 1, self.pages))
+                self.grid_page + 1, self.pages)
         else:
-            self.title.set_text("{} photos".format(len(self.photos)))
+            text = i18n.t("gallery.count").format(len(self.photos))
+        self.title.set_text(text)
+        f = i18n.font_for(text, None)
+        if f is not None:
+            self.title.set_style_text_font(f, 0)
 
     def _update_filename(self):
         """Show the current photo's file name at the bottom in full-screen mode (with its

@@ -27,6 +27,7 @@ import time
 import lvgl as lv
 
 from net import service as net_mgr
+from core import i18n
 from core import paths
 from ui import beep
 from ui import kb_layer
@@ -82,6 +83,13 @@ STATE_COLOR = {
     net_mgr.CONNECTING: COL_WARN,
     net_mgr.CONNECTED: COL_ACCENT,
     net_mgr.GAVE_UP: COL_ERR,
+}
+# Display text goes through i18n; STATE_TEXT stays the English/log form.
+STATE_I18N = {
+    net_mgr.IDLE: "net.state.idle",
+    net_mgr.CONNECTING: "net.state.connecting",
+    net_mgr.CONNECTED: "net.state.connected",
+    net_mgr.GAVE_UP: "net.state.stopped",
 }
 
 # ---------------- timezone roller bitmaps (baked offline) ----------------
@@ -440,10 +448,12 @@ class NetworkApp:
         self._style_card(self.list_panel, scrollable=True)
 
         title = lv.label(self.list_panel)
-        title.set_text("WiFi networks")
+        title_text = i18n.t("net.title")
+        title.set_text(title_text)
         title.set_style_text_color(lv.color_hex(COL_TEXT), 0)
-        if self.font:
-            title.set_style_text_font(self.font, 0)
+        f = i18n.font_for(title_text, self.font)
+        if f:
+            title.set_style_text_font(f, 0)
         title.set_pos(14, 14)
 
         self.scan_btn = lv.btn(self.list_panel)
@@ -451,10 +461,12 @@ class NetworkApp:
         self.scan_btn.align(lv.ALIGN.TOP_RIGHT, -12, 10)
         self._style_btn(self.scan_btn)
         sl = lv.label(self.scan_btn)
-        sl.set_text("scan")
+        scan_text = i18n.t("net.scan")
+        sl.set_text(scan_text)
         sl.set_style_text_color(lv.color_hex(COL_TEXT), 0)
-        if self.font:
-            sl.set_style_text_font(self.font, 0)
+        f = i18n.font_for(scan_text, self.font)
+        if f:
+            sl.set_style_text_font(f, 0)
         sl.center()
         sl.clear_flag(lv.obj.FLAG.CLICKABLE)
         beep.on_click(self.scan_btn, lambda e: self._start_scan(force=True))
@@ -479,17 +491,19 @@ class NetworkApp:
 
         # Status details: a two-column table (keys at a fixed x=16, values at a
         # fixed x=112, fixed width, left aligned).
-        self.st_ip = self._table_row(card, "ip", 64)
-        self.st_net = self._table_row(card, "network", 90)
-        self.st_ntp = self._table_row(card, "ntp", 116)
+        self.st_ip = self._table_row(card, i18n.t("net.key.ip"), 64)
+        self.st_net = self._table_row(card, i18n.t("net.key.network"), 90)
+        self.st_ntp = self._table_row(card, i18n.t("net.key.ntp"), 116)
 
         # Roller heading: centred and in the accent colour, distinct from the muted
         # table keys above.
         tzlab = lv.label(card)
-        tzlab.set_text("timezone")
+        tz_text = i18n.t("net.tz")
+        tzlab.set_text(tz_text)
         tzlab.set_style_text_color(lv.color_hex(COL_ACCENT), 0)
-        if self.font:
-            tzlab.set_style_text_font(self.font, 0)
+        f = i18n.font_for(tz_text, self.font)
+        if f:
+            tzlab.set_style_text_font(f, 0)
         tzlab.align(lv.ALIGN.TOP_MID, 0, 146)
 
         # Separator between heading and roller, same style as the status one,
@@ -595,7 +609,7 @@ class NetworkApp:
         lab = lv.label(parent)
         lab.set_text(text)
         lab.set_style_text_color(lv.color_hex(COL_TEXT), 0)
-        f = font or self.font
+        f = i18n.font_for(text, font or self.font)
         if f:
             lab.set_style_text_font(f, 0)
         lab.set_pos(x, y)
@@ -607,8 +621,9 @@ class NetworkApp:
         kl = lv.label(card)
         kl.set_text(key)
         kl.set_style_text_color(lv.color_hex(COL_MUTED), 0)
-        if self.font:
-            kl.set_style_text_font(self.font, 0)
+        kf = i18n.font_for(key, self.font)
+        if kf:
+            kl.set_style_text_font(kf, 0)
         kl.set_pos(16, y)
         vl = lv.label(card)
         vl.set_pos(112, y)
@@ -635,7 +650,7 @@ class NetworkApp:
         self._scan_running = False
         self._scan_wait_logged = False
         self._scan_at = time.ticks_ms()
-        self._set_list_msg("scanning...")
+        self._set_list_msg(i18n.t("net.scanning"))
         print("[net-app] scan requested (force={} state={} worker_busy={} scanning={})".format(
             force, net_mgr.state, net_mgr._worker_busy, net_mgr.scanning()))
 
@@ -644,8 +659,9 @@ class NetworkApp:
         lab = lv.label(self.list_panel)
         lab.set_text(msg)
         lab.set_style_text_color(lv.color_hex(COL_MUTED), 0)
-        if self.font:
-            lab.set_style_text_font(self.font, 0)
+        f = i18n.font_for(msg, self.font)
+        if f:
+            lab.set_style_text_font(f, 0)
         lab.align(lv.ALIGN.TOP_MID, 0, 80)
 
     def _clear_rows(self):
@@ -672,8 +688,9 @@ class NetworkApp:
             lab.set_text(ssid)
             lab.set_style_text_color(
                 lv.color_hex(COL_ACCENT if is_saved else COL_TEXT), 0)
-            if self.font:
-                lab.set_style_text_font(self.font, 0)
+            sf = i18n.font_for(ssid, self.font)
+            if sf:
+                lab.set_style_text_font(sf, 0)
             lab.align(lv.ALIGN.LEFT_MID, 12, 0)
             lab.clear_flag(lv.obj.FLAG.CLICKABLE)
             # Signal strength sits at the right and its colour encodes the level:
@@ -707,9 +724,10 @@ class NetworkApp:
         if self._pwd is not None:
             return
         self._pwd_ssid = ssid
-        self._pwd = kb_layer.KbLayer(title="join: {}".format(ssid),
+        self._pwd = kb_layer.KbLayer(title=i18n.t("net.join").format(ssid),
                                      on_ok=self._connect_typed,
-                                     ok_text="connect", password=True,
+                                     ok_text=i18n.t("net.connect"),
+                                     password=True,
                                      max_len=63, text_font=self.font,
                                      accent=COL_ACCENT)
 
@@ -740,14 +758,25 @@ class NetworkApp:
                 and ntp == self._last_ntp:
             return
         self._last_state, self._last_ip, self._last_ntp = st, ip, ntp
-        self.st_state.set_text(STATE_TEXT.get(st, st))
+        st_text = i18n.t(STATE_I18N.get(st, ""), STATE_TEXT.get(st, str(st)))
+        self.st_state.set_text(st_text)
+        sf = i18n.font_for(st_text, self.big_font)
+        if sf:
+            self.st_state.set_style_text_font(sf, 0)
         self.st_state.set_style_text_color(
             lv.color_hex(STATE_COLOR.get(st, COL_TEXT)), 0)
         self.st_ip.set_text(ip or "-")
         saved = net_mgr.saved_ssid()
         self.st_net.set_text(saved or "-")
+        nf = i18n.font_for(saved or "", self.font)
+        if nf:
+            self.st_net.set_style_text_font(nf, 0)
         self.st_ntp.set_text(ntp)
-        self.st_err.set_text(net_mgr.last_error if st == net_mgr.GAVE_UP else "")
+        err = net_mgr.last_error if st == net_mgr.GAVE_UP else ""
+        self.st_err.set_text(err)
+        ef = i18n.font_for(err, self.font)
+        if ef:
+            self.st_err.set_style_text_font(ef, 0)
 
     def step(self):
         # net_mgr.poll() is driven by the GUI main loop (inside and outside apps),
@@ -804,15 +833,15 @@ class NetworkApp:
                     self._rebuild_list([(ssid, None, "WPA")])
                 else:
                     print("[net-app] scan empty, no saved ssid")
-                    self._set_list_msg("no networks found")
+                    self._set_list_msg(i18n.t("net.none_found"))
             else:
                 print("[net-app] scan empty, not connected")
-                self._set_list_msg("no networks found")
+                self._set_list_msg(i18n.t("net.none_found"))
         elif self._scan_running and \
                 time.ticks_diff(time.ticks_ms(), self._scan_at) > 25000:
             self._scan_running = False
             print("[net-app] scan timeout after 25s")
-            self._set_list_msg("scan timeout")
+            self._set_list_msg(i18n.t("net.scan_timeout"))
 
     def destroy(self):
         # UI only. net_mgr is a resident service: WiFi stays connected and NTP keeps

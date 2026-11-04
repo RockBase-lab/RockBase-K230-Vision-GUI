@@ -49,6 +49,7 @@ import aidemo
 from libs.AI2D import Ai2d
 from media.sensor import Sensor, CAM_CHN_ID_1, CAM_CHN_ID_2
 from ui import beep
+from core import i18n
 from core.errors import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                         close_sensor)
 from hardware.camera_fov import set_preview
@@ -115,6 +116,15 @@ VIEWS = [
     ("Bones", "no joint dots"),
     ("Off", "preview only"),
 ]
+
+
+def _view_name(idx):
+    """Picker/hint name for a view in the UI language; VIEWS itself stays English."""
+    return i18n.t("pose.view.{}.name".format(idx), VIEWS[idx][0])
+
+
+def _view_note(idx):
+    return i18n.t("pose.view.{}.note".format(idx), VIEWS[idx][1])
 VIEW_SKELETON = 0
 VIEW_BONES = 1
 VIEW_OFF = 2
@@ -241,18 +251,19 @@ class PoseApp:
             lab.set_text(text)
             lab.set_width(lv.SIZE_CONTENT)
             lab.set_style_text_color(lv.color_hex(color), 0)
-            if bar_font is not None:
-                lab.set_style_text_font(bar_font, 0)
+            f = i18n.font_for(text, bar_font)
+            if f is not None:
+                lab.set_style_text_font(f, 0)
             # keep the whole 56 px strip as one hit target
             lab.clear_flag(lv.obj.FLAG.CLICKABLE)
             return lab
 
-        self.stat_model = _seg("loading", COL_TITLE)
+        self.stat_model = _seg(i18n.t("ai.loading"), COL_TITLE)
         self.stat_sep1 = _seg("|", COL_SEP)
         self.stat_fps = _seg("FPS -", COL_FPS)
         self.stat_sep2 = _seg("|", COL_SEP)
-        self.stat_count = _seg("0 person", COL_CNT_IDLE)
-        self.stat_hint = _seg("TAP to switch", COL_HINT)
+        self.stat_count = _seg(i18n.t("ai.persons").format(0), COL_CNT_IDLE)
+        self.stat_hint = _seg(i18n.t("ai.tap_switch"), COL_HINT)
 
         self._init_ai()
 
@@ -470,14 +481,15 @@ class PoseApp:
         # The bar reports the person being drawn, never the raw candidate count:
         # the model also fires on posters and edge objects, so "1 of 4" made the
         # screen look wrong when one person was in front of the camera.
-        self.stat_count.set_text("{} person".format(self.last_persons))
+        self.stat_count.set_text(i18n.t("ai.persons").format(self.last_persons))
         self.stat_count.set_style_text_color(
             lv.color_hex(COL_CNT if self.last_persons > 0 else COL_CNT_IDLE), 0)
         if self.frozen:
-            self.stat_hint.set_text("FROZEN")
+            self.stat_hint.set_text(i18n.t("ai.frozen"))
             self.stat_hint.set_style_text_color(lv.color_hex(COL_FROZEN), 0)
         else:
-            self.stat_hint.set_text("{} · TAP".format(VIEWS[self.view][0]))
+            self.stat_hint.set_text(i18n.t("pose.hint_tap").format(
+                _view_name(self.view)))
             self.stat_hint.set_style_text_color(lv.color_hex(COL_HINT), 0)
 
     def _show_error(self, text):
@@ -539,19 +551,27 @@ class PoseApp:
         panel.add_flag(lv.obj.FLAG.CLICKABLE)   # swallow clicks instead of closing
 
         title = lv.label(panel)
-        title.set_text("Select view")
+        title_text = i18n.t("ai.select_view")
+        title.set_text(title_text)
         title.set_style_text_color(lv.color_hex(0xE6EAF0), 0)
+        tf = i18n.font_for(title_text, None)
+        if tf is not None:
+            title.set_style_text_font(tf, 0)
         title.align(lv.ALIGN.TOP_MID, 0, 2)
 
         hint = lv.label(panel)
-        hint.set_text("tap a row to switch, tap outside to close")
+        hint_text = i18n.t("ai.row_switch")
+        hint.set_text(hint_text)
         hint.set_style_text_color(lv.color_hex(0x8A97A3), 0)
+        hf = i18n.font_for(hint_text, None)
+        if hf is not None:
+            hint.set_style_text_font(hf, 0)
         hint.align(lv.ALIGN.TOP_MID, 0, 24)
 
         font = _font("font_montserrat_16", "font_montserrat_14")
         y = 48
         for idx in range(len(VIEWS)):
-            name, note = VIEWS[idx]
+            name, note = _view_name(idx), _view_note(idx)
             row = lv.btn(panel)
             row.set_size(524, 50)
             row.align(lv.ALIGN.TOP_MID, 0, y)
@@ -566,11 +586,13 @@ class PoseApp:
 
             lab = lv.label(row)
             mark = "> " if idx == self.view else "  "
-            lab.set_text("{}{}   {}".format(mark, name, note))
+            row_text = "{}{}   {}".format(mark, name, note)
+            lab.set_text(row_text)
             lab.set_style_text_color(
                 lv.color_hex(0x00C853 if idx == self.view else 0xE6EAF0), 0)
-            if font is not None:
-                lab.set_style_text_font(font, 0)
+            rf = i18n.font_for(row_text, font)
+            if rf is not None:
+                lab.set_style_text_font(rf, 0)
             lab.center()
             lab.clear_flag(lv.obj.FLAG.CLICKABLE)   # let the click land on the row
             beep.on_click(row, lambda e, i=idx: self._pick_view(i))
@@ -608,7 +630,7 @@ class PoseApp:
             img = self.sensor.snapshot(chn=CAM_CHN_ID_2)
         except BaseException as error:
             print("[Pose] snapshot error:", error)
-            self._show_error("snapshot error")
+            self._show_error(i18n.t("ai.snapshot_error"))
             self._no_signal.on_fail(self.ctx)
             return
         self._no_signal.on_ok()
@@ -627,7 +649,7 @@ class PoseApp:
             img.as_lvgl_img_src(self.img_widget)
             self.img_widget.invalidate()
         except BaseException:
-            self._show_error("display error")
+            self._show_error(i18n.t("ai.display_error"))
             return
 
         if res is not None:
