@@ -95,7 +95,7 @@ rather than by item count:
 
 The preload pays for itself in measurable terms: opening the OCR application drops
 from 2151 ms to 253-320 ms. `BOOT_PRELOAD_MODELS` and `BOOT_PRELOAD_FONTS` in
-`launcher.py` turn the preload off for comparison work.
+`shell/boot.py` turn the preload off for comparison work.
 
 ![Boot progress](img/boot-splash.png)
 
@@ -264,10 +264,10 @@ then the desktop.
 ```text
 .
 ├── factory/gui/                # all board-side code
-│   ├── launcher.py             # boot, desktop, tile baking, app registry
-│   ├── shell/                  # home-screen framework: theme, registry (rest still in launcher.py)
+│   ├── launcher.py             # entry point: sys.path bootstrap + main()
+│   ├── shell/                  # home screen: theme, registry, tiles, display, touch, boot, Launcher
 │   ├── apps/                   # one module per app (create_app/step/destroy)
-│   ├── ui/                     # paging, keyboard, splash, click tone, PNG loader
+│   ├── ui/                     # paging, keyboard, click tone, PNG loader
 │   ├── net/                    # Wi-Fi, timezone, NTP
 │   ├── audio/                  # record and playback, TTS, tones, pinyin table
 │   ├── core/                   # config, i18n, version, errors, asset paths, pools
@@ -421,7 +421,7 @@ been measured and therefore is not part of the boot sequence.
 2. Add an entry to `APPS` in `shell/registry.py`, or to `FOLDER_MEMBERS` when it
    belongs to an existing folder.
 3. If it needs its own icon, add the `id` to `ICONS` in `tools/gen_app_icons.py`
-   **and** to `APP_ACCENTS` in `launcher.py` (a missing accent renders white). Members
+   **and** to `APP_ACCENTS` in `shell/registry.py` (a missing accent renders white). Members
    that reuse an existing PNG skip this step.
 4. Generate the icons: `python tools/gen_app_icons.py` (needs
    `pip install svglib reportlab`).

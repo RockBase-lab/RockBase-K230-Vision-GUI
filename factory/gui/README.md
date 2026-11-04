@@ -84,22 +84,22 @@ at the GUI root to decide later: the root holds `launcher.py` and nothing else.
 
 ## Current status
 
-`theme.py` and `registry.py` have moved. Everything else is still inside
-`launcher.py`, which is why it remains large; the table below says what is left.
+The split is complete: every layer below the entry point has a home, and
+`launcher.py` holds only the `sys.path` bootstrap and `main()`.
 
-| Path | Status | Still to move in |
-| --- | --- | --- |
-| `launcher.py` | populated, oversized | out: tile cache, display bring-up, touch, buttons, context, status bar, boot, `Launcher` |
-| `shell/` | partly populated | theme, registry and splash are in; the rest is listed above |
-| `apps/` | populated, clean | — (only `app_*.py` plus `anchor_base.py`) |
-| `ui/` | populated, clean | — |
-| `net/`, `audio/` | populated, final | — |
-| `core/` | populated | — (`paths`, `errors`, `config`, `i18n`, `version`, `font_pool`, `model_pool`, `ocr_dict`) |
-| `hardware/` | populated, final | — (`panel` holds the constants; its bring-up is `shell/`'s) |
-| `assets/` | populated, grouped | — (`icons/ status/ glyphs/ widgets/ fonts/ cache/ src/`) |
+| Path | Status |
+| --- | --- |
+| `launcher.py` | entry point only (~100 lines): bootstrap + `main()` |
+| `shell/` | populated, final: theme, registry, splash, widgets, perf, tile cache, display bring-up, touch, buttons, context, status bar, boot, `Launcher` |
+| `apps/` | populated, clean — only `app_*.py` plus `anchor_base.py` |
+| `ui/` | populated, clean |
+| `net/`, `audio/` | populated, final |
+| `core/` | populated — `paths`, `errors`, `config`, `i18n`, `version`, `font_pool`, `model_pool`, `ocr_dict` |
+| `hardware/` | populated, final — `panel` holds the constants; its bring-up is `shell/display_init.py` |
+| `assets/` | populated, grouped — `icons/ status/ glyphs/ widgets/ fonts/ cache/ src/` |
 
-Only `launcher.py` is left at the GUI root. `config.py` used to be the second root
-file; it now lives in `core/`.
+`launcher.py` is the only file at the GUI root. `config.py` used to be the second
+root file; it now lives in `core/`.
 
 ## Duplication that was removed
 
@@ -122,7 +122,7 @@ These read this tree and must be updated in the same change as any move:
 
 | File | Reads |
 | --- | --- |
-| `tools/gen_tile_cache.py` | parses `launcher.py` (theme constants, `APPS`, `APP_ACCENTS`) and `core/i18n.py` (`NAMES`) as text; writes `assets/cache/tile_*.bin` |
+| `tools/gen_tile_cache.py` | theme constants, `APPS`, `APP_ACCENTS` and `core/i18n.py` `NAMES` as text, through `tools/_gui_source.py`; writes `assets/cache/tile_*.bin` |
 | `tools/gen_app_icons.py` | parses the theme source for palette constants; writes `assets/icons/icon_*.png` from `assets/src/src_*.svg` |
 | `tools/gen_status_icons.py` | parses the theme source for `COL_BAR`; writes `assets/status/icon_status_*.png` and `assets/src/src_status_*.svg` |
 | `tools/gen_clock_digits.py` | parses the theme source; reads `assets/fonts/Nunito-Bold-700.ttf`; writes `assets/glyphs/clock_*.png` |
@@ -133,7 +133,7 @@ These read this tree and must be updated in the same change as any move:
 | `tools/gen_font.py` | writes `assets/fonts/*.bin` |
 | `tools/gen_ui_cjk_charset.py` | reads `core/i18n.py`; writes `tools/ui_cjk_charset.txt` |
 | `tools/gen_pinyin_map.py` | writes `audio/pinyin_map.py` (currently through a hard-coded absolute path) |
-| `tools/_doctor.py` | parses `launcher.py` for `BAKE_VER` and the `APPS` module/icon pairs; `PACKAGES` (`ui`, `net`, `audio`) and the hard-coded import probe (`ui.paging`, `ui.beep`, `net.service`, `batt`) must both follow the migration: add `core`, `hardware`, `shell` and rename `batt` to `hardware.battery`, or a broken deploy passes |
+| `tools/_doctor.py` | reads the theme and registry text through `tools/_gui_source.py`; `PACKAGES` now includes `core`, `hardware` and `shell`, and the import probe names every shell module, so a broken deploy cannot pass |
 | `tools/deploy_board.py` | walks this whole tree |
 | `tools/probes/*.py` | import `hardware.camera_fov`, `core.model_pool`, `core.config` by module name, and clear them from `sys.modules` (parent `core` included) before re-importing |
 | `AGENTS.md`, `README.md` | describe the app layout and the `APPS` table location |

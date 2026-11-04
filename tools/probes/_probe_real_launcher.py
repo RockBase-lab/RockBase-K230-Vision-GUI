@@ -21,29 +21,27 @@ except SystemExit:
     pass
 print("[I] gui module loaded")
 
+# These imports must follow the exec above: it is what puts the GUI root on
+# sys.path. Symbols are no longer re-exported through the launcher's globals.
+from shell import tile_cache
+from shell import touchscreen
+from shell.context import AppContext
+
+tile_cache.ensure_cache_dir()
 Launcher = glb["Launcher"]
 launcher = Launcher()
-
-for fn in ("_ensure_cache_dir", "_init_cache_dir"):
-    f = getattr(launcher, fn, None)
-    if f is not None:
-        try:
-            f()
-            print("[I]", fn, "ok")
-        except BaseException as e:
-            print("[I]", fn, "failed:", e)
 
 scr, content, home_btn = launcher._build_shell("IMU", show_clock=True)
 print("[I] shell: scr=%s content=%s" % (scr is not None, content is not None))
 
-ctx = glb["AppContext"]()
+ctx = AppContext()
 
 try:
-    glb["TouchScreen"]()
+    touchscreen.TouchScreen()
     print("[I] TouchScreen ready")
 except BaseException as e:
     print("[I] TouchScreen failed:", e)
-ctx.touch = glb.get("TOUCH_INPUT")
+ctx.touch = touchscreen.instance()
 ctx.app_name = "IMU"
 lv.scr_load(scr)
 lv.task_handler()

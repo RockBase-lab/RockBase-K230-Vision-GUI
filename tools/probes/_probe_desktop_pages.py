@@ -66,9 +66,12 @@ def shot(tag):
         pass
 
 
-launcher._ensure_cache_dir()
+from shell import tile_cache
+from shell.registry import APPS, FOLDER_MEMBERS
+
+tile_cache.ensure_cache_dir()
 parent = lv.obj()
-launcher.bake_all_tiles(parent)
+tile_cache.bake_all_tiles(parent)
 
 L = launcher.Launcher()
 L.build_home()
@@ -78,12 +81,12 @@ print("HOME_PAGE", L.pager.page if L.pager else 0)
 shot("desk1")
 
 # Face flyout: every member icon must still resolve after the cleanup.
-face = [m for m in launcher.APPS if m["id"] == "face"][0]
+face = [m for m in APPS if m["id"] == "face"][0]
 L._open_folder(face)
 for _ in range(4):
     lv.task_handler()
 print("FACE_OPEN", L.folder is not None)
-icons = [m["icon"].rsplit("/", 1)[-1] for m in launcher.FOLDER_MEMBERS["face"]]
+icons = [m["icon"].rsplit("/", 1)[-1] for m in FOLDER_MEMBERS["face"]]
 cache = "/sdcard/factory/gui/assets/cache"
 for n in icons:
     p = cache + "/member_" + n

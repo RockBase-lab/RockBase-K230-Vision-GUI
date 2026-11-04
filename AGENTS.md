@@ -139,7 +139,7 @@ all of it in one change:
 2. Add its entry to `APPS` in `shell/registry.py`, or to `FOLDER_MEMBERS` when it
    belongs to an existing folder tile.
 3. If the app gets its own icon, add the `id` to `ICONS` in
-   `tools/gen_app_icons.py` **and** to `APP_ACCENTS` in `launcher.py`. The
+   `tools/gen_app_icons.py` **and** to `APP_ACCENTS` in `shell/registry.py`. The
    accent is the icon's ink colour, and an id missing from `APP_ACCENTS`
    renders white. Members that reuse another entry's PNG (`detect` ->
    `icon_vision.png`) skip this step.
@@ -225,7 +225,7 @@ Check, in this order:
 | `tools/deploy_board.py` `MANIFEST` | The directory layout on the board |
 | `tools/bake_factory_image.py` `EXCLUDES` | The same skip set as `deploy_board.py`, so a baked image and an incremental deploy carry identical Python |
 | A string in `factory/gui/core/i18n.py` `NAMES` | `python tools/gen_ui_cjk_charset.py` (regenerates the glyph list and checks `ocr_charset.txt` coverage), then `python tools/gen_tile_cache.py`. Every zh character must be inside `tools/ui_cjk_charset.txt`, or it renders as a box |
-| A desktop visual constant, or `core/i18n.py` `NAMES` | `BAKE_VER` + 1 in `launcher.py`; `gen_tile_cache.py` bakes both languages (`tile_<id>.bin` / `tile_<id>_zh.bin`) |
+| A desktop visual constant, or `core/i18n.py` `NAMES` | `BAKE_VER` + 1 in `shell/theme.py`; `gen_tile_cache.py` bakes both languages (`tile_<id>.bin` / `tile_<id>_zh.bin`) |
 | A constant parsed by a generator | The generator's own default and any `docs/` value |
 | Any rule, path, or command name | The four places rules live: `AGENTS.md`, `.github/copilot-instructions.md`, `.github/skills/**`, `docs/*.md` |
 | A new file anywhere under `factory/gui/` | The layer map in `factory/gui/README.md`, plus that directory's own README |

@@ -21,22 +21,23 @@ try:
 except SystemExit:
     pass
 
+# These imports must follow the exec above: it is what puts the GUI root on
+# sys.path. Symbols are no longer re-exported through the launcher's globals.
+from hardware import panel
+from shell import tile_cache
+from shell import touchscreen
+from shell.context import AppContext
+
+tile_cache.ensure_cache_dir()
 launcher = glb["Launcher"]()
-for fn in ("_ensure_cache_dir", "_init_cache_dir"):
-    f = getattr(launcher, fn, None)
-    if f is not None:
-        try:
-            f()
-        except BaseException as e:
-            print("I", fn, "failed:", e)
 
 scr, content, home_btn = launcher._build_shell("Faces", show_clock=False,
                                               immersive=True)
-ctx = glb["AppContext"]()
-ctx.touch = glb.get("TOUCH_INPUT")
+ctx = AppContext()
+ctx.touch = touchscreen.instance()
 ctx.app_name = "Faces"
-ctx.width = glb["DISPLAY_WIDTH"]
-ctx.height = glb["DISPLAY_HEIGHT"]
+ctx.width = panel.WIDTH
+ctx.height = panel.HEIGHT
 ctx.content_x = 0
 ctx.content_y = 0
 lv.scr_load(scr)

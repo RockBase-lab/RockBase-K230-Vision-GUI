@@ -85,7 +85,7 @@
 5. 尝试 Wi-Fi 连接（硬性 15 s 预算，超时照常进桌面，之后不再后台重连）
 
 预加载的收益是可量化的：OCR 应用的打开耗时从 2151 ms 降到 253–320 ms。
-`launcher.py` 里的 `BOOT_PRELOAD_MODELS` / `BOOT_PRELOAD_FONTS` 可以关掉预加载用于对比调试。
+`shell/boot.py` 里的 `BOOT_PRELOAD_MODELS` / `BOOT_PRELOAD_FONTS` 可以关掉预加载用于对比调试。
 
 ![启动进度条](img/boot-splash.png)
 
@@ -237,10 +237,10 @@ python tools/deploy_board.py COM9 --gui-only --autostart
 ```text
 .
 ├── factory/gui/                # 全部板端代码
-│   ├── launcher.py             # 启动、桌面、tile 烘焙、应用注册表
-│   ├── shell/                  # 主屏框架：theme、registry（其余仍在 launcher.py）
+│   ├── launcher.py             # 入口：sys.path 引导 + main()
+│   ├── shell/                  # 主屏：theme、registry、tile、显示、触摸、启动流程、Launcher
 │   ├── apps/                   # 每个应用一个模块（create_app/step/destroy）
-│   ├── ui/                     # 分页、键盘、splash、点击音、PNG 读取
+│   ├── ui/                     # 分页、键盘、点击音、PNG 读取
 │   ├── net/                    # Wi-Fi 连接、时区、NTP
 │   ├── audio/                  # 录音回放、TTS、提示音、拼音表
 │   ├── core/                   # 配置、多语言、版本、异常、资源路径、两个资源池

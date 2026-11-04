@@ -13,7 +13,10 @@ except KeyError:
 import lvgl as lv
 import launcher
 
-ids = [m["id"] for m in launcher.APPS]
+from shell import tile_cache
+from shell.registry import APPS
+
+ids = [m["id"] for m in APPS]
 print("COUNT", len(ids))
 print("PAGE1", ",".join(ids[:8]))
 print("PAGE2", ",".join(ids[8:]))
@@ -22,9 +25,9 @@ print("SETTINGS_P2", "settings" in ids[8:])
 print("FACE_P1", "face" in ids[:8])
 print("IMU_P1", "imu" in ids[:8])
 
-launcher._ensure_cache_dir()
-launcher.bake_all_tiles(lv.obj())
-print("TILES", len(launcher.BAKED_TILES))
+tile_cache.ensure_cache_dir()
+tile_cache.bake_all_tiles(lv.obj())
+print("TILES", len(tile_cache.BAKED_TILES))
 
 L = launcher.Launcher()
 L.build_home()

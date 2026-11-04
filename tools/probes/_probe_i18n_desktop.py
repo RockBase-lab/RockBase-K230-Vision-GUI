@@ -7,7 +7,8 @@ import sys
 sys.path.insert(0, "/sdcard/factory/gui")
 for _name in ("core", "launcher", "core.i18n", "core.config", "apps", "core.errors", "ui.beep",
               "ui.paging", "hardware.backlight", "core.font_pool", "core.model_pool", "core.ocr_dict",
-              "hardware.camera_fov"):
+              "hardware.camera_fov", "shell", "shell.tile_cache", "shell.registry",
+              "shell.home", "shell.statusbar", "shell.boot", "shell.touchscreen"):
     if _name in sys.modules:
         del sys.modules[_name]
 
@@ -19,6 +20,8 @@ import uctypes
 from core import config
 from core import i18n
 from core import font_pool
+from shell import tile_cache
+from shell.registry import APPS
 
 
 def shot(tag):
@@ -75,12 +78,12 @@ def render(lang):
     config.set("ui.language", lang, save=False)
     i18n.init()
     print("[I18N] rendering lang={} -> {}".format(lang, i18n.lang()))
-    launcher.BAKED_TILES.clear()
-    launcher.bake_all_tiles(parent)
+    tile_cache.BAKED_TILES.clear()
+    tile_cache.bake_all_tiles(parent)
     L = launcher.Launcher()
     L.build_home()
     shot("desk_" + lang)
-    vision = [m for m in launcher.APPS if m["id"] == "vision"][0]
+    vision = [m for m in APPS if m["id"] == "vision"][0]
     L._open_folder(vision)
     shot("folder_" + lang)
     L._close_folder()
