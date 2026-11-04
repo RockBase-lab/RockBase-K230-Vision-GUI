@@ -6,8 +6,12 @@
 `aidemo` 与 `ulab` 的 MicroPython 固件是另一个产物：K230 RT-Smart SDK 的 CanMV 构建版。
 本文说明这个镜像从哪里来、以及如何为 RockBase 编译出来。
 
-以下步骤产出的是**运行环境**，不是本仓库。刷好固件后，仍然要用
-`python tools/deploy_board.py` 部署本项目（见 README）。
+以下步骤产出的是**运行环境**。把本仓库弄到板上有两种方式：
+
+| | 做法 | 适用场合 |
+| --- | --- | --- |
+| 刷机后部署 | `python tools/deploy_board.py --gui-only --autostart` | 迭代：USB 约 14 秒，增量 |
+| 烘进镜像 | 刷机前跑 `python tools/bake_factory_image.py` | 出货：开机直接进 GUI |
 
 ## 使用哪个板级配置
 
@@ -173,6 +177,37 @@ FAT16 分区：`BIN`（30 MiB）与 `SDCARD`（500 MiB，挂载为 `/sdcard`）�
 `tools/gen_image.sh`。该脚本用 `MK_IMAGE_NAME`（来自 `CONFIG_BOARD_NAME`）给产物
 命名，缺了它镜像会被写成 `_micropython_local_...`。
 
+## 把 GUI 烘进镜像
+
+纯净镜像没有 `/sdcard/main.py`，刷完开机进 REPL、屏幕是黑的。
+`tools/bake_factory_image.py` 把本仓库放进镜像并写入启动入口：
+
+```bash
+make -j$(nproc) log                     # 产出 output/<defconfig>/images/
+python tools/bake_factory_image.py      # 在仓库根目录执行
+```
+
+它在 WSL 里执行（工具链在那里），做四件事：
+
+1. 把 `factory/gui` 用 `rsync --delete` 同步到
+   `output/<defconfig>/images/sdcard/factory/gui`，跳过 `README.md`、
+   `__pycache__` 与 `*.pyc`；
+2. 写入 `images/sdcard/main.py`，即三行自启动桩；
+3. 检查暂存树是否仍能放进 500 MiB 的 `SDCARD` 分区；
+4. 用 SDK 自带的 `gen_image.sh` 重新打包。
+
+`--check` 只报告暂存状态，不修改任何东西。
+
+有两个构建系统的细节让这一步必须小心。下一次 `make` 会清空 `images/`，所以
+烘焙必须在最后一次构建之后跑。另外 `gen_image_rtapp.py` 读的是暂存的
+`micropython` 二进制，而它构建期间会被 `romfs.toml` 移进 ROMFS；再跑一次那个
+生成器会找不到文件，并静默换成 4 KB 全零假货，产物将是一个什么都启动不了的
+镜像。所以本工具不会重跑它 —— 除非 `rtapp.elf.gz` 已经小于 1 MB，那时它会先
+从 `canmv/micropython` 把二进制恢复回去。
+
+烘焙后 `images/sdcard` 里除 `examples/`、`libs/`、`res/` 之外还有 `factory/`
+与 `main.py`，`/sdcard` 约用掉 433 MiB / 500 MiB。
+
 ## 烧录
 
 Linux：
@@ -199,7 +234,8 @@ Windows：用嘉楠的烧录工具，不要直接写裸字节；它吃 `.kdimg` 
 - `/sdcard/libs/`、`/sdcard/res/font/` —— 示例 import 的 Python 库与字体
 
 它**不包含**本项目的 GUI，也**不包含** `/sdcard/main.py`：纯净镜像启动后进入
-MicroPython REPL，屏幕是黑的。先部署本项目，再复位：
+MicroPython REPL，屏幕是黑的。可以先按上面的方式把 GUI 烘进镜像，也可以刷机后
+再部署并复位：
 
 ```bash
 python tools/_doctor.py COM9

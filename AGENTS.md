@@ -223,6 +223,7 @@ Check, in this order:
 | A `docs/*.md` file | Its `docs/*_zh.md` counterpart says the same thing, and both keep the language switch at the top |
 | A `tools/` command-line flag | The usage line in the script and the skill that documents it |
 | `tools/deploy_board.py` `MANIFEST` | The directory layout on the board |
+| `tools/bake_factory_image.py` `EXCLUDES` | The same skip set as `deploy_board.py`, so a baked image and an incremental deploy carry identical Python |
 | A string in `factory/gui/core/i18n.py` `NAMES` | `python tools/gen_ui_cjk_charset.py` (regenerates the glyph list and checks `ocr_charset.txt` coverage), then `python tools/gen_tile_cache.py`. Every zh character must be inside `tools/ui_cjk_charset.txt`, or it renders as a box |
 | A desktop visual constant, or `core/i18n.py` `NAMES` | `BAKE_VER` + 1 in `launcher.py`; `gen_tile_cache.py` bakes both languages (`tile_<id>.bin` / `tile_<id>_zh.bin`) |
 | A constant parsed by a generator | The generator's own default and any `docs/` value |
@@ -266,6 +267,12 @@ one-off scripts over USB serial are documented in
 `.github/skills/rockbase-board-deploy/SKILL.md` when that local skill is
 present. The entry point is `tools/deploy_board.py`; run it without
 arguments for an incremental deploy over an auto-detected port.
+
+To ship a card that boots straight into the GUI, bake this repository into
+the image instead: `python tools/bake_factory_image.py` after the last
+`make`. It stages `factory/gui` and `main.py` into `images/sdcard` and
+re-packs with the SDK's `gen_image.sh`. See `docs/firmware.md`; unlike a
+deploy, the result needs a flash rather than a reset.
 
 ## Board constraints
 

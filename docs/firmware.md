@@ -7,8 +7,13 @@ provides `lvgl`, `image`, `media`, `nncase_runtime`, `aidemo` and `ulab` is a se
 artifact: the CanMV build of the K230 RT-Smart SDK. This page covers where that image
 comes from and how to build it for RockBase.
 
-Everything below produces the **operating environment**, not this repository. After
-flashing, deploy this project with `python tools/deploy_board.py` (see the README).
+Everything below produces the **operating environment**. Two ways to get this
+repository onto the board afterwards:
+
+| | How | Use when |
+| --- | --- | --- |
+| Deploy after flashing | `python tools/deploy_board.py --gui-only --autostart` | Iterating: 14 seconds over USB, incremental |
+| Bake into the image | `python tools/bake_factory_image.py` before flashing | Shipping: the card boots straight into the GUI |
 
 ## Which board configuration
 
@@ -182,6 +187,38 @@ from `output/<defconfig>/.config` in its environment. That script names its outp
 `MK_IMAGE_NAME`, which comes from `CONFIG_BOARD_NAME`; without it the image is written
 as `_micropython_local_...`.
 
+## Baking the GUI into the image
+
+A pristine image has no `/sdcard/main.py`, so a freshly flashed board boots into
+the REPL and leaves the panel dark. `tools/bake_factory_image.py` stages this
+repository into the image and writes that entry point:
+
+```bash
+make -j$(nproc) log                     # produces output/<defconfig>/images/
+python tools/bake_factory_image.py      # from the repository root
+```
+
+It runs inside WSL (the toolchain lives there) and does four things:
+
+1. `rsync --delete factory/gui` into `output/<defconfig>/images/sdcard/factory/gui`,
+   skipping `README.md`, `__pycache__` and `*.pyc`;
+2. writes `images/sdcard/main.py`, the three-line autostart stub;
+3. checks the staged tree still fits the 500 MiB `SDCARD` partition;
+4. re-packs with the SDK's own `gen_image.sh`.
+
+`--check` reports the staged state and changes nothing.
+
+Two build-system details make this safe. `images/` is wiped by the next `make`,
+so the bake has to run after the last build. And `gen_image_rtapp.py` reads the
+staged `micropython` binary, which `romfs.toml` moves into ROMFS while building;
+running that generator again finds nothing and substitutes a 4 KB fake, which
+produces an image that boots to nothing. The tool therefore never re-runs it
+unless `rtapp.elf.gz` is already under 1 MB, and then it restores the binary from
+`canmv/micropython` first.
+
+After a bake, `images/sdcard` holds `factory/` and `main.py` alongside
+`examples/`, `libs/` and `res/`. `/sdcard` ends up about 433 MiB used of 500 MiB.
+
 ## Flashing
 
 Linux:
@@ -212,7 +249,8 @@ The image brings the operating environment and the reference media:
 
 It does **not** contain this project's GUI, and it does **not** contain
 `/sdcard/main.py`: a pristine image boots into the MicroPython REPL with the panel
-dark. Deploy this project, then reset:
+dark. Either bake the GUI in first (see above), or deploy it after flashing and
+reset:
 
 ```bash
 python tools/_doctor.py COM9
