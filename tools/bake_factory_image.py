@@ -15,11 +15,14 @@ Usage (from the repository root, on Windows or inside WSL):
     python tools/bake_factory_image.py --sdk ~/rockbase-rtos
     python tools/bake_factory_image.py --check          # verify only, change nothing
     python tools/bake_factory_image.py --publish D:/share/k230
-    python tools/bake_factory_image.py --publish D:/share/k230 --suffix with-gui
+    python tools/bake_factory_image.py --publish D:/share/k230 --suffix release
 
 --publish copies only the .img (the file dd writes), under <image>-<suffix>.img,
-and checks it against the source MD5. The .kdimg for Canaan's Windows tool is not
-copied, so a directory of candidates cannot lead to flashing the wrong one.
+and checks it against the source MD5. The suffix defaults to
+with-gui-<GUI_VERSION> read from factory/gui/core/version.py, so a published file
+says which GUI it carries, e.g. ...with-gui-v0.1.01.img. The .kdimg for Canaan's
+Windows tool is not copied, so a directory of candidates cannot lead to flashing
+the wrong one.
 
 The SDK lives inside WSL because the cross toolchain and the build host are
 there. On Windows this tool routes through `wsl`; inside WSL it runs directly.
@@ -27,7 +30,9 @@ there. On Windows this tool routes through `wsl`; inside WSL it runs directly.
 
 import argparse
 import hashlib
+import io
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -35,6 +40,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 GUI_SRC = os.path.join(ROOT, "factory", "gui")
+VERSION_SRC = os.path.join(GUI_SRC, "core", "version.py")
 
 DEFAULT_SDK = "~/rockbase-rtos"
 DEFAULT_DEFCONFIG = "k230_canmv_rockbase_defconfig"
@@ -52,6 +58,26 @@ AUTOSTART_MAIN = (
     "import os\n"
     "exec(open('/sdcard/factory/gui/launcher.py').read())\n"
 )
+
+
+def gui_version():
+    """GUI_VERSION from core/version.py, e.g. 'v0.1.01'.
+
+    Read as text rather than imported: the module is plain data, but importing it
+    would put the GUI package on sys.path next to this host-side tool.
+    """
+    try:
+        text = io.open(VERSION_SRC, encoding="utf-8").read()
+    except OSError:
+        return None
+    m = re.search(r'GUI_VERSION\s*=\s*["\']([^"\']+)["\']', text)
+    return m.group(1) if m else None
+
+
+def default_suffix():
+    """The published-name suffix, carrying the GUI version it was built from."""
+    version = gui_version()
+    return "with-gui-" + version if version else "with-gui"
 
 
 def to_wsl_path(path):
@@ -221,12 +247,16 @@ def main():
                     help="report the staged state and exit without changing it")
     ap.add_argument("--publish", metavar="DIR", default=None,
                     help="also copy the .img into DIR, named <image>-<suffix>.img")
-    ap.add_argument("--suffix", default="with-gui",
-                    help="name suffix used by --publish (default with-gui)")
+    ap.add_argument("--suffix", default=None,
+                    help="name suffix used by --publish "
+                         "(default with-gui-<GUI_VERSION>, e.g. with-gui-v0.1.01)")
     args = ap.parse_args()
 
     if not os.path.isdir(GUI_SRC):
         sys.exit("[FAIL] %s not found; run from the repository root" % GUI_SRC)
+
+    version = gui_version()
+    print("[INFO] GUI version : %s" % (version or "unknown (core/version.py)"))
 
     sdk = args.sdk
     gui = to_wsl_path(GUI_SRC)
@@ -289,7 +319,8 @@ def main():
             print("  " + line)
 
     if args.publish:
-        publish(args.publish, args.suffix, args.sdk, args.defconfig)
+        publish(args.publish, args.suffix or default_suffix(), args.sdk,
+                args.defconfig)
 
 
 def _wsl_cmd():
