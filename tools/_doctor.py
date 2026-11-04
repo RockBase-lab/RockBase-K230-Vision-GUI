@@ -97,10 +97,17 @@ def main():
 
         # 2) Package directories must be populated. Empty ones make `from ui import ...`
         #    fail, and a stale main.py hides it because that copy uses the flat layout.
+        #    A package the card does not have at all is the same failure, not a crash:
+        #    listdir raises ENOENT, so the listing is fetched inside the snippet.
         for pkg in PACKAGES:
-            listing = run("import os;print(sorted(os.listdir('{}/{}')))".format(GUI, pkg))
-            empty = len(listing.strip()) < 4 or listing.strip() in ("[]", "''")
-            check("package {} populated".format(pkg), not empty, listing.strip()[:70])
+            listing = run("import os\n"
+                          "p = '%s/%s'\n"
+                          "try:\n    print(sorted(os.listdir(p)))\n"
+                          "except OSError as e:\n    print('MISSING', e)\n"
+                          % (GUI, pkg)).strip()
+            empty = (listing.startswith("MISSING")
+                     or len(listing) < 4 or listing in ("[]", "''"))
+            check("package {} populated".format(pkg), not empty, listing[:70])
 
         # 3) Every module the registry names must exist on the card.
         missing = []
