@@ -170,7 +170,7 @@ slightly right (roll +6 degrees), so the horizon is tilted with it.
 | Item | Requirement |
 | --- | --- |
 | SoC | K230 (the RockBase K230 Vision unit, or an equivalent K230 with an 800x480 panel) |
-| Firmware | CanMV MicroPython for K230; obtain and install it from Canaan |
+| Firmware | CanMV MicroPython for K230 built with the RockBase board configuration; see [Getting or building the RockBase firmware image](docs/firmware.md) |
 | Display | 3.5-inch 800x480 capacitive touch panel (ST7701 + FT5316) |
 | Board models | `/sdcard/examples/kmodel/` and `/sdcard/examples/utils/` come with the firmware image |
 | PC | Python 3.11 (the development and verification environment; other versions untested), USB cable for the serial link |
@@ -187,9 +187,12 @@ Partition conventions:
 
 ### 1. Prepare the firmware and the board
 
-Flash the CanMV MicroPython firmware onto the K230 the way Canaan documents it, confirm
-the serial REPL answers, and confirm the firmware image has placed `examples/kmodel`
-and `examples/utils` on the SD card.
+Flash the CanMV MicroPython firmware onto the K230, confirm the serial REPL answers, and
+confirm the firmware image has placed `examples/kmodel` and `examples/utils` on the SD
+card. The firmware is a separate artifact from this repository: see
+[Getting or building the RockBase firmware image](docs/firmware.md) for the prebuilt
+download locations, the `k230_canmv_rockbase_defconfig` source build, and the flash
+procedure.
 
 ### 2. Prepare the PC environment
 
@@ -281,7 +284,7 @@ then the desktop.
 │   └── probes/                 # reproducible measurement scripts
 ├── stubs/                      # type descriptions for the board API
 ├── models/                     # reference copies of the inference artefacts
-├── docs/                       # measured board facts
+├── docs/                       # measured board facts and the firmware build guide
 └── img/                        # images used by the README
 ```
 

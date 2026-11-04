@@ -210,6 +210,7 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_gesture_app.py` | Gesture app end to end through the launcher: fps, gestures seen, skeleton visibility |
 | `_probe_17_resident.py` | Gesture opened on top of the 16 preloaded boot models: handkp_det as a 17th resident kpu |
 | `_reset_hard.py` | `machine.reset()`, the only reset that releases a Sensor the GUI still owns |
+| `_probe_firmware_id.py` | `os.uname()` identity, used to confirm which board defconfig the image was built from |
 | `_probe_capture_caps.py` | Which transfer encodings the firmware supports for a screen capture (RLE, zlib, JPEG) |
 | `_probe_capture_jpeg.py` | Full-screen capture through the JPEG encoder instead of RLE |
 | `_cap_readme_ui.py` | README screenshots: desktop pages, both folder flyouts, Settings/Audio/IMU/Gallery/Network |

@@ -153,7 +153,7 @@ IMU 应用有三页，左右滑动切换：仪表盘、原始数据曲线、姿�
 | 项目 | 要求 |
 | --- | --- |
 | 主控 | K230（RockBase K230 Vision 整机，或等价的 K230 + 800×480 屏方案） |
-| 固件 | CanMV MicroPython for K230，需自行从嘉楠获取安装 |
+| 固件 | 用 RockBase 板级配置构建的 CanMV MicroPython，见[获取或编译 RockBase 镜像](docs/firmware.md) |
 | 显示 | 3.5 英寸 800×480 电容触摸屏（ST7701 + FT5316） |
 | 板上模型 | `/sdcard/examples/kmodel/` 与 `/sdcard/examples/utils/` 由固件镜像提供 |
 | PC 端 | Python 3.11（开发与验证环境；其它版本未实测）、USB 数据线（串口直连） |
@@ -169,8 +169,10 @@ IMU 应用有三页，左右滑动切换：仪表盘、原始数据曲线、姿�
 
 ### 1. 准备固件与板卡
 
-按嘉楠的方式给 K230 刷入 CanMV MicroPython 固件，确认串口 REPL 可用，
-并确认固件镜像已把 `examples/kmodel`、`examples/utils` 放到 SD 卡。
+给 K230 刷入 CanMV MicroPython 固件，确认串口 REPL 可用，并确认固件镜像已把
+`examples/kmodel`、`examples/utils` 放到 SD 卡。固件与本仓库是两个独立产物：
+预编译镜像的下载地址、基于 `k230_canmv_rockbase_defconfig` 的源码编译流程，
+以及烧录步骤，都写在[获取或编译 RockBase 镜像](docs/firmware.md)里。
 
 ### 2. 准备 PC 环境
 
@@ -255,7 +257,7 @@ python tools/deploy_board.py COM9 --gui-only --autostart
 │   └── probes/                 # 可复现的测量脚本
 ├── stubs/                      # 板端 API 类型描述
 ├── models/                     # 推理产物参考副本（板上由固件镜像提供）
-├── docs/                       # 板端实测事实
+├── docs/                       # 板端实测事实与固件编译说明
 └── img/                        # README 与文档用图
 ```
 
