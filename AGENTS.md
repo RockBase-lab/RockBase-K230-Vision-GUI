@@ -30,14 +30,20 @@ instructions all follow the same test.
 | Commit messages | English | yes |
 | `README.md` | English | yes |
 | `README_zh.md` | Chinese (explicit translation) | yes |
+| `docs/*.md` | English | yes |
+| `docs/*_zh.md` | Chinese (explicit translation) | yes |
 | `AGENTS.md` | English | yes |
 | `.github/skills/**` | Chinese | no |
 | `.github/copilot-instructions.md` | Chinese | no |
 | Design notes (`*_design.md`, `*设计*.md`) | Chinese | no |
 
-`README_zh.md` is the one deliberate exception on the tracked side: it is
-the Chinese counterpart of `README.md` and is expected to stay in
-Chinese. Do not treat it as a precedent for other tracked files.
+A `*_zh.md` file is the Chinese counterpart of the English file with the same name
+minus the suffix (`README_zh.md` of `README.md`, `docs/firmware_zh.md` of
+`docs/firmware.md`). The pair is one document in two languages: same headings, same
+table rows, same numbers, same code blocks, and each file links to the other at the
+top. A Chinese file that has no English counterpart does not belong in the
+repository; write it as a local design note instead. Never let one side of a pair
+describe something the other does not.
 
 When you are unsure, run the check instead of guessing:
 
@@ -168,6 +174,7 @@ Check, in this order:
 | App contract (`create_app` / `step` / `destroy`) | Every `apps/app_*.py` still matches it |
 | A board API call | `stubs/*.pyi` covers the symbol |
 | `README.md` | `README_zh.md` carries the same content, with the same headings, table rows, and numbers. The full README sync walkthrough is in `.github/skills/readme-sync/SKILL.md` when that local skill is present |
+| A `docs/*.md` file | Its `docs/*_zh.md` counterpart says the same thing, and both keep the language switch at the top |
 | A `tools/` command-line flag | The usage line in the script and the skill that documents it |
 | `tools/deploy_board.py` `MANIFEST` | The directory layout on the board |
 | A constant parsed by a generator | The generator's own default and any `docs/` value |

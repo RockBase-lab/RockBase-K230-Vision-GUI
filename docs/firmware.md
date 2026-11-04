@@ -1,5 +1,7 @@
 # Getting or building the RockBase firmware image
 
+English | [简体中文](firmware_zh.md)
+
 This project ships **application-layer Python only**. The MicroPython firmware that
 provides `lvgl`, `image`, `media`, `nncase_runtime`, `aidemo` and `ulab` is a separate
 artifact: the CanMV build of the K230 RT-Smart SDK. This page covers where that image
