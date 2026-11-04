@@ -199,7 +199,7 @@ python tools/bake_factory_image.py      # 在仓库根目录执行
 `--check` 只报告暂存状态，不修改任何东西。`--publish DIR` 还会把产出的 `.img`
 复制成 `<镜像名>-<后缀>.img`，并与源文件 MD5 核对。后缀默认是
 `with-gui-<GUI_VERSION>`（读自 `factory/gui/core/version.py`），所以文件名自带
-它用的 GUI 版本：`...with-gui-v0.1.01.img`。**只复制 `.img`**：那才是 `dd` 要写的
+它用的 GUI 版本：`...with-gui-v0.1.02.img`。**只复制 `.img`**：那才是 `dd` 要写的
 文件，不含 `.kdimg` 也就不会在一个目录里堆出多个候选而刷错。
 
 有两个构建系统的细节让这一步必须小心。下一次 `make` 会清空 `images/`，所以
@@ -210,7 +210,7 @@ python tools/bake_factory_image.py      # 在仓库根目录执行
 从 `canmv/micropython` 把二进制恢复回去。
 
 烘焙后 `images/sdcard` 里除 `examples/`、`libs/`、`res/` 之外还有 `factory/`
-与 `main.py`，`/sdcard` 约用掉 433 MiB / 500 MiB。
+与 `main.py`。实测：`/sdcard` 用掉 500 MiB 分区中的 435.8 MiB，剩余 67,305,472 字节。
 
 ## 烧录
 

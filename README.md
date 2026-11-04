@@ -6,7 +6,7 @@ An 800x480 touch desktop and edge-AI application suite for K230 (CanMV MicroPyth
 
 ![Page swipe](img/swipe.gif)
 
-`GUI v0.1.01` | Apache-2.0 | MicroPython | LVGL
+`GUI v0.1.02` | Apache-2.0 | MicroPython | LVGL
 
 > This repository contains **application-layer Python code only**: the desktop, 23
 > applications, the asset bakers and the serial deploy tools. It does not contain the
@@ -265,7 +265,7 @@ then the desktop.
 .
 ├── factory/gui/                # all board-side code
 │   ├── launcher.py             # boot, desktop, tile baking, app registry
-│   ├── shell/                  # home-screen framework; scaffold until the split lands
+│   ├── shell/                  # home-screen framework: theme, registry (rest still in launcher.py)
 │   ├── apps/                   # one module per app (create_app/step/destroy)
 │   ├── ui/                     # paging, keyboard, splash, click tone, PNG loader
 │   ├── net/                    # Wi-Fi, timezone, NTP

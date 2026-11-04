@@ -41,8 +41,8 @@ Do not invert this by copying the number into `core/`.
 | The new code is | Goes in |
 | --- | --- |
 | A user-facing app with its own tile | `apps/app_<name>.py` |
-| The `APPS` / `FOLDER_MEMBERS` entry, an icon path, an accent | `shell/registry.py` (still `launcher.py` until the split lands) |
-| A colour, size, margin or `BAKE_VER` worth | `shell/theme.py` (still `launcher.py`) |
+| The `APPS` / `FOLDER_MEMBERS` entry, an icon path, an accent | `shell/registry.py` |
+| A colour, size, margin or `BAKE_VER` worth | `shell/theme.py` |
 | Home-screen navigation, folder flyout, paging, status bar | `shell/` |
 | A reusable LVGL widget used by more than one app | `ui/` |
 | Click/sound feedback bound to a widget event | `ui/beep.py` |
@@ -84,14 +84,13 @@ at the GUI root to decide later: the root holds `launcher.py` and nothing else.
 
 ## Current status
 
-The ladder is the target. Directories marked *scaffold* exist and hold only this
-README plus an `__init__.py`; their contents are still at the GUI root and move
-in a later change.
+`theme.py` and `registry.py` have moved. Everything else is still inside
+`launcher.py`, which is why it remains large; the table below says what is left.
 
 | Path | Status | Still to move in |
 | --- | --- | --- |
-| `launcher.py` | populated, oversized | out: theme, registry, tile cache, display, touch, buttons, context, status bar, boot, `Launcher` |
-| `shell/` | **scaffold** | all of the above |
+| `launcher.py` | populated, oversized | out: tile cache, display bring-up, touch, buttons, context, status bar, boot, `Launcher` |
+| `shell/` | partly populated | theme and registry are in; the rest is listed above |
 | `apps/` | populated, clean | — (only `app_*.py` plus `anchor_base.py`) |
 | `ui/` | populated, clean | — |
 | `net/`, `audio/` | populated, final | — |

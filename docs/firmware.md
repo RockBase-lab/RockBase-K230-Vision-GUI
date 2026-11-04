@@ -210,7 +210,7 @@ It runs inside WSL (the toolchain lives there) and does four things:
 copies the resulting `.img`, as `<image>-<suffix>.img`, and checks it against the
 source MD5. The suffix defaults to `with-gui-<GUI_VERSION>` read from
 `factory/gui/core/version.py`, so a published file names the GUI it carries:
-`...with-gui-v0.1.01.img`. Only the `.img` is copied, because that is the file
+`...with-gui-v0.1.02.img`. Only the `.img` is copied, because that is the file
 `dd` writes; leaving the `.kdimg` out keeps a directory of candidates from
 leading to a wrong flash.
 
@@ -223,7 +223,8 @@ unless `rtapp.elf.gz` is already under 1 MB, and then it restores the binary fro
 `canmv/micropython` first.
 
 After a bake, `images/sdcard` holds `factory/` and `main.py` alongside
-`examples/`, `libs/` and `res/`. `/sdcard` ends up about 433 MiB used of 500 MiB.
+`examples/`, `libs/` and `res/`. Measured on a built image: `/sdcard` uses
+435.8 MiB of the 500 MiB partition, leaving 67,305,472 bytes free.
 
 ## Flashing
 

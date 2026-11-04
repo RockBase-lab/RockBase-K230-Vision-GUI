@@ -6,7 +6,7 @@
 
 ![左右滑页](img/swipe.gif)
 
-`GUI v0.1.01` · Apache-2.0 · MicroPython · LVGL
+`GUI v0.1.02` · Apache-2.0 · MicroPython · LVGL
 
 > 本仓库只包含**应用层 Python 代码**：桌面、23 个应用、资源烘焙与串口部署工具。
 > 它不含固件、SDK 或 BSP，也不分发 CanMV 运行时。
@@ -238,7 +238,7 @@ python tools/deploy_board.py COM9 --gui-only --autostart
 .
 ├── factory/gui/                # 全部板端代码
 │   ├── launcher.py             # 启动、桌面、tile 烘焙、应用注册表
-│   ├── shell/                  # 主屏框架；拆分完成前只有占位
+│   ├── shell/                  # 主屏框架：theme、registry（其余仍在 launcher.py）
 │   ├── apps/                   # 每个应用一个模块（create_app/step/destroy）
 │   ├── ui/                     # 分页、键盘、splash、点击音、PNG 读取
 │   ├── net/                    # Wi-Fi 连接、时区、NTP

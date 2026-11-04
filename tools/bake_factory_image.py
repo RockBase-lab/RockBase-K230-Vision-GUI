@@ -20,9 +20,8 @@ Usage (from the repository root, on Windows or inside WSL):
 --publish copies only the .img (the file dd writes), under <image>-<suffix>.img,
 and checks it against the source MD5. The suffix defaults to
 with-gui-<GUI_VERSION> read from factory/gui/core/version.py, so a published file
-says which GUI it carries, e.g. ...with-gui-v0.1.01.img. The .kdimg for Canaan's
-Windows tool is not copied, so a directory of candidates cannot lead to flashing
-the wrong one.
+says which GUI it carries. The .kdimg for Canaan's Windows tool is not copied, so
+a directory of candidates cannot lead to flashing the wrong one.
 
 The SDK lives inside WSL because the cross toolchain and the build host are
 there. On Windows this tool routes through `wsl`; inside WSL it runs directly.
@@ -61,7 +60,7 @@ AUTOSTART_MAIN = (
 
 
 def gui_version():
-    """GUI_VERSION from core/version.py, e.g. 'v0.1.01'.
+    """GUI_VERSION from core/version.py, as written there (a 'v' prefix included).
 
     Read as text rather than imported: the module is plain data, but importing it
     would put the GUI package on sys.path next to this host-side tool.
@@ -249,7 +248,7 @@ def main():
                     help="also copy the .img into DIR, named <image>-<suffix>.img")
     ap.add_argument("--suffix", default=None,
                     help="name suffix used by --publish "
-                         "(default with-gui-<GUI_VERSION>, e.g. with-gui-v0.1.01)")
+                         "(default with-gui-<GUI_VERSION>)")
     args = ap.parse_args()
 
     if not os.path.isdir(GUI_SRC):

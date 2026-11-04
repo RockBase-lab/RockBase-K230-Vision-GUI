@@ -231,16 +231,15 @@ if _gui_dir not in sys.path:
 # ---- Theme and registry (shell/) ----
 # These tables are parsed as text by the offline bakers, so they must stay literal
 # assignments in shell/theme.py and shell/registry.py. Imported by name here to keep
-# the rest of this file unchanged.
-from shell import theme
+# the rest of this file unchanged; a name the board never reads (ICON_SIZE,
+# NAME_BOTTOM_MARGIN) is deliberately not imported, so it has one home only.
 from shell.theme import (COL_BG, COL_BAR, COL_TEXT, COL_MUTED, COL_DOT_OFF,
                          ACCENT, STATUS_H, GRID_PAD_L, GRID_MARGIN,
                          GRID_V_MARGIN, DOTS_GAP, DOT_H, CLOCK_CELL_W,
                          CLOCK_COLON_W, CLOCK_H, SWIPE_DIAG, TILE_SIZE,
-                         ICON_SIZE, TILE_BG, TILE_BORDER, TILE_BORDER_W,
+                         TILE_BG, TILE_BORDER, TILE_BORDER_W,
                          TILE_RADIUS, TILE_PAD, NAME_COLOR,
-                         NAME_BOTTOM_MARGIN, STATUS_BATT_W, TILE_FONT_SIZE,
-                         BAKE_VER)
+                         STATUS_BATT_W, TILE_FONT_SIZE, BAKE_VER)
 from shell.registry import APPS, FOLDER_MEMBERS, APP_ACCENTS, ACCENTS, _sym
 
 # Shared paging module (home screen, gallery and any other horizontally paged app use
@@ -293,13 +292,9 @@ REFR_NOW = None   # cached lv.refr_now (None = not supported)
 # bitmaps; a full-screen repaint during a swipe then costs a few blits, about 0ms.
 # The first boot bakes at ~1.3s per tile (a one-off tiny_ttf cost) and stores the
 # result on SD; later boots read the cache and come up almost instantly.
-BAKE_VER = 7                       # +1 when tile layout/fonts change, dropping old caches
-                                   # v2: added the Gallery tile (APPS order changed, re-bake all)
-                                   # v3: placeholders replaced by 10 new app icon tiles (bake all)
-                                   # v4: palette A (tile fill/border and per-app icon tint)
-                                   # v5: de-saturated icons settled + clock digits back to white
-                                   # v6: home reordered to 13 items + folder dot badge;
-                                   #     header gained a folder flag byte (folder change invalidates)
+# BAKE_VER lives in shell/theme.py: the offline baker parses it there, and a second
+# definition here would shadow the import, so bumping the one the docs name would
+# leave the board reading the stale value and skipping the re-bake.
 CACHE_DIR = None                   # = _gui_dir + "/assets/cache", initialised in main
 BAKED_TILES = {}                   # app id -> (img_dsc_t, raw_bytes): kept referenced against GC
 
