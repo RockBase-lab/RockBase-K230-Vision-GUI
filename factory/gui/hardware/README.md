@@ -35,4 +35,8 @@ here draws a widget or decides a user flow.
 
 ## Status
 
-Scaffold. These modules still live at the GUI root and under `ui/`/`apps/`.
+Populated. `backlight.py` came from `ui/`, `battery.py` from the GUI root,
+`battery_trace.py` from `apps/` and `camera_fov.py` from the GUI root.
+
+`panel.py` is still pending: the `DISPLAY_*` constants and the display bring-up
+remain in `launcher.py` because they are entangled with `lvgl_setup`.

@@ -6,8 +6,8 @@ import gc
 import sys
 
 sys.path.insert(0, "/sdcard/factory/gui")
-for _name in ("launcher", "model_pool", "font_pool", "apps", "ui.beep",
-              "ui.paging", "ui.splash", "ui.backlight", "net.service", "batt"):
+for _name in ("core", "launcher", "core.model_pool", "core.font_pool", "apps", "ui.beep",
+              "ui.paging", "ui.splash", "hardware.backlight", "net.service", "hardware.battery"):
     if _name in sys.modules:
         del sys.modules[_name]
 
@@ -20,7 +20,7 @@ exec(compile(src, "launcher.py", "exec"), G)
 G["_ensure_cache_dir"]()
 print("BAKE_VER", G["BAKE_VER"])
 
-import model_pool
+from core import model_pool
 
 # boot_load() is what main() runs before building the desktop: it preloads the
 # models and fonts. Calling Launcher() alone skips it and reports resident=0.

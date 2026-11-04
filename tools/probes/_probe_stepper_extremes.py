@@ -6,7 +6,7 @@ import sys
 sys.path.insert(0, "/sdcard/factory/gui")
 
 import apps
-for _m in ("apps.app_settings", "config"):
+for _m in ("core", "apps.app_settings", "core.config"):
     try:
         del sys.modules[_m]
     except KeyError:
@@ -17,7 +17,7 @@ except Exception:
     pass
 
 import lvgl as lv
-import config
+from core import config
 
 config.PATH = "/data/settings/_probe_stepper.json"
 

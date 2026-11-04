@@ -27,7 +27,7 @@ from libs.AI2D import Ai2d
 from media.sensor import Sensor, CAM_CHN_ID_1, CAM_CHN_ID_2
 
 sys.path.insert(0, "/sdcard/factory/gui")
-from camera_fov import set_preview
+from hardware.camera_fov import set_preview
 
 PREVIEW_W = 800
 PREVIEW_H = 480

@@ -57,7 +57,8 @@ from machine import FPIOA, I2C
 
 from ui import beep
 from ui import paging
-from apps.error import AppUnavailable
+from core import paths
+from core.errors import AppUnavailable
 
 IMU_UNAVAILABLE = ("IMU (QMI8658A) not detected.\n"
                    "The IMU did not respond on I2C3.\n"
@@ -467,18 +468,6 @@ def _font(*names):
     return None
 
 
-def _assets_dir():
-    """Asset directory, derived from this module's __file__ (gui/ is above apps/)."""
-    path = globals().get("__file__")
-    if path:
-        try:
-            base = path.rsplit("/", 1)[0]        # .../gui/apps
-            return base.rsplit("/", 1)[0] + "/assets"
-        except BaseException:
-            pass
-    return "/sdcard/factory/gui/assets"
-
-
 _VALUE_FONT = None
 _VALUE_FONT_TRIED = False
 
@@ -503,7 +492,7 @@ def _value_font():
     load = getattr(lv, "font_load", None)
     if load is not None:
         # The path needs the A: prefix; without it the call silently returns None.
-        path = "A:" + _assets_dir() + "/fonts/" + MONO_FONT
+        path = "A:" + paths.asset_path("fonts", MONO_FONT)
         try:
             font = load(path)
             if font is not None:
@@ -660,7 +649,7 @@ def _dialog_font(name, fallback=("font_montserrat_16", "font_montserrat_14")):
     font = None
     load = getattr(lv, "font_load", None)
     if load is not None:
-        path = "A:" + _assets_dir() + "/fonts/" + name
+        path = "A:" + paths.asset_path("fonts", name)
         try:
             font = load(path)
             if font is None:

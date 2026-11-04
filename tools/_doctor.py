@@ -28,7 +28,7 @@ STUB_MAX_BYTES = 400
 
 # Package directories created by the module split. An empty one means the card still
 # has the flat pre-split layout and the current launcher cannot import them.
-PACKAGES = ("ui", "net", "audio")
+PACKAGES = ("ui", "net", "audio", "core", "hardware")
 
 
 def local_state():
@@ -180,7 +180,8 @@ def main():
         # 7) Import the packages the launcher needs, without starting a UI.
         out = run("import sys\n"
                   "sys.path.insert(0, '%s')\n"
-                  "for m in ['ui.paging', 'ui.beep', 'net.service', 'batt']:\n"
+                  "for m in ['ui.paging', 'ui.beep', 'net.service', 'hardware.battery',\n"
+                  "          'core.paths', 'core.config', 'hardware.camera_fov']:\n"
                   "    try:\n"
                   "        __import__(m)\n"
                   "        print('OK', m)\n"

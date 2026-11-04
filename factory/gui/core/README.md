@@ -46,5 +46,5 @@ resource pools (kmodel, font) plus the OCR dictionary.
 
 ## Status
 
-Scaffold. Seven of the eight modules still live at the GUI root, `errors.py`
-still lives under `apps/`, and `paths.py` does not exist yet.
+Final layout. Every module listed above is here; `paths.py` is new and replaced
+eight per-module root resolvers.

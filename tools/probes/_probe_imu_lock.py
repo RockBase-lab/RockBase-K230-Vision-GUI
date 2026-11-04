@@ -7,7 +7,7 @@ import math
 import ustruct
 
 sys.path.insert(0, "/sdcard/factory/gui")
-for _name in ("apps.app_motion", "apps", "apps.error"):
+for _name in ("core", "apps.app_motion", "apps", "core.errors"):
     if _name in sys.modules:
         del sys.modules[_name]
 

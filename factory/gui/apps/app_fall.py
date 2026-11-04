@@ -3,7 +3,7 @@
 # fallen posture was detected; NoFall boxes are upright people and are drawn
 # too so the user can see what the model is rejecting.
 
-from apps.anchor_det import AnchorDetApp
+from apps.anchor_base import AnchorDetApp
 
 CFG = {
     "name": "Fall Y5n",

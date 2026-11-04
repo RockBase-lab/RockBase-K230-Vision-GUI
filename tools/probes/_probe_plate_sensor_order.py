@@ -24,7 +24,7 @@ import time
 sys.path.insert(0, "/sdcard/factory/gui")
 
 from media.sensor import Sensor, CAM_CHN_ID_1, CAM_CHN_ID_2
-from camera_fov import set_preview
+from hardware.camera_fov import set_preview
 
 W = 800
 H = 480

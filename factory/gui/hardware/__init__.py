@@ -6,6 +6,7 @@
 #   from hardware import backlight
 #   from hardware import battery
 #
-# Planned contents: panel, backlight, battery, battery_trace, camera_fov.
+# Contents: backlight, battery, battery_trace, camera_fov (panel constants are
+# still in launcher.py).
 # Click feedback (ui/beep.py) is NOT here: it binds to lv.EVENT, so it belongs to
 # the interaction layer even though it drives a PWM.

@@ -20,10 +20,10 @@ import aidemo
 from libs.AI2D import Ai2d
 from media.sensor import Sensor, CAM_CHN_ID_1, CAM_CHN_ID_2
 from ui import beep
-from apps.error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
+from core.errors import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                        close_sensor)
-from camera_fov import set_preview
-import model_pool
+from hardware.camera_fov import set_preview
+from core import model_pool
 
 PREVIEW_W = 800
 PREVIEW_H = 480

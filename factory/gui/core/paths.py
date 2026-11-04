@@ -1,0 +1,80 @@
+# Single asset-path resolver for every layer above hardware/.
+#
+# This module exists because eight separate copies of "where is the GUI root?" had
+# accumulated, each hard-coding /sdcard/factory/gui and each counting path
+# separators from its own location. A module that moves one directory deeper then
+# resolves the wrong path, and the failure is silent: the PNG loader turns ENOENT
+# into None, so an icon simply disappears with no log line.
+#
+# Resolution is depth-independent: walk up from this file until a directory that
+# holds assets/ is found. CanMV has no os.path, so the walk uses os.stat and plain
+# string work.
+
+import os
+
+FALLBACK_ROOT = "/sdcard/factory/gui"
+
+_root = None
+
+
+def _dirname(path):
+    """Parent directory of an absolute POSIX path, or '' at the root."""
+    if "/" not in path:
+        return ""
+    return path.rsplit("/", 1)[0]
+
+
+def _is_dir(path):
+    try:
+        os.stat(path)
+        return True
+    except OSError:
+        return False
+
+
+def gui_root():
+    """Absolute path of the deployed GUI root (the directory holding assets/).
+
+    Under exec(open('launcher.py').read()) there is no __file__; every imported
+    module has one, so this is only reached from launcher.py itself (which keeps
+    its own fallback for sys.path setup).
+    """
+    global _root
+    if _root is not None:
+        return _root
+
+    path = globals().get("__file__")
+    if not path:
+        _root = FALLBACK_ROOT
+        return _root
+
+    # The board is POSIX, but normalising backslashes lets this module be exercised on
+    # a host interpreter, which is the only way to test it off the board.
+    current = _dirname(path.replace("\\", "/"))
+    while current:
+        if _is_dir(current + "/assets"):
+            _root = current
+            return _root
+        parent = _dirname(current)
+        if parent == current:
+            break
+        current = parent
+
+    _root = FALLBACK_ROOT
+    return _root
+
+
+def asset_path(*parts):
+    """Absolute path under assets/. Use this instead of joining from a module dir."""
+    path = gui_root() + "/assets"
+    for part in parts:
+        path += "/" + part
+    return path
+
+
+def gui_path(*parts):
+    """Absolute path under the GUI root (for cache/ or other non-asset trees)."""
+    path = gui_root()
+    for part in parts:
+        path += "/" + part
+    return path

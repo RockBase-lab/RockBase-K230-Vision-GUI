@@ -12,8 +12,8 @@ import sys
 import time
 
 sys.path.insert(0, "/sdcard/factory/gui")
-for _name in ("apps.anchor_det", "apps.app_person", "apps", "apps.error",
-              "ui.beep", "launcher", "camera_fov", "model_pool"):
+for _name in ("core", "apps.anchor_base", "apps.app_person", "apps", "core.errors",
+              "ui.beep", "launcher", "hardware.camera_fov", "core.model_pool"):
     if _name in sys.modules:
         del sys.modules[_name]
 
@@ -22,7 +22,7 @@ import ulab.numpy as np
 import aicube
 from libs.AI2D import Ai2d
 from media.sensor import Sensor, CAM_CHN_ID_1
-from camera_fov import set_preview
+from hardware.camera_fov import set_preview
 
 
 def score_max(outs):

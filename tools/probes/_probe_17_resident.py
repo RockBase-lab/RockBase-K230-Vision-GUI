@@ -11,13 +11,13 @@ import sys
 import time
 
 sys.path.insert(0, "/sdcard/factory/gui")
-for _name in ("apps.app_gesture", "apps", "apps.error", "ui.beep", "launcher",
-              "camera_fov", "model_pool"):
+for _name in ("core", "apps.app_gesture", "apps", "core.errors", "ui.beep", "launcher",
+              "hardware.camera_fov", "core.model_pool"):
     if _name in sys.modules:
         del sys.modules[_name]
 
 import lvgl as lv
-from model_pool import preload, loaded_count
+from core.model_pool import preload, loaded_count
 
 BOOT_MODELS = [
     "face_detection_320.kmodel", "face_liveness_rgb.kmodel",

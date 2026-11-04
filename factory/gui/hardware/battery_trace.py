@@ -19,7 +19,7 @@ import gc
 import os
 import time
 
-import batt
+from hardware import battery
 
 DIR = "/data/battery"
 ENABLE_FILE = DIR + "/trace_on"
@@ -98,8 +98,8 @@ class Tracer(object):
         pi = []             # their position in the batch, for min/max placement
         for i in range(n):
             uv = uvs[i]
-            if 0 < uv <= batt.MAX_INPUT_UV:
-                pv.append(uv * batt.DIV_NUM // batt.DIV_DEN // 1000)
+            if 0 < uv <= battery.MAX_INPUT_UV:
+                pv.append(uv * battery.DIV_NUM // battery.DIV_DEN // 1000)
                 pi.append(i)
         n_ok = len(pv)
 
@@ -134,7 +134,7 @@ class Tracer(object):
             rel[mx_i] // 1000 if mx_i >= 0 else -1,
             span_r, over20, mean, status.replace(" ", "_"),
             pct if pct is not None else -1, paint_us, gc.mem_free(),
-            batt.STATUS_SAMPLES, 1 if quiet else 0,
+            battery.STATUS_SAMPLES, 1 if quiet else 0,
         ]
         out = ",".join([str(v) for v in fields]) + "\n"
 
@@ -143,7 +143,7 @@ class Tracer(object):
             self.dumps += 1
             for i in range(n):
                 uv = uvs[i]
-                ok = 1 if 0 < uv <= batt.MAX_INPUT_UV else 0
+                ok = 1 if 0 < uv <= battery.MAX_INPUT_UV else 0
                 r = rel[i] // 1000 if i < len(rel) else -1
                 g = gap[i] // 1000 if i < len(gap) else -1
                 p = sp[i] // 1000 if i < len(sp) else -1

@@ -7,14 +7,14 @@ import sys
 
 sys.path.insert(0, "/sdcard/factory/gui")
 
-for m in ("apps.app_settings", "config"):
+for m in ("core", "apps.app_settings", "core.config"):
     try:
         del sys.modules[m]
     except KeyError:
         pass
 
 import lvgl as lv
-import config
+from core import config
 from apps import app_settings
 
 

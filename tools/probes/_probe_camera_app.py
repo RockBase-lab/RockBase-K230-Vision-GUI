@@ -12,7 +12,7 @@ import time
 
 import lvgl as lv
 
-for _k in ("apps.app_camera", "app_camera", "apps", "camera_fov", "audio.shutter"):
+for _k in ("apps.app_camera", "app_camera", "apps", "hardware.camera_fov", "audio.shutter"):
     if _k in sys.modules:
         del sys.modules[_k]
 

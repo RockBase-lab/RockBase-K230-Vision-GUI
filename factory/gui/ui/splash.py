@@ -12,8 +12,8 @@
 import lvgl as lv
 
 import time
-import font_pool
-from version import GUI_VERSION
+from core import font_pool
+from core.version import GUI_VERSION
 
 COL_BG = 0x12141A
 COL_TEXT = 0xFFFFFF

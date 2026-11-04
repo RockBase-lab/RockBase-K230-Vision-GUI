@@ -10,7 +10,7 @@ import ubinascii
 import uctypes
 
 sys.path.insert(0, "/sdcard/factory/gui")
-for _name in ("ui.splash", "font_pool", "version"):
+for _name in ("core", "ui.splash", "core.font_pool", "core.version"):
     if _name in sys.modules:
         del sys.modules[_name]
 

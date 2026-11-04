@@ -77,6 +77,10 @@ in `core/`, `hardware/` or `ui/` according to the layer map.
 
 ## Status
 
-Populated. Three files are in the wrong place and move out later:
-`error.py` → `core/errors.py`, `batt_trace.py` → `hardware/battery_trace.py`,
-`anchor_det.py` → `anchor_base.py` (rename only).
+Final layout: every `app_*.py` here is an app, and `anchor_base.py` is the only
+shared module, kept because only apps in this directory subclass it.
+
+`error.py` moved to `core/errors.py` (infrastructure every layer catches) and
+`batt_trace.py` to `hardware/battery_trace.py` (it writes ADC batches);
+`anchor_det.py` was renamed `anchor_base.py` so its name no longer reads as an
+app.

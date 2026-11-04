@@ -3,7 +3,7 @@
 # differs. conf 0.2 matches the official tuning for this kmodel -- a real
 # person measures ~0.88, so 0.2 keeps distance shots without noise boxes.
 
-from apps.anchor_det import AnchorDetApp
+from apps.anchor_base import AnchorDetApp
 
 CFG = {
     "name": "Person Y5n",

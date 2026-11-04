@@ -218,7 +218,7 @@ gyro LSB is 15.6 mdps with 0.2-0.5 dps noise, so one decimal suffices.
   provide. All lit segments share one colour chosen from the current charge
   (red to 25 %, yellow to 50 %, green above), the same rule as the icon: a
   fixed colour per position would leave a red block glowing at the left of a
-  full gauge. Both consumers read through `batt.py`, which owns the single
+  full gauge. Both consumers read through `hardware/battery.py`, which owns the single
   ADC5 handle; opening the channel twice is untested.
 - Charge still cannot be measured, only inferred: the anchors are voltage
   thresholds, so the reading sags under load and lifts while charging.

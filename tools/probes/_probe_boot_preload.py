@@ -13,9 +13,9 @@ sys.path.insert(0, "/sdcard/factory/gui")
 # Purging a SUBmodule is not enough: the parent package keeps the old module object
 # in its namespace, so "from net import service" hands back the stale one even after
 # "del sys.modules['net.service']". Purge the parents too.
-for _name in ("apps.app_ocr", "apps.app_vision", "apps", "apps.error",
-              "ui", "ui.beep", "ui.splash", "launcher", "camera_fov",
-              "model_pool", "font_pool", "ocr_dict",
+for _name in ("core", "apps.app_ocr", "apps.app_vision", "apps", "core.errors",
+              "ui", "ui.beep", "ui.splash", "launcher", "hardware.camera_fov",
+              "core.model_pool", "core.font_pool", "core.ocr_dict",
               "net", "net.service"):
     if _name in sys.modules:
         del sys.modules[_name]

@@ -14,11 +14,11 @@ import sys
 import time
 
 sys.path.insert(0, "/sdcard/factory/gui")
-for _name in ("camera_fov", "apps.app_camera", "apps.app_scan", "apps.app_vision",
-              "apps.app_face_det", "apps.app_face_points", "apps", "apps.error"):
+for _name in ("core", "hardware.camera_fov", "apps.app_camera", "apps.app_scan", "apps.app_vision",
+              "apps.app_face_det", "apps.app_face_points", "apps", "core.errors"):
     sys.modules.pop(_name, None)
 
-from camera_fov import preview_crop, set_preview, SENSOR_W, SENSOR_H
+from hardware.camera_fov import preview_crop, set_preview, SENSOR_W, SENSOR_H
 from media.sensor import Sensor, CAM_CHN_ID_1, CAM_CHN_ID_2
 
 FRAMES = 10

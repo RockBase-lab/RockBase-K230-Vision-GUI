@@ -6,5 +6,5 @@
 #   from core import config
 #   from core.errors import AppUnavailable
 #
-# Planned contents: paths, errors, config, i18n, version, font_pool, model_pool,
+# Contents: paths, errors, config, i18n, version, font_pool, model_pool,
 # ocr_dict. `paths` is the single asset-path resolver for every layer above.

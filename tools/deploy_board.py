@@ -397,7 +397,7 @@ def main():
             out = run(
                 "import sys\n"
                 "sys.path.insert(0, '/sdcard/factory/gui')\n"
-                "mods = ['ui.paging', 'ui.backlight', 'apps.app_touch',\n"
+                "mods = ['ui.paging', 'hardware.backlight', 'apps.app_touch',\n"
                 "        'apps.app_camera', 'apps.app_gallery', 'apps.app_audio',\n"
                 "        'apps.app_settings', 'apps.app_placeholder']\n"
                 "for m in mods:\n"

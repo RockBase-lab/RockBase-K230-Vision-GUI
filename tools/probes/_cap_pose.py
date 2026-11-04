@@ -13,8 +13,8 @@ import sys
 VIEW_INDEX = 0
 
 sys.path.insert(0, "/sdcard/factory/gui")
-for _name in ("apps.app_pose", "apps", "apps.error", "ui.beep", "launcher",
-              "camera_fov"):
+for _name in ("core", "apps.app_pose", "apps", "core.errors", "ui.beep", "launcher",
+              "hardware.camera_fov"):
     if _name in sys.modules:
         del sys.modules[_name]
 

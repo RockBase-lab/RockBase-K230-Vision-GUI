@@ -27,6 +27,7 @@ import time
 import lvgl as lv
 
 from net import service as net_mgr
+from core import paths
 from ui import beep
 from ui import kb_layer
 
@@ -95,11 +96,7 @@ _TIER_CELL_H = [44, 30, 22]   # must match the TIERS cell heights baked into the
 
 
 def _tz_cache_dir():
-    try:
-        d = __file__.rsplit("/", 1)[0]
-    except NameError:
-        d = "/sdcard/factory/gui/apps"
-    return d.rsplit("/", 1)[0] + "/assets/cache"
+    return paths.asset_path("cache")
 
 
 def _tz_load_sheets():

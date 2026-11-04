@@ -12,6 +12,7 @@ not own a device or a user flow.
 | `kb_layer.py` | the reusable keyboard overlay, including the CJK face and the password eye |
 | `splash.py` | the boot progress screen |
 | `beep.py` | click/tone feedback through the GPIO43 PWM buzzer, plus the `on_click` / `bind` event wrappers |
+| `image.py` | `load(path)` / `load_asset(name)`, the one PNG → `lv.img_dsc_t` reader |
 
 ## Rules
 
@@ -40,4 +41,5 @@ not own a device or a user flow.
 
 ## Status
 
-Populated. `backlight.py` moves to `hardware/`; everything else stays.
+Final layout. `backlight.py` moved to `hardware/`; `image.py` is new and replaced
+the four per-module PNG readers.

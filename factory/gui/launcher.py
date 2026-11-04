@@ -491,27 +491,30 @@ from ui import splash as splash_ui
 from net import service as net_mgr
 # Shared ADC5 access: the status bar and the Battery app hold one channel handle, so
 # the app never opens a second one.
-import batt
+from hardware import battery
 # Signal that an app cannot run (camera missing, ...): the app raises AppUnavailable
 # and this file shows the notice panel.
-from apps.error import AppUnavailable
+from core.errors import AppUnavailable
 # Click sound (passive buzzer on IO43). init/poll failures all degrade silently so
 # they never block startup.
 from ui import beep
 # Panel backlight handle: this file brings the pin up, then hands the PWM over so
 # the Settings app can change brightness without creating a second channel.
-from ui import backlight
+from hardware import backlight
 # Persistent user preferences (/data/settings/gui.json). Read at boot for the
 # click tone and brightness, then by each app that owns a setting.
-import config
+from core import config
 # Desktop string table + language state: tile names, folder titles and member
 # labels resolve through this so a language switch rebuilds the home in place.
-import i18n
+from core import i18n
 # Resident kpu / bitmap-font caches: apps take their resources from these instead of
 # loading them at open, which is what makes the boot preload worth doing.
-import model_pool
-import font_pool
-import ocr_dict
+from core import model_pool
+from core import font_pool
+from core import ocr_dict
+# PNG loading is shared with the keyboard and the apps (ui/image.py); the alias keeps
+# the existing _load_png() call sites unchanged.
+from ui.image import load as _load_png
 
 SWIPE_THRESHOLD_PX = paging.SWIPE_THRESHOLD_PX   # 120px, shared with every app
 SNAP_ANIM_MS = paging.SNAP_ANIM_MS               # 180ms
@@ -519,16 +522,6 @@ SNAP_ANIM_MS = paging.SNAP_ANIM_MS               # 180ms
 disp_imgs = None
 disp_drv = None
 REFR_NOW = None   # cached lv.refr_now (None = not supported)
-
-
-def _load_png(path):
-    """Read a PNG file into an LVGL image descriptor; None if that fails."""
-    try:
-        with open(path, "rb") as f:
-            data = f.read()
-        return lv.img_dsc_t({"data_size": len(data), "data": data})
-    except OSError:
-        return None
 
 
 # ---- Tile bake cache (the core of smooth swiping) ----
@@ -783,7 +776,7 @@ CLOCK_IMGS = {}    # clock digit bitmap cache: '0'..'9' / ':'
 def _battery_level():
     """Charge cell count 0-3 for the status bar, 0 when the pack cannot be read."""
     try:
-        state = batt.status()
+        state = battery.status()
     except BaseException as error:
         print("[GUI] battery read failed: {}".format(error))
         return 0
@@ -1331,8 +1324,8 @@ def _backlight_on(target_pct=backlight.MIN_PERCENT):
 
     PWM first for a short fade, then a plain GPIO high, then give up loudly: a silent
     failure here is indistinguishable from a dead board from the user's side. The
-    PWM object is handed to ui.backlight so the Settings app can dim it later; the
-    GPIO fallback cannot dim, and ui.backlight stays detached.
+    PWM object is handed to hardware.backlight so the Settings app can dim it later;
+    the GPIO fallback cannot dim, and hardware.backlight stays detached.
     """
     global _BACKLIGHT
     target = int(target_pct)
@@ -1605,7 +1598,7 @@ class Launcher:
 
         # Status icons on the right: battery hugs the edge, wifi sits to its left.
         # The battery icon carries four charge cells and is replaced on the 1s tick
-        # from batt.status(), the same way wifi swaps its signal variant.
+        # from battery.status(), the same way wifi swaps its signal variant.
         batt_w = STATUS_BATT_W
         batt_icon = None
         batt_src = _status_icon("battery_" + str(_battery_level()))
@@ -2265,7 +2258,7 @@ class Launcher:
         """Refresh the status-bar battery icon from the shared ADC cache.
 
         Immersive apps have no status bar, so this is skipped when batt_img is None.
-        batt.status() is cached for 20s inside the module, so the 1s tick only costs a
+        battery.status() is cached for 20s inside the module, so the 1s tick only costs a
         compare and a set_src when the charge cell actually changes.
         """
         img = getattr(self, "batt_img", None)

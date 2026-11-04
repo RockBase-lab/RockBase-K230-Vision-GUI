@@ -13,8 +13,8 @@ import ubinascii
 import uctypes
 
 sys.path.insert(0, "/sdcard/factory/gui")
-for _name in ("apps", "apps.error", "ui", "ui.beep", "ui.splash", "launcher",
-              "camera_fov", "model_pool", "font_pool", "ocr_dict",
+for _name in ("core", "apps", "core.errors", "ui", "ui.beep", "ui.splash", "launcher",
+              "hardware.camera_fov", "core.model_pool", "core.font_pool", "core.ocr_dict",
               "net", "net.service"):
     if _name in sys.modules:
         del sys.modules[_name]

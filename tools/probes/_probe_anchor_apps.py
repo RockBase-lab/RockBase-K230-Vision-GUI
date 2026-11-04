@@ -10,9 +10,9 @@ import sys
 import time
 
 sys.path.insert(0, "/sdcard/factory/gui")
-for _name in ("apps.anchor_det", "apps.app_person", "apps.app_fall",
-              "apps.app_gesture", "apps", "apps.error", "ui.beep", "launcher",
-              "camera_fov", "model_pool"):
+for _name in ("core", "apps.anchor_base", "apps.app_person", "apps.app_fall",
+              "apps.app_gesture", "apps", "core.errors", "ui.beep", "launcher",
+              "hardware.camera_fov", "core.model_pool"):
     if _name in sys.modules:
         del sys.modules[_name]
 

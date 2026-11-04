@@ -18,8 +18,8 @@ import nncase_runtime as nn
 import aidemo
 from libs.AI2D import Ai2d
 from media.sensor import Sensor, CAM_CHN_ID_1
-from camera_fov import set_preview
-from model_pool import get as model_get
+from hardware.camera_fov import set_preview
+from core.model_pool import get as model_get
 
 W = 640
 H = 384

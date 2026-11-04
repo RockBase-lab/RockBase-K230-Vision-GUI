@@ -17,8 +17,8 @@ import nncase_runtime as nn
 import aicube
 from libs.AI2D import Ai2d
 from media.sensor import Sensor, CAM_CHN_ID_1
-from camera_fov import set_preview
-from model_pool import get as model_get, loaded_count
+from hardware.camera_fov import set_preview
+from core.model_pool import get as model_get, loaded_count
 
 PREVIEW_W = 800
 PREVIEW_H = 480

@@ -11,8 +11,8 @@ import sys
 import time
 
 sys.path.insert(0, "/sdcard/factory/gui")
-for _name in ("apps.app_face_recognize", "apps.app_face_points",
-              "apps.app_face_det", "apps", "apps.error", "ui.beep",
+for _name in ("core", "apps.app_face_recognize", "apps.app_face_points",
+              "apps.app_face_det", "apps", "core.errors", "ui.beep",
               "ui.kb_layer", "launcher"):
     if _name in sys.modules:
         del sys.modules[_name]

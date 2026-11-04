@@ -55,10 +55,10 @@ import aidemo
 from libs.AI2D import Ai2d
 from media.sensor import Sensor, CAM_CHN_ID_1, CAM_CHN_ID_2
 from ui import beep
-from model_pool import get as model_get
+from core.model_pool import get as model_get
 from ui import kb_layer
 from audio import greet
-from apps.error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
+from core.errors import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                         close_sensor)
 
 PREVIEW_W = 800

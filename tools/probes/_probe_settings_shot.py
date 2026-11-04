@@ -7,7 +7,7 @@ sys.path.insert(0, "/sdcard/factory/gui")
 # `del sys.modules` alone leaves the stale object reachable through the package
 # attribute, and that object keeps its own `config` binding. Clear both.
 import apps
-for _m in ("apps.app_settings", "config"):
+for _m in ("core", "apps.app_settings", "core.config"):
     try:
         del sys.modules[_m]
     except KeyError:
@@ -18,7 +18,7 @@ except Exception:
     pass
 
 import lvgl as lv
-import config
+from core import config
 from apps import app_settings
 
 # Assert one shared module before trusting anything the app renders.

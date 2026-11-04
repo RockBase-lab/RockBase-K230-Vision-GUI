@@ -35,7 +35,7 @@ from media.sensor import Sensor, CAM_CHN_ID_1, CAM_CHN_ID_2
 # helper so the timings and the coordinate domain match production.
 sys.path.insert(0, "/sdcard/factory/gui")
 try:
-    from camera_fov import set_preview
+    from hardware.camera_fov import set_preview
 except BaseException as _error:
     print("P0 camera_fov unavailable ({}), using crop=True".format(_error))
     set_preview = None

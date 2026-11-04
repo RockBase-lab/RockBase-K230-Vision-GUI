@@ -5,7 +5,7 @@
 import io
 import re
 
-src = io.open("factory/gui/i18n.py", encoding="utf-8").read()
+src = io.open("factory/gui/core/i18n.py", encoding="utf-8").read()
 pairs = re.findall(r'\("([^"]*)", "([^"]*)"\)', src)
 zh = set()
 for _en, name in pairs:

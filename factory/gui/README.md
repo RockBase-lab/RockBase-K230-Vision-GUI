@@ -58,8 +58,7 @@ Do not invert this by copying the number into `core/`.
 | A one-off measurement or screenshot script | `tools/probes/` at the **repo root**, never here |
 
 If a new file does not fit any row, the design is not decided yet. Do not drop it
-at the GUI root to decide later: after the migration the root holds `launcher.py`
-and nothing else (`config.py` is the last file waiting to move down).
+at the GUI root to decide later: the root holds `launcher.py` and nothing else.
 
 ## Rules
 
@@ -90,38 +89,32 @@ in a later change.
 
 | Path | Status | Still to move in |
 | --- | --- | --- |
-| `launcher.py` | populated, oversized | out: tables, widgets, display bring-up |
-| `shell/` | **scaffold** | theme, registry, tile cache, display, touch, buttons, context, status bar, boot, `Launcher` |
-| `apps/` | populated | out: `error.py`, `batt_trace.py`; `anchor_det.py` → `anchor_base.py` |
-| `ui/` | populated | out: `backlight.py` only; `beep.py` stays (see `ui/README.md`) |
+| `launcher.py` | populated, oversized | out: theme, registry, tile cache, display, touch, buttons, context, status bar, boot, `Launcher` |
+| `shell/` | **scaffold** | all of the above |
+| `apps/` | populated, clean | — (only `app_*.py` plus `anchor_base.py`) |
+| `ui/` | populated, clean | — |
 | `net/`, `audio/` | populated, final | — |
-| `core/` | **scaffold** | `paths.py` (new), `config.py`, `i18n.py`, `version.py`, `font_pool.py`, `model_pool.py`, `ocr_dict.py`, `errors.py` |
-| `hardware/` | **scaffold** | `panel.py` (from launcher), `backlight.py` (from ui), `battery.py`, `battery_trace.py`, `camera_fov.py` |
+| `core/` | populated | — (`paths`, `errors`, `config`, `i18n`, `version`, `font_pool`, `model_pool`, `ocr_dict`) |
+| `hardware/` | populated | `panel.py` (the `DISPLAY_*` constants still sit in `launcher.py`) |
 | `assets/` | populated, flat | grouping into `icons/ status/ glyphs/ widgets/ fonts/ cache/ src/` |
 
-## Known duplication the migration must remove
+Only `launcher.py` is left at the GUI root. `config.py` used to be the second root
+file; it now lives in `core/`.
 
-These all answer "where is the GUI root?" today, each with its own hard-coded
-`/sdcard/factory/gui` fallback and its own assumption about how deep the calling
-module sits. They collapse into `core/paths.py`: a depth-independent `gui_root()`
-that walks up until `assets/` exists, plus `asset_path(name)`. Recreating any of
-them under a new name defeats the purpose of the move.
+## Duplication that was removed
 
-| Module | Function |
-| --- | --- |
-| `launcher.py:478` | `_gui_dir` |
-| `ui/kb_layer.py:57` | `_gui_root()` |
-| `core/font_pool.py:28` | `assets_dir()` |
-| `apps/app_audio.py:145` | assets dir helper |
-| `apps/app_imu.py:476` | assets dir helper |
-| `apps/app_plate.py:201` | assets dir helper |
-| `apps/app_touch.py:52` | assets dir helper |
-| `apps/app_network.py:98` | cache dir helper |
+Eight modules used to answer "where is the GUI root?" independently, each with its
+own `/sdcard/factory/gui` fallback and its own separator count. All of them now
+call `core.paths`. Four copies of `_load_png` likewise collapsed into
+`ui/image.py`.
 
-`_load_png` is likewise defined four times (`launcher.py:524`,
-`ui/kb_layer.py:98`, `apps/app_audio.py:149`, `apps/app_touch.py:33`); the single
-copy belongs in `ui/image.py`, because it needs `lvgl` and `core/` must not import
-`lvgl` at module scope.
+`launcher.py` keeps one `_gui_dir` for the `sys.path` bootstrap. That cannot use
+`core.paths`: the package is not importable until the GUI root is on `sys.path`,
+so the bootstrap is the one place that still hard-codes the deploy path.
+
+Do not reintroduce a resolver. A module that joins `assets/` from its own
+directory breaks when it moves, and it fails silently (`_load_png` turns `ENOENT`
+into `None`, so an icon just disappears).
 
 ## Coupled files outside this tree
 
@@ -129,7 +122,7 @@ These read this tree and must be updated in the same change as any move:
 
 | File | Reads |
 | --- | --- |
-| `tools/gen_tile_cache.py` | parses `launcher.py` (theme constants, `APPS`, `APP_ACCENTS`) and `i18n.py` (`NAMES`) as text; writes `assets/cache/tile_*.bin` |
+| `tools/gen_tile_cache.py` | parses `launcher.py` (theme constants, `APPS`, `APP_ACCENTS`) and `core/i18n.py` (`NAMES`) as text; writes `assets/cache/tile_*.bin` |
 | `tools/gen_app_icons.py` | parses `launcher.py` for palette constants; writes `assets/icon_*.png` from `assets/src_*.svg` |
 | `tools/gen_status_icons.py` | parses `launcher.py` for `COL_BAR`; writes `assets/icon_status_*.png` and `assets/src_status_*.svg` |
 | `tools/gen_clock_digits.py` | parses `launcher.py`; reads `assets/Nunito-Bold-700.ttf`; writes `assets/clock_*.png`, `assets/timer_*.png` |
@@ -137,9 +130,9 @@ These read this tree and must be updated in the same change as any move:
 | `tools/gen_member_icons.py` | writes `assets/cache/member_icon_*.png` |
 | `tools/gen_touch_hint.py` | writes `assets/hint_multitouch.png` |
 | `tools/gen_font.py` | writes `assets/fonts/*.bin` |
-| `tools/gen_ui_cjk_charset.py` | reads `i18n.py`; writes `tools/ui_cjk_charset.txt` |
+| `tools/gen_ui_cjk_charset.py` | reads `core/i18n.py`; writes `tools/ui_cjk_charset.txt` |
 | `tools/gen_pinyin_map.py` | writes `audio/pinyin_map.py` (currently through a hard-coded absolute path) |
 | `tools/_doctor.py` | parses `launcher.py` for `BAKE_VER` and the `APPS` module/icon pairs; `PACKAGES` (`ui`, `net`, `audio`) and the hard-coded import probe (`ui.paging`, `ui.beep`, `net.service`, `batt`) must both follow the migration: add `core`, `hardware`, `shell` and rename `batt` to `hardware.battery`, or a broken deploy passes |
 | `tools/deploy_board.py` | walks this whole tree |
-| `tools/probes/*.py` | import `camera_fov`, `model_pool`, `config` by module name |
+| `tools/probes/*.py` | import `hardware.camera_fov`, `core.model_pool`, `core.config` by module name, and clear them from `sys.modules` (parent `core` included) before re-importing |
 | `AGENTS.md`, `README.md` | describe the app layout and the `APPS` table location |

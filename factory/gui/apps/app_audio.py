@@ -32,6 +32,7 @@ import lvgl as lv
 
 from audio import device
 from ui import beep
+from ui import image
 from ui import paging
 from audio import tone
 
@@ -130,41 +131,14 @@ _BTN_IMGS = {}
 # =========================================================================
 # Assets
 # =========================================================================
-def _assets_dir():
-    """Asset directory, derived from this module's __file__ (apps/'s parent is gui/).
-
-    Deriving it from here rather than from an audio module keeps it correct when
-    those modules move between packages.
-    """
-    path = globals().get("__file__")
-    if path:
-        try:
-            base = path.rsplit("/", 1)[0]        # .../gui/apps
-            return base.rsplit("/", 1)[0] + "/assets"
-        except BaseException:
-            pass
-    return "/sdcard/factory/gui/assets"
-
-
-def _load_png(path):
-    try:
-        f = open(path, "rb")
-        data = f.read()
-        f.close()
-        return lv.img_dsc_t({"data_size": len(data), "data": data})
-    except BaseException:
-        return None
-
-
 def _timer_imgs():
     if _TIMER_IMGS:
         return _TIMER_IMGS
-    base = _assets_dir()
     for ch in "0123456789":
-        dsc = _load_png(base + "/timer_" + ch + ".png")
+        dsc = image.load_asset("timer_" + ch + ".png")
         if dsc is not None:
             _TIMER_IMGS[ch] = dsc
-    dsc = _load_png(base + "/timer_colon.png")
+    dsc = image.load_asset("timer_colon.png")
     if dsc is not None:
         _TIMER_IMGS[":"] = dsc
     return _TIMER_IMGS
@@ -175,7 +149,7 @@ def _btn_img(name):
     module dict to survive GC."""
     dsc = _BTN_IMGS.get(name)
     if dsc is None:
-        dsc = _load_png(_assets_dir() + "/" + name + ".png")
+        dsc = image.load_asset(name + ".png")
         _BTN_IMGS[name] = dsc
     return dsc
 

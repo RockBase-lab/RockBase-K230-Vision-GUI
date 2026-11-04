@@ -20,9 +20,9 @@ import time
 import lvgl as lv
 from machine import FPIOA, Pin
 
-import batt
-from apps.batt_trace import open_session
-from apps.error import AppUnavailable
+from hardware import battery
+from hardware.battery_trace import open_session
+from core.errors import AppUnavailable
 
 BATTERY_UNAVAILABLE = ("Battery ADC does not respond.\n"
                        "The pack voltage cannot be measured.\n"
@@ -34,16 +34,16 @@ BATTERY_UNAVAILABLE = ("Battery ADC does not respond.\n"
 # 3s settle). It is still driven here so the pin is never left floating; do not rely
 # on it to save power.
 ENABLE_PIN = 69             # nominally the divider switch, measured ineffective
-ADC_CHANNEL = batt.ADC_CHANNEL   # only channel whose reading matches a divider tap
+ADC_CHANNEL = battery.ADC_CHANNEL   # only channel whose reading matches a divider tap
 
 # ---- conversion ----
 # One source for the whole chain: the status bar reads the same pack, so the
-# constants live in batt.py rather than being duplicated here.
-DIV_NUM = batt.DIV_NUM      # 1.5k + 1k divider, tap at 1k: pack = tap * 5/2
-DIV_DEN = batt.DIV_DEN
-ADC_FULL_CODE = batt.ADC_FULL_CODE
-ADC_FULL_MV = batt.ADC_FULL_MV
-MAX_INPUT_UV = batt.MAX_INPUT_UV
+# constants live in battery.py rather than being duplicated here.
+DIV_NUM = battery.DIV_NUM      # 1.5k + 1k divider, tap at 1k: pack = tap * 5/2
+DIV_DEN = battery.DIV_DEN
+ADC_FULL_CODE = battery.ADC_FULL_CODE
+ADC_FULL_MV = battery.ADC_FULL_MV
+MAX_INPUT_UV = battery.MAX_INPUT_UV
 
 # ---- sampling ----
 # A batch is a window of elapsed time, not a count: step() is called once per panel
@@ -58,7 +58,7 @@ SAMPLE_COUNT = 31           # hard cap on conversions per batch
 SAMPLE_GAP_MS = 10          # enforced only when the loop runs faster than this
 REFRESH_MS = 1000
 SPAN_LIMIT_MV = 100         # peak-to-peak above this means an unstable input
-ABSENT_MAX_MV = batt.ABSENT_MAX_MV
+ABSENT_MAX_MV = battery.ABSENT_MAX_MV
 PRESENT_MIN_MV = 3000
 # A resting full pack sits at 4.2V, but while charging the charger holds the rail
 # above it: measured 4363mV on this board with the cable connected. Anything in the
@@ -149,7 +149,7 @@ def _font(*names):
 
 def _percent(mv):
     """Map a pack voltage to a 0-100 estimate (shared OCV curve)."""
-    return batt.percent(mv)
+    return battery.percent(mv)
 
 
 def _seg_color(pct):
@@ -279,7 +279,7 @@ class BatteryApp(object):
             fpioa.set_function(ENABLE_PIN, FPIOA.GPIO0 + ENABLE_PIN)
             self.enable = Pin(ENABLE_PIN, Pin.OUT, pull=Pin.PULL_NONE, drive=7)
             self.enable.value(1)
-            self.adc = batt.adc()
+            self.adc = battery.adc()
         except BaseException as error:
             print("[Battery] open failed: {}".format(error))
             self._release()
@@ -526,11 +526,11 @@ class BatteryApp(object):
 
         # Derive the 12-bit code from the same conversion instead of reading the
         # channel twice. No Vref scaling: read_uv() already reports against the 1.8V
-        # full scale the code assumes (see the note in batt.py).
+        # full scale the code assumes (see the note in battery.py).
         raw = uv * ADC_FULL_CODE // ADC_FULL_MV
         self._tap_uv = uv
         self._raws.append(raw)
-        self._mvs.append(batt.pack_mv(uv))
+        self._mvs.append(battery.pack_mv(uv))
         if traced:
             self._uvs.append(uv)
 

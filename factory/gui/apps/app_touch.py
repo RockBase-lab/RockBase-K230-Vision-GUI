@@ -29,31 +29,7 @@
 import lvgl as lv
 import time
 
-
-def _load_png(path):
-    """Read a PNG into an lv.img_dsc_t. The returned dsc must stay referenced (its data
-    lives inside it)."""
-    try:
-        f = open(path, "rb")
-        data = f.read()
-        f.close()
-        return lv.img_dsc_t({"data_size": len(data), "data": data})
-    except BaseException as error:
-        print("[Touch] load {} failed: {}".format(path, error))
-        return None
-
-
-def _assets_dir():
-    """Asset directory, derived from this module's __file__ (apps/'s parent is gui/)."""
-    path = globals().get("__file__")
-    if path:
-        try:
-            base = path.rsplit("/", 1)[0]        # .../gui/apps
-            return base.rsplit("/", 1)[0] + "/assets"
-        except BaseException:
-            pass
-    return "/sdcard/factory/gui/assets"
-
+from ui import image
 
 # ---- Top coordinate readout ----
 # Use built-in font labels (no pre-baked bitmaps): the text changes on every touch batch,
@@ -153,7 +129,7 @@ class TouchApp:
         self.hint = lv.img(self.canvas)
         # The dsc's data must stay referenced, otherwise the bitmap turns into garbage after
         # GC; keep it on the instance
-        self._hint_dsc = _load_png(_assets_dir() + "/" + HINT_IMG)
+        self._hint_dsc = image.load_asset(HINT_IMG)
         if self._hint_dsc is not None:
             self.hint.set_src(self._hint_dsc)
             self.hint.align(lv.ALIGN.CENTER, 0, 0)

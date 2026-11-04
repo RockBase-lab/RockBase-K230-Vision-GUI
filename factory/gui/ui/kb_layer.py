@@ -47,20 +47,13 @@ import time
 
 import lvgl as lv
 
+from core import paths
 from ui import beep
+from ui import image
 
 # Keyboard bin bitmap font (baked offline, deployed to assets/fonts).
 _KB_FONT_BIN = "kb_nunito_bold_28.bin"
 _KB_FONT_CACHE = None   # font_load allocates memory; a module-level cache avoids reloading per overlay
-
-
-def _gui_root():
-    """GUI root that holds assets/: this module sits in factory/gui/ui/, so the
-    asset directory is one level above the module's own directory."""
-    try:
-        return __file__.rsplit("/", 2)[0]
-    except (NameError, AttributeError):
-        return "/sdcard/factory/gui"
 
 
 def load_kb_font():
@@ -75,7 +68,7 @@ def load_kb_font():
         return _fallback_font()
     if _KB_FONT_CACHE is not None:
         return _KB_FONT_CACHE
-    path = "A:" + _gui_root() + "/assets/fonts/" + _KB_FONT_BIN
+    path = "A:" + paths.asset_path("fonts", _KB_FONT_BIN)
     try:
         font = lv.font_load(path)
     except Exception:
@@ -93,24 +86,6 @@ def _fallback_font():
         if f:
             return f
     return None
-
-
-def _load_png(path):
-    """Read a PNG into an LVGL image descriptor, returning None on failure.
-
-    The icons are opaque RGB already composited onto the field's background colour,
-    so no alpha blending is needed and they sit seamlessly on the field.
-    """
-    try:
-        with open(path, "rb") as f:
-            data = f.read()
-        return lv.img_dsc_t({"data_size": len(data), "data": data})
-    except OSError:
-        return None
-
-
-def _asset(name):
-    return _gui_root() + "/assets/" + name
 
 
 def mode_consts():
@@ -393,7 +368,7 @@ class KbLayer:
         eye_dsc = None
         if password:
             ta.set_style_pad_right(34, 0)   # reserve room for the icon so text does not overlap it
-            eye_dsc = _load_png(_asset("icon_kb_eye.png"))
+            eye_dsc = image.load_asset("icon_kb_eye.png")
             eye = lv.obj(panel)
             eye.set_size(36, 36)
             eye.set_pos(588 - 6, 40 + (42 - 36) // 2)
@@ -475,7 +450,7 @@ class KbLayer:
             return
         if self._eye_img is not None:
             name = "icon_kb_eye.png" if self._pwd_hidden else "icon_kb_eye_off.png"
-            dsc = _load_png(_asset(name))
+            dsc = image.load_asset(name)
             if dsc is not None:
                 self._eye_dsc = dsc
                 try:

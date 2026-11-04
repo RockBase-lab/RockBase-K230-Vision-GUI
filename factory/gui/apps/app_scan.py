@@ -28,9 +28,9 @@ import lvgl as lv
 from media.sensor import Sensor, CAM_CHN_ID_1, CAM_CHN_ID_2
 
 from ui import beep
-from apps.error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
+from core.errors import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                        close_sensor)
-from camera_fov import set_preview
+from hardware.camera_fov import set_preview
 
 # Detection channel size. It must keep the 5:3 output aspect of the preview
 # channel, otherwise the two channels crop different windows and the strips that

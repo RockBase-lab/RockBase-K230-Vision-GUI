@@ -17,8 +17,8 @@ import sys
 import time
 
 sys.path.insert(0, "/sdcard/factory/gui")
-for _name in ("apps.app_face_det", "apps.app_face_points", "apps",
-              "apps.error", "ui.beep"):
+for _name in ("core", "apps.app_face_det", "apps.app_face_points", "apps",
+              "core.errors", "ui.beep"):
     if _name in sys.modules:
         del sys.modules[_name]
 
@@ -170,7 +170,7 @@ import aidemo
 import nncase_runtime as nn
 from libs.AI2D import Ai2d
 from media.sensor import Sensor, CAM_CHN_ID_1
-from camera_fov import set_preview
+from hardware.camera_fov import set_preview
 from apps.app_face_det import y_pad_offset
 
 Y_OFF = y_pad_offset()

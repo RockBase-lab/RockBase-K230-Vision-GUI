@@ -7,8 +7,8 @@ import sys
 
 for _name in list(sys.modules.keys()):
     if (_name == "launcher" or _name.startswith("apps") or _name.startswith("ui")
-            or _name.startswith("net") or _name == "camera_fov"
-            or _name in ("model_pool", "font_pool", "ocr_dict", "batt",
+            or _name.startswith("net") or _name.startswith("core") or _name == "hardware.camera_fov"
+            or _name in ("core", "core.model_pool", "core.font_pool", "core.ocr_dict", "hardware.battery",
                          "paging")):
         del sys.modules[_name]
 

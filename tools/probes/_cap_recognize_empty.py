@@ -7,7 +7,7 @@ import struct
 import sys
 
 sys.path.insert(0, "/sdcard/factory/gui")
-for _name in ("apps.app_face_recognize", "apps", "apps.error", "ui.beep",
+for _name in ("core", "apps.app_face_recognize", "apps", "core.errors", "ui.beep",
               "ui.kb_layer", "launcher"):
     if _name in sys.modules:
         del sys.modules[_name]

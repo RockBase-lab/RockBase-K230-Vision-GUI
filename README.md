@@ -377,7 +377,7 @@ settings file never blocks the GUI from starting; it falls back to the defaults 
 prints one log line.
 
 `ui.language` (`en` / `zh`) localizes the desktop: tile names, folder titles and
-member labels come from `factory/gui/i18n.py`. A change applies when the desktop
+member labels come from `factory/gui/core/i18n.py`. A change applies when the desktop
 is next shown, which needs no reset: the launcher rebuilds the home screen and
 reads the new language's tile cache. Application-internal strings are still
 English.
@@ -436,7 +436,7 @@ been measured and therefore is not part of the boot sequence.
 
 ### Adding a setting
 
-1. Add the key and its default to `DEFAULTS` in `config.py`.
+1. Add the key and its default to `DEFAULTS` in `core/config.py`.
 2. Add one row to `GROUPS` in `apps/app_settings.py`; the row types are `toggle`,
    `stepper`, `choice`, `info` and `action`.
 3. Read the value where it is consumed: boot-time behaviour in the launcher, per-app
@@ -445,7 +445,7 @@ been measured and therefore is not part of the boot sequence.
 Do not import `launcher.py` from an application to reach a runtime handle. It runs via
 `exec(open().read())`, so a reverse import executes it again and builds a second
 Launcher. When shared hardware needs a new entry point, write a small module for it, as
-`ui/backlight.py` does.
+`hardware/backlight.py` does.
 
 ### Changing a colour or size constant
 

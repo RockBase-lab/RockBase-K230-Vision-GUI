@@ -19,7 +19,7 @@ import time
 
 import nncase_runtime as nn
 
-from apps.error import AppUnavailable
+from core.errors import AppUnavailable
 
 MISSING = ("Model missing on the SD card.\n"
            "Expected:\n  {}")

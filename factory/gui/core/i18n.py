@@ -10,7 +10,7 @@
 # per language, see _cache_path in launcher.py). Apps keep running; their own
 # strings are not localized yet.
 
-import config
+from core import config
 
 LANGS = ("en", "zh")
 CJK_FONT = "ui_cjk_28.bin"

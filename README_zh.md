@@ -343,7 +343,7 @@ config.DEFAULTS  ──►  /data/settings/gui.json  ◄──  app_settings.GRO
 会用默认值继续并打印一行日志。
 
 `ui.language`（`en` / `zh`）负责桌面本地化：tile 名、文件夹标题和成员标签都来自
-`factory/gui/i18n.py`。切换在下次显示桌面时生效，不需要复位：launcher 会重建
+`factory/gui/core/i18n.py`。切换在下次显示桌面时生效，不需要复位：launcher 会重建
 home 屏并读取该语言对应的 tile 缓存。应用内部文案目前仍是英文。
 
 ## 应用清单
@@ -394,13 +394,13 @@ home 屏并读取该语言对应的 tile 缓存。应用内部文案目前仍是
 
 ### 新增一个设置项
 
-1. `config.py` 的 `DEFAULTS` 里加键与默认值。
+1. `core/config.py` 的 `DEFAULTS` 里加键与默认值。
 2. `apps/app_settings.py` 的 `GROUPS` 里加一行，类型是 `toggle` / `stepper` / `choice` / `info` / `action`。
 3. 在消费方读取该值：启动期行为放 launcher，应用内行为由应用自己在打开时读。
 
 不要为了拿运行期句柄从应用里 import `launcher.py`（它通过 `exec(open().read())` 运行，
 反向 import 会再执行一遍并创建第二个 Launcher）。需要共享硬件时，单独写一个小模块，
-例如 `ui/backlight.py`。
+例如 `hardware/backlight.py`。
 
 ### 改动了颜色或尺寸常量
 

@@ -14,8 +14,8 @@ import sys
 import time
 
 sys.path.insert(0, "/sdcard/factory/gui")
-for _name in ("apps.app_face_points", "apps.app_face_det", "apps",
-              "apps.error", "ui.beep"):
+for _name in ("core", "apps.app_face_points", "apps.app_face_det", "apps",
+              "core.errors", "ui.beep"):
     if _name in sys.modules:
         del sys.modules[_name]
 
@@ -25,7 +25,7 @@ import nncase_runtime as nn
 import aidemo
 from libs.AI2D import Ai2d
 from media.sensor import Sensor, CAM_CHN_ID_1
-from camera_fov import set_preview
+from hardware.camera_fov import set_preview
 
 DET_MODEL = "/sdcard/examples/kmodel/face_detection_320.kmodel"
 LM_MODEL = "/sdcard/examples/kmodel/face_landmark.kmodel"

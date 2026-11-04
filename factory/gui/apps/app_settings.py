@@ -17,11 +17,11 @@ import time
 
 import lvgl as lv
 
-import config
-import i18n
-from ui import backlight
+from core import config
+from core import i18n
+from hardware import backlight
 from ui import beep
-from version import GUI_VERSION
+from core.version import GUI_VERSION
 
 COL_TEXT = 0xE6EAF0
 COL_MUTED = 0x8A94A2
@@ -87,7 +87,7 @@ GROUPS = (
         {"type": "choice", "key": "ui.language",
          "label": "Language",
          "hint": "desktop text; applies on returning home",
-         "options": (("en", "English"), ("zh", "中文"))},
+         "options": (("en", "English"), ("zh", "涓枃"))},
     )),
     ("NETWORK", (
         {"type": "info", "label": "Wi-Fi and timezone",
@@ -133,7 +133,7 @@ def _load_baked(name, fallback):
     them, so taking one here costs a dict lookup.
     """
     try:
-        import font_pool
+        from core import font_pool
         font = font_pool.get(name)
         if font is not None:
             return font
@@ -160,7 +160,7 @@ def _models_text():
     heap, so this tracks preload use, not memory.
     """
     try:
-        import model_pool
+        from core import model_pool
         return "{} resident".format(model_pool.loaded_count())
     except BaseException:
         return "n/a"
@@ -375,7 +375,7 @@ class SettingsApp:
         f = self.small
         if i18n.needs_cjk(text):
             try:
-                import font_pool
+                from core import font_pool
                 f = font_pool.get("ocr_cjk_16.bin") or self.small
             except BaseException:
                 pass

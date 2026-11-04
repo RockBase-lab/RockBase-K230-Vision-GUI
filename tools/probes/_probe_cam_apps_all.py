@@ -22,13 +22,13 @@ disp.set_flush_cb(lambda drv, area, color: drv.flush_ready())
 GUI = "/sdcard/factory/gui"
 if GUI not in sys.path:
     sys.path.insert(0, GUI)
-for m in ("apps.error", "apps.app_camera", "apps.app_scan", "apps.app_vision"):
+for m in ("core", "core.errors", "apps.app_camera", "apps.app_scan", "apps.app_vision"):
     sys.modules.pop(m, None)
 
 g = {"__name__": "guimod", "__file__": GUI + "/launcher.py"}
 exec(open(GUI + "/launcher.py").read(), g)
 AppUnavailable = g["AppUnavailable"]
-from apps.error import NoSignalCounter
+from core.errors import NoSignalCounter
 
 g["_ensure_cache_dir"]()
 APPS = {

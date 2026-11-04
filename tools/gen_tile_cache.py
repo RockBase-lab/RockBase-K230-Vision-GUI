@@ -73,7 +73,7 @@ def parse_gui():
                          "folder": '"folder": True' in e})
     # Localized names from i18n.NAMES: id -> (en, zh). The baker must emit the
     # same per-language tiles the board's _cache_load validates.
-    itxt = open(os.path.join(GUI, "i18n.py"), encoding="utf-8").read()
+    itxt = open(os.path.join(GUI, "core", "i18n.py"), encoding="utf-8").read()
     names = dict(
         (m.group(1), (m.group(2), m.group(3)))
         for m in re.finditer(

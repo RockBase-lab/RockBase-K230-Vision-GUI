@@ -156,10 +156,10 @@ icon, and accent already exist.
 
 ## Adding a setting
 
-User preferences live in one store: `factory/gui/config.py`, a flat JSON
+User preferences live in one store: `factory/gui/core/config.py`, a flat JSON
 object at `/data/settings/gui.json` (rule 11). To add one:
 
-1. Add the key and its default to `DEFAULTS` in `config.py`.
+1. Add the key and its default to `DEFAULTS` in `core/config.py`.
 2. Add one row to `GROUPS` in `apps/app_settings.py`. The row types are
    `toggle`, `stepper`, `choice`, `info`, and `action`; no new widget code is needed.
 3. Apply the value where it is consumed: the launcher for boot-time values
@@ -168,11 +168,11 @@ object at `/data/settings/gui.json` (rule 11). To add one:
 
 Do not import `launcher.py` from an app to reach a runtime handle. Shared
 hardware a setting needs to touch gets its own small module, as
-`ui/backlight.py` does for the PWM channel.
+`hardware/backlight.py` does for the PWM channel.
 
 ## Adding a language string
 
-Desktop strings live in `factory/gui/i18n.py`: one `NAMES` row per entry id,
+Desktop strings live in `factory/gui/core/i18n.py`: one `NAMES` row per entry id,
 `(en, zh)`. `APPS` / `FOLDER_MEMBERS` keep their English `name` as the fallback
 the launcher uses when an id has no row.
 
@@ -223,7 +223,7 @@ Check, in this order:
 | A `docs/*.md` file | Its `docs/*_zh.md` counterpart says the same thing, and both keep the language switch at the top |
 | A `tools/` command-line flag | The usage line in the script and the skill that documents it |
 | `tools/deploy_board.py` `MANIFEST` | The directory layout on the board |
-| A string in `factory/gui/i18n.py` `NAMES` | `python tools/gen_ui_cjk_charset.py` (regenerates the glyph list and checks `ocr_charset.txt` coverage), then `python tools/gen_tile_cache.py`. Every zh character must be inside `tools/ui_cjk_charset.txt`, or it renders as a box |
+| A string in `factory/gui/core/i18n.py` `NAMES` | `python tools/gen_ui_cjk_charset.py` (regenerates the glyph list and checks `ocr_charset.txt` coverage), then `python tools/gen_tile_cache.py`. Every zh character must be inside `tools/ui_cjk_charset.txt`, or it renders as a box |
 | A desktop visual constant, or `i18n.NAMES` | `BAKE_VER` + 1 in `launcher.py`; `gen_tile_cache.py` bakes both languages (`tile_<id>.bin` / `tile_<id>_zh.bin`) |
 | A constant parsed by a generator | The generator's own default and any `docs/` value |
 | Any rule, path, or command name | The four places rules live: `AGENTS.md`, `.github/copilot-instructions.md`, `.github/skills/**`, `docs/*.md` |

@@ -37,10 +37,11 @@ import aidemo
 from libs.AI2D import Ai2d
 from media.sensor import Sensor, CAM_CHN_ID_1, CAM_CHN_ID_2
 from ui import beep
-from apps.error import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
+from core import paths
+from core.errors import (AppUnavailable, CAMERA_UNAVAILABLE, NoSignalCounter,
                         close_sensor)
-from camera_fov import set_preview
-from model_pool import get as model_get
+from hardware.camera_fov import set_preview
+from core.model_pool import get as model_get
 
 PREVIEW_W = 800               # capture size shared by preview and AI (= screen)
 PREVIEW_H = 480
@@ -192,18 +193,6 @@ def _font(*names):
     return None
 
 
-def _assets_dir():
-    """Asset directory derived from this module's __file__ (gui/ is above apps/)."""
-    path = globals().get("__file__")
-    if path:
-        try:
-            base = path.rsplit("/", 1)[0]        # .../gui/apps
-            return base.rsplit("/", 1)[0] + "/assets"
-        except BaseException:
-            pass
-    return "/sdcard/factory/gui/assets"
-
-
 _PLATE_FONT = None
 _PLATE_FONT_TRIED = False
 
@@ -222,7 +211,7 @@ def _plate_font():
     _PLATE_FONT_TRIED = True
     load = getattr(lv, "font_load", None)
     if load is not None:
-        path = "A:" + _assets_dir() + "/fonts/" + FONT_FILE
+        path = "A:" + paths.asset_path("fonts", FONT_FILE)
         try:
             font = load(path)
             if font is not None:

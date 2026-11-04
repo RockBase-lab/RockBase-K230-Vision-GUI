@@ -9,8 +9,8 @@ import ubinascii
 import uctypes
 
 sys.path.insert(0, "/sdcard/factory/gui")
-for _name in ("apps", "apps.error", "apps.app_battery", "apps.app_touch",
-              "ui.beep", "ui.paging", "ui.backlight", "launcher", "config"):
+for _name in ("core", "apps", "core.errors", "apps.app_battery", "apps.app_touch",
+              "ui.beep", "ui.paging", "hardware.backlight", "launcher", "core.config"):
     if _name in sys.modules:
         del sys.modules[_name]
 

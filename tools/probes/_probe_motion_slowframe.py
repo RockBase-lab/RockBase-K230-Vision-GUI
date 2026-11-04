@@ -6,7 +6,7 @@ import sys
 import time
 
 sys.path.insert(0, "/sdcard/factory/gui")
-for _name in ("apps.app_motion", "apps", "apps.error", "launcher"):
+for _name in ("core", "apps.app_motion", "apps", "core.errors", "launcher"):
     if _name in sys.modules:
         del sys.modules[_name]
 

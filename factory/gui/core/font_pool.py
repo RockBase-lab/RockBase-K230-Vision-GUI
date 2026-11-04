@@ -16,28 +16,13 @@ import time
 
 import lvgl as lv
 
+from core import paths
+
 _pool = {}
-_assets = None
-
-
-def assets_dir():
-    """assets/ directory derived from this module's __file__ (font_pool.py sits in gui/)."""
-    global _assets
-    if _assets is not None:
-        return _assets
-    path = globals().get("__file__")
-    if path:
-        try:
-            _assets = path.rsplit("/", 1)[0] + "/assets"
-            return _assets
-        except BaseException:
-            pass
-    _assets = "/sdcard/factory/gui/assets"
-    return _assets
 
 
 def bin_path(name):
-    return "A:" + assets_dir() + "/fonts/" + name
+    return "A:" + paths.asset_path("fonts", name)
 
 
 def get(name):

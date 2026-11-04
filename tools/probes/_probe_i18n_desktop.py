@@ -5,9 +5,9 @@
 import sys
 
 sys.path.insert(0, "/sdcard/factory/gui")
-for _name in ("launcher", "i18n", "config", "apps", "apps.error", "ui.beep",
-              "ui.paging", "ui.backlight", "font_pool", "model_pool", "ocr_dict",
-              "camera_fov"):
+for _name in ("core", "launcher", "core.i18n", "core.config", "apps", "core.errors", "ui.beep",
+              "ui.paging", "hardware.backlight", "core.font_pool", "core.model_pool", "core.ocr_dict",
+              "hardware.camera_fov"):
     if _name in sys.modules:
         del sys.modules[_name]
 
@@ -16,9 +16,9 @@ import time
 import ubinascii
 import uctypes
 
-import config
-import i18n
-import font_pool
+from core import config
+from core import i18n
+from core import font_pool
 
 
 def shot(tag):

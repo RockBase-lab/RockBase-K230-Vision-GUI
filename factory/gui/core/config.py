@@ -15,7 +15,7 @@
 import json
 import os
 
-from ui import backlight
+from hardware import backlight
 
 PATH = "/data/settings/gui.json"
 

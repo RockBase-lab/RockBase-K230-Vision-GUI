@@ -13,12 +13,12 @@ import time
 import uctypes
 
 sys.path.insert(0, "/sdcard/factory/gui")
-for _name in ("apps", "apps.error", "apps.anchor_det", "apps.app_vision",
+for _name in ("core", "apps", "core.errors", "apps.anchor_base", "apps.app_vision",
               "apps.app_pose", "apps.app_ocr", "apps.app_plate",
               "apps.app_face_points", "apps.app_gesture", "apps.app_segment",
               "apps.app_orient", "apps.app_person", "apps.app_fall",
-              "apps.app_mask", "ui.beep", "launcher", "camera_fov",
-              "model_pool", "font_pool", "ocr_dict"):
+              "apps.app_mask", "ui.beep", "launcher", "hardware.camera_fov",
+              "core.model_pool", "core.font_pool", "core.ocr_dict"):
     if _name in sys.modules:
         del sys.modules[_name]
 
