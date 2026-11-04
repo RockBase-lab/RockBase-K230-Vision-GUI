@@ -15,6 +15,8 @@
 #
 # Deployed content (MANIFEST):
 #   factory/gui  -> /sdcard/factory/gui   launcher.py / ui / audio / net / apps / assets
+#                                         (README.md files are skipped: the layer map is
+#                                         local documentation and costs device space)
 #   factory/test -> /sdcard/factory/test  production test scripts (**without** media >1MB
 #                                         unless --with-test-media). This directory is
 #                                         not part of the public tree; the entry is a
@@ -133,6 +135,9 @@ BOARD_MKDIRS = [
 
 SKIP_DIRS = {"__pycache__", ".git"}
 SKIP_EXT = {".pyc", ".pyo", ".bak"}   # .bak = local rollback backup, never pushed
+# Directory READMEs describe the layer map for contributors. They are tracked in git but
+# have no runtime use and would cost /sdcard space, so they stay off the board.
+SKIP_NAMES = {"README.md"}
 BIG_MEDIA_EXT = {".wav", ".mp3", ".mp4", ".avi", ".mkv", ".flac", ".ogg"}
 BIG_MEDIA_BYTES = 1 << 20  # 1MB
 HASH_LIMIT = 256 << 10     # only files <=256KB get a sha256 comparison
@@ -154,7 +159,7 @@ def collect_files():
             rdir = remote_dir if rel == "." else remote_dir + "/" + rel
             for name in sorted(fs):
                 ext = os.path.splitext(name)[1].lower()
-                if ext in SKIP_EXT:
+                if ext in SKIP_EXT or name in SKIP_NAMES:
                     continue
                 full = os.path.join(root, name)
                 if not allow_media and (

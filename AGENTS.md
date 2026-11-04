@@ -105,6 +105,30 @@ Do not rewrite old comments in bulk. When you are already editing the
 code a comment explains, tighten **that** comment to the budget above, so
 the cleanup ships next to a behaviour change and stays reviewable.
 
+## GUI layout
+
+`factory/gui/README.md` is the layer map and the authority for **where a new file
+governs**. Read it before adding anything under `factory/gui/`.
+
+The ladder, top to bottom, with imports pointing only downward:
+
+```
+launcher.py  ->  shell/  ->  apps/  ->  ui/ net/ audio/  ->  core/  ->  hardware/
+```
+
+Each directory carries a `README.md` that states its purpose, its contents and its
+rules. Two consequences worth repeating here:
+
+- **The GUI root holds `launcher.py` and nothing else.** A helper, a probe or a
+  "temporary" script does not go there while its place is being decided; pick a
+  layer from the table in `factory/gui/README.md` or leave the change undone.
+- **`shell/` never imports `launcher.py`.** The launcher runs through
+  `exec(open(...).read())`, so a reverse import executes the file a second time and
+  builds a second launcher.
+
+The directory READMEs are documentation only: `tools/deploy_board.py` skips
+`README.md` and never writes them to the board.
+
 ## Adding an app
 
 An app is a module under `factory/gui/apps/` plus registry entries. Do
@@ -179,6 +203,7 @@ Check, in this order:
 | `tools/deploy_board.py` `MANIFEST` | The directory layout on the board |
 | A constant parsed by a generator | The generator's own default and any `docs/` value |
 | Any rule, path, or command name | The four places rules live: `AGENTS.md`, `.github/copilot-instructions.md`, `.github/skills/**`, `docs/*.md` |
+| A new file anywhere under `factory/gui/` | The layer map in `factory/gui/README.md`, plus that directory's own README |
 | A board fact learned the hard way | See `## Capturing what you learned` |
 
 Checker script and git hook are deliberately absent: the rules above are

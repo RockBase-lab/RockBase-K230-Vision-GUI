@@ -264,6 +264,10 @@ python tools/deploy_board.py COM9 --gui-only --autostart
 `factory/gui/assets/cache/` 是生成产物，可以删除后重新烘焙；
 `apps/` 之外的任何文件都不应该写运行时数据。
 
+`factory/gui/README.md` 是该目录的分层表
+（`launcher.py -> shell/ -> apps/ -> ui/ net/ audio/ -> core/ -> hardware/`，
+import 只能向下）。新增文件前先读它，以及目标目录自己的 `README.md`。
+
 ## 架构
 
 ### 一次开机发生了什么

@@ -291,6 +291,11 @@ then the desktop.
 `factory/gui/assets/cache/` is generated output and can be deleted and re-baked.
 Nothing outside `apps/` should ever write runtime data.
 
+`factory/gui/README.md` is the layer map for that tree
+(`launcher.py -> shell/ -> apps/ -> ui/ net/ audio/ -> core/ -> hardware/`, imports
+pointing only downward). Read it, and the `README.md` in the target directory, before
+adding any file there.
+
 ## Architecture
 
 ### What happens during a boot

@@ -22,6 +22,9 @@ BOARD_DIR = sys.argv[4] if len(sys.argv) > 4 else "/sdcard/factory/gui"
 
 SKIP_NAMES = {"__pycache__"}
 SKIP_EXT = {".pyc"}
+# Directory READMEs document the layer map for contributors; they have no runtime use
+# and would cost /sdcard space, so they stay off the board.
+SKIP_FILES = {"README.md"}
 
 from ampy.pyboard import PyboardError
 
@@ -33,7 +36,8 @@ def collect_files():
         rel = os.path.relpath(root, LOCAL_DIR).replace("\\", "/")
         remote_dir = BOARD_DIR if rel == "." else BOARD_DIR + "/" + rel
         for name in sorted(fs):
-            if os.path.splitext(name)[1].lower() in SKIP_EXT:
+            if (os.path.splitext(name)[1].lower() in SKIP_EXT
+                    or name in SKIP_FILES):
                 continue
             items.append((os.path.join(root, name), remote_dir + "/" + name))
     return items
