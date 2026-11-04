@@ -21,11 +21,18 @@ del _f
 
 G = {"__name__": "gui_probe"}
 exec(compile(gui_src, "launcher.py", "exec"), G)
+# The tables and classes live in shell/ after the layer split; importing them
+# here also keeps sys.path bootstrapped by the exec above.
+from shell.registry import FOLDER_MEMBERS
+from shell.home import Launcher
+from shell.theme import STATUS_H
+from shell import tile_cache
+
 print("L1 gui loaded")
 
-launcher = G["Launcher"]()
+launcher = Launcher()
 meta = None
-for item in G["FOLDER_MEMBERS"]["vision"]:
+for item in FOLDER_MEMBERS["vision"]:
     if item["id"] == "detect":
         meta = item
         break
@@ -53,7 +60,7 @@ for i in range(n_child):
         cw, chh = ch.get_width(), ch.get_height()
     except BaseException:
         continue
-    if cw == 800 and chh == G["STATUS_H"]:
+    if cw == 800 and chh == STATUS_H:
         status_found = True
     print("     child[{}] {}{}x{} at ({},{})".format(
         i, type(ch).__name__, cw, chh, ch.get_x(), ch.get_y()))
@@ -126,6 +133,6 @@ try:
 except BaseException as e:
     sys.print_exception(e)
 
-G["_ensure_cache_dir"]()
+tile_cache.ensure_cache_dir()
 launcher.close_app()
 print("L11 closed, sensor released")

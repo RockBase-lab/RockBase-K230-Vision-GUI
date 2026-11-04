@@ -5,6 +5,7 @@ import gc
 import sys
 import time
 import ubinascii
+import uctypes
 
 import lvgl as lv
 

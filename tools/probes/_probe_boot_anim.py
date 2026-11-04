@@ -22,9 +22,15 @@ import lvgl as lv
 _src = open("/sdcard/factory/gui/launcher.py").read()
 G = {"__name__": "gui_probe"}
 exec(compile(_src, "launcher.py", "exec"), G)
-G["_ensure_cache_dir"]()
+# The tables and classes live in shell/ after the layer split; importing them
+# here also keeps sys.path bootstrapped by the exec above.
+from shell import tile_cache
+from shell.boot import boot_load
+from shell import splash as splash_ui
 
-splash = G["splash_ui"].Splash()
+tile_cache.ensure_cache_dir()
+
+splash = splash_ui.Splash()
 
 # Record every value that reaches the bar, with the time it happened.
 trace = []
@@ -42,7 +48,7 @@ splash._set_pct = _spy
 
 t0 = time.ticks_ms()
 try:
-    G["boot_load"](splash)
+    boot_load(splash)
 except BaseException as error:
     print("A1 boot_load failed: {}".format(error))
     try:

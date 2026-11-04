@@ -21,13 +21,19 @@ import lvgl as lv
 _src = open("/sdcard/factory/gui/launcher.py").read()
 G = {"__name__": "gui_probe"}
 exec(compile(_src, "launcher.py", "exec"), G)
-G["_ensure_cache_dir"]()
+# The tables and classes live in shell/ after the layer split; importing them
+# here also keeps sys.path bootstrapped by the exec above.
+from shell.registry import FOLDER_MEMBERS
+from shell.home import Launcher
+from shell import tile_cache
 
-launcher = G["Launcher"]()
+tile_cache.ensure_cache_dir()
+
+launcher = Launcher()
 
 try:
     meta = None
-    for item in G["FOLDER_MEMBERS"]["vision"]:
+    for item in FOLDER_MEMBERS["vision"]:
         if item["id"] == "ocr":
             meta = item
             break

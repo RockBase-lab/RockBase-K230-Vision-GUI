@@ -20,12 +20,18 @@ import lvgl as lv
 _src = open("/sdcard/factory/gui/launcher.py").read()
 G = {"__name__": "gui_probe"}
 exec(compile(_src, "launcher.py", "exec"), G)
-G["_ensure_cache_dir"]()
+# The tables and classes live in shell/ after the layer split; importing them
+# here also keeps sys.path bootstrapped by the exec above.
+from shell.registry import FOLDER_MEMBERS
+from shell.home import Launcher
+from shell import tile_cache
+
+tile_cache.ensure_cache_dir()
 
 FRAMES = 150
 SLOW_MS = 40
 
-launcher = G["Launcher"]()
+launcher = Launcher()
 # Real entry path: the home screen exists with its tiles, and open_app destroys
 # it (release_home) before the app starts. Skipping this hides the garbage that
 # the first gc.collect() inside the app then has to sweep.
@@ -35,7 +41,7 @@ print("S0 build_home {}ms mem={}".format(
     time.ticks_diff(time.ticks_ms(), t_home), gc.mem_free()))
 
 meta = None
-for item in G["FOLDER_MEMBERS"]["vision"]:
+for item in FOLDER_MEMBERS["vision"]:
     if item["id"] == "ocr":
         meta = item
         break

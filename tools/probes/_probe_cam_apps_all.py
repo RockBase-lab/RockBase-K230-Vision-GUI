@@ -27,10 +27,16 @@ for m in ("core", "core.errors", "apps.app_camera", "apps.app_scan", "apps.app_v
 
 g = {"__name__": "guimod", "__file__": GUI + "/launcher.py"}
 exec(open(GUI + "/launcher.py").read(), g)
-AppUnavailable = g["AppUnavailable"]
+# The tables and classes live in shell/ after the layer split; importing them
+# here also keeps sys.path bootstrapped by the exec above.
+from core.errors import AppUnavailable
+from shell.home import Launcher
+from shell import tile_cache
+
+
 from core.errors import NoSignalCounter
 
-g["_ensure_cache_dir"]()
+tile_cache.ensure_cache_dir()
 APPS = {
     "camera": {"id": "camera", "name": "Camera",
                "module": "apps.app_camera", "immersive": True},
@@ -89,7 +95,7 @@ class Ctx2:
     def print_exception(err):
         pass
 
-launcher = g["Launcher"]()
+launcher = Launcher()
 todo = [("A", k) for k in ("camera", "scan", "detect")] + \
        [("B", k) for k in ("camera", "scan", "detect")]
 fails = 0

@@ -25,14 +25,19 @@ del _f
 
 G = {"__name__": "gui_probe"}
 exec(compile(_src, "launcher.py", "exec"), G)
+# The tables and classes live in shell/ after the layer split; importing them
+# here also keeps sys.path bootstrapped by the exec above.
+from shell.registry import FOLDER_MEMBERS
+from shell.home import Launcher
+
 
 meta = None
-for item in G["FOLDER_MEMBERS"]["face"]:
+for item in FOLDER_MEMBERS["face"]:
     if item["id"] == "recognize":
         meta = item
         break
 
-launcher = G["Launcher"]()
+launcher = Launcher()
 launcher.open_app(meta)
 app = launcher.active_app
 print("A0 switch_widget={} photos_allowed={} db={}".format(

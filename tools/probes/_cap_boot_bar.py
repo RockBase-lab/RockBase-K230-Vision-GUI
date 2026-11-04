@@ -24,9 +24,15 @@ import lvgl as lv
 _src = open("/sdcard/factory/gui/launcher.py").read()
 G = {"__name__": "gui_probe"}
 exec(compile(_src, "launcher.py", "exec"), G)
-G["_ensure_cache_dir"]()
+# The tables and classes live in shell/ after the layer split; importing them
+# here also keeps sys.path bootstrapped by the exec above.
+from shell import tile_cache
+from shell.boot import boot_load
+from shell import splash as splash_ui
 
-splash = G["splash_ui"].Splash()
+tile_cache.ensure_cache_dir()
+
+splash = splash_ui.Splash()
 
 # Bar strip on the 800x480 screen: BAR_W 520 centred, BAR_DY -22 from centre.
 CROP_X = 140
@@ -88,7 +94,7 @@ def _spy(value):
 splash._set_pct = _spy
 
 try:
-    G["boot_load"](splash)
+    boot_load(splash)
 except BaseException as error:
     print("A1 boot_load failed: {}".format(error))
     try:

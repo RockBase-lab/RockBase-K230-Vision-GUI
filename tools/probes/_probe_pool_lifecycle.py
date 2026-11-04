@@ -23,14 +23,25 @@ import lvgl as lv
 _src = open("/sdcard/factory/gui/launcher.py").read()
 G = {"__name__": "gui_probe"}
 exec(compile(_src, "launcher.py", "exec"), G)
-G["_ensure_cache_dir"]()
+# The tables and classes live in shell/ after the layer split; importing them
+# here also keeps sys.path bootstrapped by the exec above.
+from shell.boot import BOOT_MODELS
+from shell.registry import FOLDER_MEMBERS
+from shell.boot import KMODEL_DIR
+from shell.home import Launcher
+from shell import tile_cache
+from shell.boot import boot_load
+from core import model_pool
+from shell import splash as splash_ui
 
-splash = G["splash_ui"].Splash()
-G["boot_load"](splash)
-mp = G["model_pool"]
+tile_cache.ensure_cache_dir()
+
+splash = splash_ui.Splash()
+boot_load(splash)
+mp = model_pool
 print("K0 after boot: pool={}".format(mp.loaded_count()))
 
-launcher = G["Launcher"]()
+launcher = Launcher()
 launcher.build_home()
 if launcher.splash is not None:
     splash.delete()
@@ -38,7 +49,7 @@ if launcher.splash is not None:
 ORDER = ["ocr", "plate", "face_det", "landmark"]
 for app_id in ORDER:
     meta = None
-    for group in G["FOLDER_MEMBERS"].values():
+    for group in FOLDER_MEMBERS.values():
         for item in group:
             if item["id"] == app_id:
                 meta = item
@@ -68,6 +79,6 @@ for app_id in ORDER:
 
 print("K2 final pool={} models={}".format(
     mp.loaded_count(),
-    [p.rsplit("/", 1)[-1] for p in G["BOOT_MODELS"]
-     if mp.is_loaded(G["KMODEL_DIR"] + "/" + p[0])]))
+    [p.rsplit("/", 1)[-1] for p in BOOT_MODELS
+     if mp.is_loaded(KMODEL_DIR + "/" + p[0])]))
 print("RESULT: DONE")

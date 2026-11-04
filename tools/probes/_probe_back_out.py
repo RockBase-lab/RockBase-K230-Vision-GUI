@@ -26,9 +26,15 @@ del _f
 
 G = {"__name__": "gui_probe"}
 exec(compile(gui_src, "launcher.py", "exec"), G)
-G["_ensure_cache_dir"]()
+# The tables and classes live in shell/ after the layer split; importing them
+# here also keeps sys.path bootstrapped by the exec above.
+from shell.registry import APPS, FOLDER_MEMBERS
+from shell.home import Launcher
+from shell import tile_cache
 
-launcher = G["Launcher"]()
+tile_cache.ensure_cache_dir()
+
+launcher = Launcher()
 launcher.build_home()
 lv.task_handler()
 
@@ -57,7 +63,7 @@ else:
     check("moved to page 1", pager.page, 1)
 
     face_meta = None
-    for meta in G["APPS"]:
+    for meta in APPS:
         if meta["id"] == "face":
             face_meta = meta
             break
@@ -69,7 +75,7 @@ else:
     check("folder open", launcher.folder is not None, True)
 
     member = None
-    for m in G["FOLDER_MEMBERS"]["face"]:
+    for m in FOLDER_MEMBERS["face"]:
         if m["id"] == "face_det":
             member = m
             break
@@ -134,7 +140,7 @@ else:
         time.sleep_ms(20)
     print("B4e positioned on page={}".format(launcher.pager.page))
     top = None
-    for meta in G["APPS"]:
+    for meta in APPS:
         if meta.get("id") == "settings":
             top = meta
             break

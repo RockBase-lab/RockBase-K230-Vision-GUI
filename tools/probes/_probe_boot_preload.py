@@ -25,7 +25,19 @@ import lvgl as lv
 _src = open("/sdcard/factory/gui/launcher.py").read()
 G = {"__name__": "gui_probe"}
 exec(compile(_src, "launcher.py", "exec"), G)
-G["_ensure_cache_dir"]()
+# The tables and classes live in shell/ after the layer split; importing them
+# here also keeps sys.path bootstrapped by the exec above.
+from shell.boot import BOOT_FONTS
+from shell.registry import FOLDER_MEMBERS
+from shell.home import Launcher
+from shell import tile_cache
+from shell.boot import boot_load
+from core import font_pool
+from core import model_pool
+from core import ocr_dict
+from shell import splash as splash_ui
+
+tile_cache.ensure_cache_dir()
 
 REPORT = []
 
@@ -36,13 +48,13 @@ def say(text):
     REPORT.append(text)
 
 
-splash = G["splash_ui"].Splash()
+splash = splash_ui.Splash()
 say("P0 splash up mem_free={} KB".format(gc.mem_free() // 1024))
 
 # open_app swallows the constructor exception into the notice panel. Hook the panel
 # builder to record the reason, otherwise a failed open looks like "app=None" with no
 # explanation once the serial stream is truncated.
-_Launcher = G["Launcher"]
+_Launcher = Launcher
 _orig_unavailable = _Launcher._show_app_unavailable
 
 
@@ -56,7 +68,7 @@ _Launcher._show_app_unavailable = _hooked_unavailable
 
 t0 = time.ticks_ms()
 try:
-    G["boot_load"](splash)
+    boot_load(splash)
     boot_ms = time.ticks_diff(time.ticks_ms(), t0)
     say("P1 boot_load {}ms ({} s) mem_free={} KB".format(
         boot_ms, boot_ms // 1000, gc.mem_free() // 1024))
@@ -68,14 +80,14 @@ except BaseException as error:
         pass
     boot_ms = -1
 
-mp = G["model_pool"]
-fp = G["font_pool"]
+mp = model_pool
+fp = font_pool
 say("P2 resident models={} fonts={} dict={}".format(
     mp.loaded_count(),
-    len([n for n in G["BOOT_FONTS"] if fp.is_loaded(n[0])]),
-    G["ocr_dict"].is_loaded()))
+    len([n for n in BOOT_FONTS if fp.is_loaded(n[0])]),
+    ocr_dict.is_loaded()))
 
-launcher = G["Launcher"]()
+launcher = Launcher()
 t0 = time.ticks_ms()
 launcher.build_home()
 say("P4 build_home {}ms mem_free={} KB".format(
@@ -88,7 +100,7 @@ if launcher.splash is None:
 CASES = ["ocr", "plate", "face_det", "landmark"]
 for app_id in CASES:
     meta = None
-    for group in G["FOLDER_MEMBERS"].values():
+    for group in FOLDER_MEMBERS.values():
         for item in group:
             if item["id"] == app_id:
                 meta = item

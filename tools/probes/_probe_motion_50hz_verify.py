@@ -20,10 +20,15 @@ del src_file
 
 G = {"__name__": "gui_probe"}
 exec(compile(gui_src, "launcher.py", "exec"), G)
+# The tables and classes live in shell/ after the layer split; importing them
+# here also keeps sys.path bootstrapped by the exec above.
+from shell.registry import APPS
+from shell.home import Launcher
 
-launcher = G["Launcher"]()
+
+launcher = Launcher()
 meta = None
-for item in G["APPS"]:
+for item in APPS:
     if item["id"] == "motion":
         meta = item
         break

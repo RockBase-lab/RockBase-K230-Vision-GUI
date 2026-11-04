@@ -104,7 +104,11 @@ if err2 is not None:
 g = {"__name__": "guimod", "__file__": "/sdcard/factory/gui/launcher.py"}
 src = open("/sdcard/factory/gui/launcher.py").read()
 exec(src, g)
-launcher = g["Launcher"]()
+# The tables and classes live in shell/ after the layer split; importing them
+# here also keeps sys.path bootstrapped by the exec above.
+from shell.home import Launcher
+
+launcher = Launcher()
 if err2 is None:
     err2 = AppUnavailable("Camera module not detected.\n"
                           "Check the camera cable and try again.")

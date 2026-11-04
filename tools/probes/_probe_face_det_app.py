@@ -27,9 +27,10 @@ from hardware import panel
 from shell import tile_cache
 from shell import touchscreen
 from shell.context import AppContext
+from shell.home import Launcher
 
 tile_cache.ensure_cache_dir()
-launcher = glb["Launcher"]()
+launcher = Launcher()
 
 scr, content, home_btn = launcher._build_shell("Faces", show_clock=False,
                                               immersive=True)

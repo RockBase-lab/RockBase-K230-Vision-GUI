@@ -28,11 +28,17 @@ del _f
 
 G = {"__name__": "gui_probe"}
 exec(compile(gui_src, "launcher.py", "exec"), G)
-G["_ensure_cache_dir"]()
+# The tables and classes live in shell/ after the layer split; importing them
+# here also keeps sys.path bootstrapped by the exec above.
+from shell.registry import FOLDER_MEMBERS
+from shell.home import Launcher
+from shell import tile_cache
 
-launcher = G["Launcher"]()
+tile_cache.ensure_cache_dir()
+
+launcher = Launcher()
 meta = None
-for item in G["FOLDER_MEMBERS"]["vision"]:
+for item in FOLDER_MEMBERS["vision"]:
     if item["id"] == "pose":
         meta = item
         break

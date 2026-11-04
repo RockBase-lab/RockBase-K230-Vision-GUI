@@ -28,15 +28,21 @@ del _f
 
 G = {"__name__": "gui_probe"}
 exec(compile(gui_src, "launcher.py", "exec"), G)
-G["_ensure_cache_dir"]()
+# The tables and classes live in shell/ after the layer split; importing them
+# here also keeps sys.path bootstrapped by the exec above.
+from shell.registry import APPS
+from shell.home import Launcher
+from shell import tile_cache
 
-launcher = G["Launcher"]()
+tile_cache.ensure_cache_dir()
+
+launcher = Launcher()
 # _open_folder attaches the flyout to home_scr, which only exists after the home
 # screen is built. Without this the call returns immediately and the capture shows
 # an empty screen.
 launcher.build_home()
 meta = None
-for item in G["APPS"]:
+for item in APPS:
     if item["id"] == "vision":
         meta = item
         break

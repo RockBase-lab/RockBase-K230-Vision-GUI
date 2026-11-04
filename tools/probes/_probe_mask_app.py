@@ -21,13 +21,19 @@ import ulab.numpy as np
 src = open("/sdcard/factory/gui/launcher.py").read()
 G = {"__name__": "gui_probe"}
 exec(compile(src, "launcher.py", "exec"), G)
-G["_ensure_cache_dir"]()
+# The tables and classes live in shell/ after the layer split; importing them
+# here also keeps sys.path bootstrapped by the exec above.
+from shell.registry import FOLDER_MEMBERS
+from shell.home import Launcher
+from shell import tile_cache
 
-meta = {m["id"]: m for m in G["FOLDER_MEMBERS"]["face"]}["mask"]
+tile_cache.ensure_cache_dir()
+
+meta = {m["id"]: m for m in FOLDER_MEMBERS["face"]}["mask"]
 print("MODULE", meta["module"])
 
 t0 = time.ticks_ms()
-launcher = G["Launcher"]()
+launcher = Launcher()
 launcher.open_app(meta)
 print("O open {}ms mem_free={}".format(
     time.ticks_diff(time.ticks_ms(), t0), gc.mem_free()))

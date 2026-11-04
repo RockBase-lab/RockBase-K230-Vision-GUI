@@ -34,7 +34,12 @@ del _f
 
 G = {"__name__": "gui_probe"}
 exec(compile(_src, "launcher.py", "exec"), G)
-G["_ensure_cache_dir"]()
+# The tables and classes live in shell/ after the layer split; importing them
+# here also keeps sys.path bootstrapped by the exec above.
+from shell.home import Launcher
+from shell import tile_cache
+
+tile_cache.ensure_cache_dir()
 
 OUT = "/data/capture"
 
@@ -84,7 +89,7 @@ def save_jpeg(tag):
         dsc.buf_free()
 
 
-launcher = G["Launcher"]()
+launcher = Launcher()
 launcher.build_home()
 
 pager = launcher.pager

@@ -5,6 +5,7 @@ import gc
 import sys
 import time
 import ubinascii
+import uctypes
 
 import lvgl as lv
 
@@ -26,9 +27,10 @@ print("[I] gui module loaded")
 from shell import tile_cache
 from shell import touchscreen
 from shell.context import AppContext
+from shell.home import Launcher
 
 tile_cache.ensure_cache_dir()
-Launcher = glb["Launcher"]
+
 launcher = Launcher()
 
 scr, content, home_btn = launcher._build_shell("IMU", show_clock=True)

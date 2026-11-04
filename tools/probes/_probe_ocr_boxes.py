@@ -17,15 +17,21 @@ import lvgl as lv
 src = open("/sdcard/factory/gui/launcher.py").read()
 G = {"__name__": "ocr_boxes"}
 exec(compile(src, "launcher.py", "exec"), G)
-G["_ensure_cache_dir"]()
+# The tables and classes live in shell/ after the layer split; importing them
+# here also keeps sys.path bootstrapped by the exec above.
+from shell.registry import FOLDER_MEMBERS
+from shell.home import Launcher
+from shell import tile_cache
+
+tile_cache.ensure_cache_dir()
 
 meta = None
-for item in G["FOLDER_MEMBERS"]["vision"]:
+for item in FOLDER_MEMBERS["vision"]:
     if item["id"] == "ocr":
         meta = item
         break
 
-launcher = G["Launcher"]()
+launcher = Launcher()
 launcher.open_app(meta)
 app = launcher.active_app
 print("B1 MAX_BOXES={} MIN_H={} MIN_W={}".format(

@@ -33,7 +33,13 @@ del _f
 
 G = {"__name__": "gui_probe"}
 exec(compile(_gui_src, "launcher.py", "exec"), G)
-G["_ensure_cache_dir"]()
+# The tables and classes live in shell/ after the layer split; importing them
+# here also keeps sys.path bootstrapped by the exec above.
+from shell.registry import FOLDER_MEMBERS
+from shell.home import Launcher
+from shell import tile_cache
+
+tile_cache.ensure_cache_dir()
 
 OUT = "/data/capture"
 
@@ -80,13 +86,13 @@ def save_jpeg(tag):
 
 
 def meta_of(group, app_id):
-    for item in G["FOLDER_MEMBERS"][group]:
+    for item in FOLDER_MEMBERS[group]:
         if item["id"] == app_id:
             return item
     return None
 
 
-launcher = G["Launcher"]()
+launcher = Launcher()
 launcher.build_home()
 
 TARGETS = [

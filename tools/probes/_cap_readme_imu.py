@@ -27,7 +27,13 @@ del _f
 
 G = {"__name__": "gui_probe"}
 exec(compile(_src, "launcher.py", "exec"), G)
-G["_ensure_cache_dir"]()
+# The tables and classes live in shell/ after the layer split; importing them
+# here also keeps sys.path bootstrapped by the exec above.
+from shell.registry import APPS
+from shell.home import Launcher
+from shell import tile_cache
+
+tile_cache.ensure_cache_dir()
 
 
 def shot(tag):
@@ -75,13 +81,13 @@ def shot(tag):
 
 
 def top_of(app_id):
-    for item in G["APPS"]:
+    for item in APPS:
         if item["id"] == app_id:
             return item
     return None
 
 
-launcher = G["Launcher"]()
+launcher = Launcher()
 launcher.build_home()
 
 meta = top_of("imu")
