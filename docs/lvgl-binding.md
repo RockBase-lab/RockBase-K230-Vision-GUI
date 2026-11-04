@@ -67,6 +67,27 @@ Font assets in this repo are produced by `tools/gen_font.py`, whose `SPECS`
 table defines size and glyph set. The assets land in
 `factory/gui/assets/fonts/*.bin` and are deployed automatically.
 
+### localized UI text uses a glyph subset, not a whole CJK font
+
+The home screen carries Chinese labels, and the Latin faces (`Nunito`,
+`montserrat`, `mono_dejavu`) have no CJK glyphs. The zh strings are baked into
+`ui_cjk_28.bin` from Source Han Sans at 28 px, bpp 4, covering only the
+characters `i18n.NAMES` actually uses (47 glyphs plus ASCII, 30 KB).
+
+Measured on board: `lv.font_load("A:/sdcard/factory/gui/assets/fonts/ui_cjk_28.bin")`
+costs 163 ms and 30 KB of LVGL heap, and a full-screen repaint with four mixed
+ASCII/CJK labels costs under 1 ms (`refr_now` x10).
+
+The same size is required on both bake paths: the offline
+`tools/gen_tile_cache.py` rasterises tile names with Source Han Sans at 28 px,
+and the on-board fallback bake uses the same `ui_cjk_28.bin`, so a cache miss
+renders identically to a cache hit.
+
+The full 3755-glyph GB2312 level-1 set was measured too: 876 KB on SD, 4688 ms
+to load, ~860 KB of heap. This firmware's GUI runs with about 1.6 MB free while
+an AI app holds its buffers, so a full CJK face would crowd out the
+`release_home` applications. Keep UI CJK to the used subset.
+
 ### monospace digits
 
 `tools/gen_font.py mono16` produces `mono_dejavu_16.bin` from DejaVu Sans Mono

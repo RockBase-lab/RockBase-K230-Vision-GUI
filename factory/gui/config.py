@@ -27,6 +27,9 @@ DEFAULTS = {
     # Panel backlight, percent. Ships at the minimum readable level: the panel is
     # the largest fixed load on the pack, and the Settings stepper shares the floor.
     "display.brightness": backlight.MIN_PERCENT,
+    # Desktop language: "en" or "zh". Only the home screen (tile names, folder
+    # titles/labels) is localized so far; apps keep their own strings.
+    "ui.language": "en",
 }
 
 _values = None

@@ -213,6 +213,7 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_firmware_id.py` | `os.uname()` identity, used to confirm which board defconfig the image was built from |
 | `_probe_capture_caps.py` | Which transfer encodings the firmware supports for a screen capture (RLE, zlib, JPEG) |
 | `_probe_capture_jpeg.py` | Full-screen capture through the JPEG encoder instead of RLE |
+| `_probe_i18n_desktop.py` | Desktop in en and zh: tile cache hits per language, folder flyout labels, and one capture of each (needs `--lvgl`) |
 | `_cap_readme_ui.py` | README screenshots: desktop pages, both folder flyouts, Settings/Audio/IMU/Gallery/Network |
 | `_cap_readme_ui2.py` | README screenshots: Battery (after a real reading) and Touch |
 | `_cap_readme_splash.py` | README screenshot: boot progress bar at a realistic mid-boot state |

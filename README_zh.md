@@ -78,7 +78,8 @@
 启动阶段带真实进度条，按**实测毫秒权重**推进（不是按条目数均分）：
 
 1. 读取 tile 位图缓存（未命中则在板上现场烘焙并写盘）
-2. 加载 5 套位图字体（其中 OCR CJK 字体单套约 7.5 s，占进度条大头）
+2. 加载 6 套位图字体（其中 OCR CJK 字体单套约 7.5 s，占进度条大头；
+   桌面中文子集字体只有 47 个字，实测 163 ms）
 3. 读取 OCR 字典
 4. 常驻加载 16 个 kmodel
 5. 尝试 Wi-Fi 连接（硬性 15 s 预算，超时照常进桌面，之后不再后台重连）
@@ -341,6 +342,10 @@ config.DEFAULTS  ──►  /data/settings/gui.json  ◄──  app_settings.GRO
 设置项没有“保存”按钮，改一次写一次盘。缺失或损坏的配置文件不会阻止 GUI 启动，
 会用默认值继续并打印一行日志。
 
+`ui.language`（`en` / `zh`）负责桌面本地化：tile 名、文件夹标题和成员标签都来自
+`factory/gui/i18n.py`。切换在下次显示桌面时生效，不需要复位：launcher 会重建
+home 屏并读取该语言对应的 tile 缓存。应用内部文案目前仍是英文。
+
 ## 应用清单
 
 | 分组 | 应用 | 模块 | 主要依赖 |
@@ -390,7 +395,7 @@ config.DEFAULTS  ──►  /data/settings/gui.json  ◄──  app_settings.GRO
 ### 新增一个设置项
 
 1. `config.py` 的 `DEFAULTS` 里加键与默认值。
-2. `apps/app_settings.py` 的 `GROUPS` 里加一行，类型是 `toggle` / `stepper` / `info` / `action`。
+2. `apps/app_settings.py` 的 `GROUPS` 里加一行，类型是 `toggle` / `stepper` / `choice` / `info` / `action`。
 3. 在消费方读取该值：启动期行为放 launcher，应用内行为由应用自己在打开时读。
 
 不要为了拿运行期句柄从应用里 import `launcher.py`（它通过 `exec(open().read())` 运行，

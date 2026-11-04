@@ -18,6 +18,7 @@ import time
 import lvgl as lv
 
 import config
+import i18n
 from ui import backlight
 from ui import beep
 from version import GUI_VERSION
@@ -81,6 +82,12 @@ GROUPS = (
              backlight.MIN_PERCENT, backlight.MAX_PERCENT),
          "min": backlight.MIN_PERCENT, "max": backlight.MAX_PERCENT,
          "step": 10, "unit": "%"},
+        # Language cycles on tap. Only the home screen is localized so far, so the
+        # hint says the change lands when you return to the desktop.
+        {"type": "choice", "key": "ui.language",
+         "label": "Language",
+         "hint": "desktop text; applies on returning home",
+         "options": (("en", "English"), ("zh", "中文"))},
     )),
     ("NETWORK", (
         {"type": "info", "label": "Wi-Fi and timezone",
@@ -172,6 +179,7 @@ class SettingsApp:
         self.value_font = _load_baked("kb_nunito_bold_28.bin", builtin)
         self._toggles = []    # (key, switch)
         self._steppers = []   # (item, value label)
+        self._choices = []    # (item, value label)
         self._live = []       # (kind, label, config key or None)
         self._actions = {}    # action name -> value label
         self._confirm = {}    # action name -> ticks_ms deadline
@@ -264,6 +272,8 @@ class SettingsApp:
             return self._toggle_row(item, y)
         if kind == "stepper":
             return self._stepper_row(item, y)
+        if kind == "choice":
+            return self._choice_row(item, y)
         if kind == "info":
             return self._info_row(item, y)
         if kind == "action":
@@ -349,6 +359,56 @@ class SettingsApp:
         lab.center()
         lab.clear_flag(lv.obj.FLAG.CLICKABLE)
         return btn
+
+    def _choice_row(self, item, y):
+        """Whole-row tap cycles through the option list; the current label sits on
+        the right. A CJK option takes the preloaded 16px OCR face, which covers
+        the two language names."""
+        row = self._card(y)
+        row.add_flag(lv.obj.FLAG.CLICKABLE)
+        self._press_feedback(row)
+        self._rows_label(row, item)
+        vlabel = lv.label(row)
+        text = self._choice_text(item)
+        vlabel.set_text(text)
+        vlabel.set_style_text_color(lv.color_hex(COL_TEXT), 0)
+        f = self.small
+        if i18n.needs_cjk(text):
+            try:
+                import font_pool
+                f = font_pool.get("ocr_cjk_16.bin") or self.small
+            except BaseException:
+                pass
+        if f:
+            vlabel.set_style_text_font(f, 0)
+        vlabel.align(lv.ALIGN.RIGHT_MID, -18, 0)
+        key = item["key"]
+        beep.on_click(row, lambda e, _i=item, _l=vlabel: self._on_choice(_i, _l))
+        self._choices.append((item, vlabel))
+        return y + ROW_H + ROW_GAP
+
+    def _choice_text(self, item):
+        value = config.get(item["key"], item["options"][0][0])
+        for code, text in item["options"]:
+            if code == value:
+                return text
+        return item["options"][0][1]
+
+    def _on_choice(self, item, vlabel):
+        codes = [c for c, _t in item["options"]]
+        current = config.get(item["key"], codes[0])
+        try:
+            idx = codes.index(current)
+        except ValueError:
+            idx = -1
+        code = codes[(idx + 1) % len(codes)]
+        config.set(item["key"], code)
+        if item["key"] == "ui.language":
+            i18n.set_lang(code)
+        for _item, label in self._choices:
+            if _item is item:
+                label.set_text(self._choice_text(_item))
+                break
 
     def _info_row(self, item, y):
         row = self._card(y)
@@ -440,6 +500,10 @@ class SettingsApp:
             beep.set_enabled(config.get_bool("ui.click_sound", True))
             backlight.set_percent(
                 config.get_int("display.brightness", backlight.MIN_PERCENT))
+            # Restoring defaults also restores the language: re-read it and rebuild
+            # the desktop tiles to match.
+            i18n.init()
+            i18n.mark_home_dirty()
             self._refresh_controls()
             self._refresh_live(force=True)
             label = self._actions.get(name)
@@ -458,6 +522,8 @@ class SettingsApp:
             label.set_text("{}{}".format(
                 config.get_int(item["key"], item.get("max", 100)),
                 item.get("unit", "")))
+        for item, label in self._choices:
+            label.set_text(self._choice_text(item))
 
     # ---------- per-frame ----------
 

@@ -22,6 +22,9 @@ GUI = os.path.join(ROOT, "factory", "gui")
 ASSETS = os.path.join(GUI, "assets")
 CACHE = os.path.join(ASSETS, "cache")
 FONT_PATH = os.path.join(ASSETS, "Nunito-Bold-700.ttf")
+# 28px CJK face for localized tile names: the same source and size as the
+# on-board ui_cjk_28.bin fallback bake, so both paths render identically.
+CJK_FONT_PATH = os.path.join(HERE, "fontsrc", "SourceHanSansCN-Regular.ttf")
 
 CF_XRGB8888 = 17   # same as the on-board snapshot
 
@@ -68,7 +71,15 @@ def parse_gui():
             apps.append({"id": i.group(1), "name": n.group(1),
                          "icon": c.group(1) if c else None,
                          "folder": '"folder": True' in e})
-    return ver, accents, apps
+    # Localized names from i18n.NAMES: id -> (en, zh). The baker must emit the
+    # same per-language tiles the board's _cache_load validates.
+    itxt = open(os.path.join(GUI, "i18n.py"), encoding="utf-8").read()
+    names = dict(
+        (m.group(1), (m.group(2), m.group(3)))
+        for m in re.finditer(
+            r'"([a-z_]+)":\s*\("([^"]*)",\s*"([^"]*)"\)',
+            re.search(r"NAMES\s*=\s*\{(.*?)\n\}", itxt, re.S).group(1)))
+    return ver, accents, apps, names
 
 
 def to_xrgb8888(img):
@@ -85,7 +96,7 @@ def to_xrgb8888(img):
     return bytes(raw)
 
 
-def bake(app, idx, accents):
+def bake(app, idx, accents, label, font_path):
     tile = CFG["tile"]
     icon_size = CFG["icon"]
     accent = accents[idx % len(accents)]
@@ -95,7 +106,7 @@ def bake(app, idx, accents):
                         fill=CFG["btn"] + (255,),
                         outline=CFG["border"] + (255,),
                         width=max(1, CFG["border_w"]))
-    font = ImageFont.truetype(FONT_PATH, CFG["font"])
+    font = ImageFont.truetype(font_path, CFG["font"])
 
     if app["icon"]:
         p = os.path.join(GUI, app["icon"])
@@ -110,8 +121,8 @@ def bake(app, idx, accents):
         by = (tile - 30 - BADGE_SIZE) // 2
         d.ellipse([bx, by, bx + BADGE_SIZE - 1, by + BADGE_SIZE - 1],
                   fill=(accent >> 16 & 255, accent >> 8 & 255, accent & 255, 255))
-        letter = app["name"][0].upper()
-        lfont = ImageFont.truetype(FONT_PATH, 44)
+        letter = label[0].upper()
+        lfont = ImageFont.truetype(font_path, 44)
         bb = d.textbbox((0, 0), letter, font=lfont)
         tw, th = bb[2] - bb[0], bb[3] - bb[1]
         cx = bx + BADGE_SIZE // 2
@@ -123,10 +134,10 @@ def bake(app, idx, accents):
     # Note that textbbox's origin is the ascender line, so ink bottom = draw y + bb[3];
     # using y = tile-2-(bb[3]-bb[1]) shifts everything down by bb[1] pixels and clips
     # the bottom (observed).
-    bb = d.textbbox((0, 0), app["name"], font=font)
+    bb = d.textbbox((0, 0), label, font=font)
     tw = bb[2] - bb[0]
     d.text(((tile - tw) // 2 - bb[0], tile - CFG["name_margin"] - bb[3]),
-           app["name"], font=font, fill=CFG["txt"] + (255,))
+           label, font=font, fill=CFG["txt"] + (255,))
 
     # Folder badge: three dots in the bottom-right corner (same position, size, and
     # colour lookup as _bake_tile on board).
@@ -141,25 +152,29 @@ def bake(app, idx, accents):
 
 
 def main():
-    ver, accents, apps = parse_gui()
+    ver, accents, apps, names = parse_gui()
     os.makedirs(CACHE, exist_ok=True)
     print("BAKE_VER={} TILE={} ICON={} FONT={} radius={} apps={}".format(
         ver, CFG["tile"], CFG["icon"], CFG["font"], CFG["radius"], len(apps)))
     for idx, app in enumerate(apps):
-        img = bake(app, idx, accents)
-        raw = to_xrgb8888(img)
-        name = app["name"].encode()
-        tile = CFG["tile"]
-        header = (b"TILE2" + bytes([ver]) +
-                  tile.to_bytes(2, "little") + tile.to_bytes(2, "little") +
-                  CF_XRGB8888.to_bytes(2, "little") +
-                  len(name).to_bytes(2, "little") + name +
-                  bytes([1 if app.get("folder") else 0]))
-        path = os.path.join(CACHE, "tile_{}.bin".format(app["id"]))
-        with open(path, "wb") as f:
-            f.write(header + raw)
-        print("{:14s} {:10s} -> tile_{}.bin ({}B)".format(
-            app["id"], app["name"], app["id"], len(header) + len(raw)))
+        for lang, font_path in (("en", FONT_PATH), ("zh", CJK_FONT_PATH)):
+            label = names.get(app["id"], (app["name"], app["name"]))[
+                1 if lang == "zh" else 0]
+            img = bake(app, idx, accents, label, font_path)
+            raw = to_xrgb8888(img)
+            name = label.encode()
+            tile = CFG["tile"]
+            header = (b"TILE2" + bytes([ver]) +
+                      tile.to_bytes(2, "little") + tile.to_bytes(2, "little") +
+                      CF_XRGB8888.to_bytes(2, "little") +
+                      len(name).to_bytes(2, "little") + name +
+                      bytes([1 if app.get("folder") else 0]))
+            suffix = "" if lang == "en" else "_" + lang
+            path = os.path.join(CACHE, "tile_{}{}.bin".format(app["id"], suffix))
+            with open(path, "wb") as f:
+                f.write(header + raw)
+            print("{:14s} {:10s} -> tile_{}{}.bin ({}B)".format(
+                app["id"], label, app["id"], suffix, len(header) + len(raw)))
     print("done ->", CACHE)
 
 

@@ -162,6 +162,7 @@ BOOT_FONTS = [
     ("mono_dejavu_16.bin", 106),
     ("ui_nunito_bold_22.bin", 110),
     ("kb_nunito_bold_28.bin", 119),
+    ("ui_cjk_28.bin", 60),
     ("plate_cjk_30.bin", 164),
     ("ocr_cjk_16.bin", 7469),
 ]
@@ -503,6 +504,9 @@ from ui import backlight
 # Persistent user preferences (/data/settings/gui.json). Read at boot for the
 # click tone and brightness, then by each app that owns a setting.
 import config
+# Desktop string table + language state: tile names, folder titles and member
+# labels resolve through this so a language switch rebuilds the home in place.
+import i18n
 # Resident kpu / bitmap-font caches: apps take their resources from these instead of
 # loading them at open, which is what makes the boot preload worth doing.
 import model_pool
@@ -545,8 +549,13 @@ CACHE_DIR = None                   # = _gui_dir + "/assets/cache", initialised i
 BAKED_TILES = {}                   # app id -> (img_dsc_t, raw_bytes): kept referenced against GC
 
 
-def _cache_path(app_id):
-    return CACHE_DIR + "/tile_{}.bin".format(app_id)
+def _cache_path(meta):
+    # One cache file per language: the English tiles keep the historical name so an
+    # existing card never re-bakes; localized languages get a suffix.
+    lang = i18n.lang()
+    if lang == "en":
+        return CACHE_DIR + "/tile_{}.bin".format(meta["id"])
+    return CACHE_DIR + "/tile_{}_{}.bin".format(meta["id"], lang)
 
 
 def _ensure_cache_dir():
@@ -577,11 +586,35 @@ def _make_dsc(w, h, cf, raw):
                          "data_size": len(raw), "data": raw})
 
 
+def _tile_name(meta):
+    """Display name for the current language; falls back to the APPS entry name."""
+    return i18n.name(meta["id"], meta["name"])
+
+
+def _cjk_font(name=i18n.CJK_FONT):
+    """Baked bitmap font covering the desktop CJK strings, or None."""
+    try:
+        return font_pool.get(name)
+    except BaseException:
+        return None
+
+
+def _tile_name_font(label):
+    """Font for a tile name: the Latin tiny_ttf face has no CJK glyphs, so a
+    localized label takes the baked ui_cjk_28 face instead (same 28px size)."""
+    if i18n.needs_cjk(label):
+        f = _cjk_font()
+        if f is not None:
+            return f
+    return TILE_FONT or _font("font_dejavu_16_persian_hebrew",
+                              "font_montserrat_16", "font_montserrat_14")
+
+
 def _cache_load(meta):
     """Return (dsc, raw) on a cache hit, else None. Validates magic/version/size/name;
     any mismatch invalidates the entry."""
     try:
-        with open(_cache_path(meta["id"]), "rb") as f:
+        with open(_cache_path(meta), "rb") as f:
             blob = f.read()
     except OSError:
         return None
@@ -596,7 +629,7 @@ def _cache_load(meta):
     raw = blob[15 + nlen:]
     # The folder flag takes part in validation: an entry switching between "folder"
     # and "plain app" invalidates its old tile automatically.
-    if (name != meta["name"].encode() or
+    if (name != _tile_name(meta).encode() or
             folder_flag != (1 if meta.get("folder") else 0) or
             len(raw) != w * h * 4):
         return None
@@ -604,9 +637,9 @@ def _cache_load(meta):
 
 
 def _cache_save(meta, w, h, cf, raw):
-    name = meta["name"].encode()
+    name = _tile_name(meta).encode()
     try:
-        with open(_cache_path(meta["id"]), "wb") as f:
+        with open(_cache_path(meta), "wb") as f:
             f.write(b"TILE2")
             f.write(bytes([BAKE_VER]))
             f.write(w.to_bytes(2, "little"))
@@ -675,11 +708,11 @@ def _bake_tile(parent, meta):
             sym.set_style_text_font(font, 0)
         sym.center()
 
+    tile_label = _tile_name(meta)
     name = lv.label(btn)
-    name.set_text(meta["name"])
+    name.set_text(tile_label)
     name.set_style_text_color(lv.color_hex(NAME_COLOR), 0)
-    font = TILE_FONT or _font("font_dejavu_16_persian_hebrew",
-                              "font_montserrat_16", "font_montserrat_14")
+    font = _tile_name_font(tile_label)
     if font:
         name.set_style_text_font(font, 0)
     name.align(lv.ALIGN.BOTTOM_MID, 0, -2)
@@ -1439,6 +1472,7 @@ class Launcher:
         self.clock_imgs = None  # clock bitmap widgets of the current screen (None = none)
         self.dots = []
         self.pager = None      # home pager (paging.SnapPager; None when there is one page)
+        self._scratch = None   # temporary screen used only when rebuilding a live home
         # Home page to restore. A release_home app deletes the home screen, so the pager
         # is rebuilt from scratch and would otherwise always come back on page 0. The
         # page is saved before that deletion so CANCEL can step back one level at a time
@@ -1537,6 +1571,12 @@ class Launcher:
         center = lv.label(status)
         center.set_text(center_text)
         center.set_style_text_color(lv.color_hex(COL_TEXT), 0)
+        if center_text and i18n.needs_cjk(center_text):
+            # App title in the status bar: the default montserrat_16 has no CJK
+            # glyphs, so a localized title takes the preloaded 16px OCR face.
+            f = _cjk_font("ocr_cjk_16.bin")
+            if f is not None:
+                center.set_style_text_font(f, 0)
         center.align(lv.ALIGN.CENTER, 0, 0)
         if show_clock:
             # The clock uses bitmap digits (HH:MM:SS = 6 digits + 2 colons). Each digit is
@@ -1678,7 +1718,9 @@ class Launcher:
         # The home screen is built exactly once: lv.scr_load does not destroy the old
         # screen, so rebuilding it on every app exit would pile up object trees forever
         # and make the UI slower the longer it runs.
-        if self.home_scr is not None:
+        # A language change is the one reason to rebuild a resident home: the tile
+        # bitmaps hold baked text, so consume_home_dirty() forces the full path below.
+        if self.home_scr is not None and not i18n.consume_home_dirty():
             lv.scr_load(self.home_scr)
             self.clock_imgs = self.home_clock_imgs
             self.wifi_img = self.home_wifi_img
@@ -1689,6 +1731,29 @@ class Launcher:
             self._wifi_key = None
             self._battery_key = None
             return
+        if self.home_scr is not None:
+            # Language changed while the home screen stayed resident: drop it and its
+            # baked tiles so the rebuild picks up the new language's cache. The active
+            # screen is never the home here (build_home runs from close_app with the app
+            # screen still active, or from run() before home exists), so deleting it is
+            # safe. Guard anyway against deleting the active screen.
+            self._scratch = None
+            if self.home_scr == lv.scr_act():
+                scratch = lv.obj()
+                lv.scr_load(scratch)
+                self._scratch = scratch
+            try:
+                self.home_scr.delete()
+            except BaseException as error:
+                print("[GUI] home delete for language failed: {}".format(error))
+            self.home_scr = None
+            self.home_clock_imgs = None
+            self.home_wifi_img = None
+            self.home_batt_img = None
+            self.dots = []
+            self.pager = None
+            BAKED_TILES.clear()
+            gc.collect()
         # Coming back from an app that used release_home: the tile bitmaps were dropped,
         # so reload them from the SD cache first
         if not BAKED_TILES:
@@ -1831,6 +1896,14 @@ class Launcher:
             else:
                 self.home_page = 0
         self.home_scr = scr
+        # The language-rebuild guard may have parked the display on a scratch screen;
+        # now that the new home is active, drop it.
+        if self._scratch is not None:
+            try:
+                self._scratch.delete()
+            except BaseException:
+                pass
+            self._scratch = None
         self.home_clock_imgs = self.clock_imgs
         # The home wifi icon needs its own reference: entering an app makes _build_shell
         # repoint self.wifi_img at the app screen's icon (or None when immersive), and the
@@ -1881,7 +1954,7 @@ class Launcher:
             tile.add_flag(lv.obj.FLAG.CLICKABLE)
             tile.clear_flag(lv.obj.FLAG.SCROLLABLE)
             lb = lv.label(tile)
-            lb.set_text(meta["name"])
+            lb.set_text(_tile_name(meta))
             lb.center()
 
         def on_clicked(event, m=meta):
@@ -1954,9 +2027,10 @@ class Launcher:
             pass
 
         title = lv.label(panel)
-        title.set_text(meta["name"])
+        folder_title = _tile_name(meta)
+        title.set_text(folder_title)
         title.set_style_text_color(lv.color_hex(COL_TEXT), 0)
-        tf = TILE_FONT or _font("font_montserrat_20", "font_montserrat_16")
+        tf = _tile_name_font(folder_title)
         if tf:
             title.set_style_text_font(tf, 0)
         title.align(lv.ALIGN.TOP_MID, 0, 14)
@@ -2070,9 +2144,17 @@ class Launcher:
             _no_hit(sym)
 
         lab = lv.label(tile)
-        lab.set_text(meta["name"])
+        member_name = i18n.name(meta["id"], meta["name"])
+        lab.set_text(member_name)
         lab.set_style_text_color(lv.color_hex(NAME_COLOR), 0)
-        f = _font("font_montserrat_14", "font_montserrat_16")
+        if i18n.needs_cjk(member_name):
+            # 16px CJK: reuse the preloaded OCR face (SourceHanSans 16px) rather than
+            # baking a second CJK size for one label row.
+            f = _cjk_font("ocr_cjk_16.bin")
+        else:
+            f = None
+        if f is None:
+            f = _font("font_montserrat_14", "font_montserrat_16")
         if f:
             lab.set_style_text_font(f, 0)
         lab.align(lv.ALIGN.BOTTOM_MID, 0, -5)
@@ -2235,17 +2317,17 @@ class Launcher:
             ctx.height = DISPLAY_HEIGHT
             ctx.content_x = 0
             ctx.content_y = 0
-            scr, content, home_btn = self._build_shell(meta["name"], show_clock=False,
+            scr, content, home_btn = self._build_shell(_tile_name(meta), show_clock=False,
                                                        immersive=True)
         else:
-            scr, content, home_btn = self._build_shell(meta["name"], show_clock=False)
+            scr, content, home_btn = self._build_shell(_tile_name(meta), show_clock=False)
             ctx.content_x = 0
             ctx.content_y = STATUS_H
             if home_btn is not None:
                 beep.on_click(
                     home_btn,
                     lambda e: (print("[GUI] home clicked"), ctx.request_exit()))
-        ctx.app_name = meta["name"]
+        ctx.app_name = _tile_name(meta)
 
         # release_home: reclaim home-screen memory before a heavy AI or memory-sensitive
         # app starts.
@@ -2344,7 +2426,7 @@ class Launcher:
         panel.add_flag(lv.obj.FLAG.CLICKABLE)
 
         title = lv.label(panel)
-        title.set_text("{} unavailable".format(meta["name"]))
+        title.set_text("{} unavailable".format(_tile_name(meta)))
         title.set_style_text_color(lv.color_hex(COL_TEXT), 0)
         tf = _font("font_montserrat_24", "font_montserrat_20", "font_montserrat_16")
         if tf:
@@ -2696,6 +2778,7 @@ def main():
     # Preferences first: brightness and click tone are applied while the panel
     # comes up, so the first boot frame and the first tap already honour them.
     config.load()
+    i18n.init()
     # Display rotation is applied at the Display layer.
     Display.init(DISPLAY_TYPE, width=DISPLAY_WIDTH, height=DISPLAY_HEIGHT,
                  flag=DISPLAY_FLAG, to_ide=True)

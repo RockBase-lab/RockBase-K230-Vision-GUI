@@ -144,6 +144,23 @@ SPECS = {
              [(0x20, 0x7E)] + [(ord(c), ord(c)) for c in PLATE_CJK]),
         ],
     },
+    # Desktop language labels: the zh tile names bake into the tile bitmaps at
+    # TILE_FONT_SIZE (28px), so the on-board fallback bake and the folder flyout
+    # title need a 28px CJK face. The charset is only the characters i18n.NAMES
+    # actually uses (tools/gen_ui_cjk_charset.py regenerates it from i18n.py), so
+    # the font stays tiny (~50 glyphs) instead of a full CJK set.
+    "ui28cjk": {
+        "out": "ui_cjk_28.bin",
+        "size": 28,
+        "bpp": 4,
+        "charset": "ui_cjk_charset.txt",
+        "parts": [
+            ("SourceHanSansCN-Regular.ttf", [(0x20, 0x7E)]),
+            # Second section of the same font: gen() passes the charset literally
+            # via --symbols when a part's ranges is None.
+            ("SourceHanSansCN-Regular.ttf", None),
+        ],
+    },
     # OCR result labels: the font must cover every character the ocr_rec dictionary
     # can emit, because a character missing here renders as a box even when the model
     # read it correctly. That is 6549 glyphs (6255 hanzi + 293 punctuation/symbols +
