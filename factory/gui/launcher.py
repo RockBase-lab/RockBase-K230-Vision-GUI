@@ -43,20 +43,7 @@ import lvgl as lv
 import uctypes
 from machine import FPIOA, Pin, PWM
 from media.display import Display
-from media.media import ALIGN_UP
 from machine import TOUCH
-
-DISPLAY_TYPE = Display.ST7701
-# ALIGN_UP(800, 16) == 800 because 800 is a multiple of 16. Measured on board:
-# FLAG_ROTATION_270 accepts an 800x480 buffer.
-DISPLAY_WIDTH = ALIGN_UP(800, 16)
-DISPLAY_HEIGHT = 480
-
-# The ST7701 on RockBase is mounted rotated the opposite way to the SDK's default
-# landscape orientation, so it is corrected at the display layer with
-# Display.init(flag=FLAG_ROTATION_270). The FT5316 touch driver's default rotation
-# already matches that display, so TOUCH(0) gets no extra rotate argument.
-DISPLAY_FLAG = Display.FLAG_ROTATION_270
 
 
 # ---- Frame-rate boost (removes the "low refresh / smearing" feel while swiping) ----
@@ -242,13 +229,21 @@ from shell.theme import (COL_BG, COL_BAR, COL_TEXT, COL_MUTED, COL_DOT_OFF,
                          STATUS_BATT_W, TILE_FONT_SIZE, BAKE_VER)
 from shell.registry import APPS, FOLDER_MEMBERS, APP_ACCENTS, ACCENTS, _sym
 
+# Panel identity lives in hardware/panel.py. Bound to the DISPLAY_* names here so
+# the layout code below reads unchanged.
+from hardware import panel
+DISPLAY_TYPE = panel.TYPE
+DISPLAY_WIDTH = panel.WIDTH
+DISPLAY_HEIGHT = panel.HEIGHT
+DISPLAY_FLAG = panel.FLAG
+
 # Shared paging module (home screen, gallery and any other horizontally paged app use
 # the same thresholds and styles).
 # It must be imported after _gui_dir is on sys.path, and it must never import launcher.py
 # back: this file runs via exec(open().read()), so a reverse import would execute it a
 # second time and build a second Launcher.
 from ui import paging
-from ui import splash as splash_ui
+from shell import splash as splash_ui
 from net import service as net_mgr
 # Shared ADC5 access: the status bar and the Battery app hold one channel handle, so
 # the app never opens a second one.

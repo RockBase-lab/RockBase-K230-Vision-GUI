@@ -90,12 +90,12 @@ at the GUI root to decide later: the root holds `launcher.py` and nothing else.
 | Path | Status | Still to move in |
 | --- | --- | --- |
 | `launcher.py` | populated, oversized | out: tile cache, display bring-up, touch, buttons, context, status bar, boot, `Launcher` |
-| `shell/` | partly populated | theme and registry are in; the rest is listed above |
+| `shell/` | partly populated | theme, registry and splash are in; the rest is listed above |
 | `apps/` | populated, clean | — (only `app_*.py` plus `anchor_base.py`) |
 | `ui/` | populated, clean | — |
 | `net/`, `audio/` | populated, final | — |
 | `core/` | populated | — (`paths`, `errors`, `config`, `i18n`, `version`, `font_pool`, `model_pool`, `ocr_dict`) |
-| `hardware/` | populated | `panel.py` (the `DISPLAY_*` constants still sit in `launcher.py`) |
+| `hardware/` | populated, final | — (`panel` holds the constants; its bring-up is `shell/`'s) |
 | `assets/` | populated, flat | grouping into `icons/ status/ glyphs/ widgets/ fonts/ cache/ src/` |
 
 Only `launcher.py` is left at the GUI root. `config.py` used to be the second root

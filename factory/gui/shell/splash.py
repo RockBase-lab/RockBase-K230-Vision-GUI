@@ -14,10 +14,11 @@ import lvgl as lv
 import time
 from core import font_pool
 from core.version import GUI_VERSION
+# The panel colours are the desktop's, not this screen's own: taking them from the
+# theme keeps the splash and the home screen from drifting apart after a palette
+# change.
+from shell.theme import COL_BG, COL_TEXT, COL_MUTED
 
-COL_BG = 0x12141A
-COL_TEXT = 0xFFFFFF
-COL_MUTED = 0x6B7484
 COL_TRACK = 0x252B36
 COL_FILL = 0x00E5A0
 COL_WARN = 0xFFC857

@@ -16,7 +16,7 @@ import uctypes
 sys.path.insert(0, "/sdcard/factory/gui")
 for _name in ("core", "apps", "core.errors", "apps.app_settings", "apps.app_audio",
               "apps.app_imu", "apps.app_touch", "apps.app_network",
-              "apps.app_gallery", "ui.beep", "ui.paging", "ui.splash",
+              "apps.app_gallery", "ui.beep", "ui.paging", "shell.splash",
               "hardware.backlight", "launcher", "hardware.camera_fov", "core.config"):
     if _name in sys.modules:
         del sys.modules[_name]

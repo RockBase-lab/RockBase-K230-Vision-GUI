@@ -14,7 +14,7 @@ sys.path.insert(0, "/sdcard/factory/gui")
 # in its namespace, so "from net import service" hands back the stale one even after
 # "del sys.modules['net.service']". Purge the parents too.
 for _name in ("core", "apps.app_ocr", "apps.app_vision", "apps", "core.errors",
-              "ui", "ui.beep", "ui.splash", "launcher", "hardware.camera_fov",
+              "ui", "ui.beep", "shell.splash", "launcher", "hardware.camera_fov",
               "core.model_pool", "core.font_pool", "core.ocr_dict",
               "net", "net.service"):
     if _name in sys.modules:

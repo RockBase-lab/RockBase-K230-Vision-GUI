@@ -18,7 +18,7 @@ import time
 import uctypes
 
 sys.path.insert(0, "/sdcard/factory/gui")
-for _name in ("core", "apps", "core.errors", "ui.beep", "ui.paging", "ui.splash",
+for _name in ("core", "apps", "core.errors", "ui.beep", "ui.paging", "shell.splash",
               "hardware.backlight", "launcher", "core.config"):
     if _name in sys.modules:
         del sys.modules[_name]

@@ -10,7 +10,6 @@ not own a device or a user flow.
 | --- | --- |
 | `paging.py` | horizontal paging: snap, drag thresholds, shared page-indicator styles, `RawImageCache` |
 | `kb_layer.py` | the reusable keyboard overlay, including the CJK face and the password eye |
-| `splash.py` | the boot progress screen |
 | `beep.py` | click/tone feedback through the GPIO43 PWM buzzer, plus the `on_click` / `bind` event wrappers |
 | `image.py` | `load(path)` / `load_asset(name)`, the one PNG → `lv.img_dsc_t` reader |
 
@@ -41,5 +40,6 @@ not own a device or a user flow.
 
 ## Status
 
-Final layout. `backlight.py` moved to `hardware/`; `image.py` is new and replaced
-the four per-module PNG readers.
+Final layout. `backlight.py` moved to `hardware/`, `splash.py` to `shell/` (it
+belongs to the boot flow and now takes its palette from `shell/theme.py` instead
+of copying it), and `image.py` replaced the four per-module PNG readers.

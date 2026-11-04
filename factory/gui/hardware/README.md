@@ -8,13 +8,11 @@ here draws a widget or decides a user flow.
 
 | Module | Owns |
 | --- | --- |
+| `panel.py` | `WIDTH` / `HEIGHT` / `TYPE` / `FLAG`, the panel identity the display bring-up needs |
 | `backlight.py` | PWM channel on GPIO25, `MIN_PERCENT` / `MAX_PERCENT`, `attach` / `set_percent` |
 | `battery.py` | ADC5 pack-voltage sampling, divider constants, OCV percentage |
 | `battery_trace.py` | optional per-batch ADC trace to `/data/battery` |
 | `camera_fov.py` | sensor geometry, preview crop, `set_preview` |
-
-`panel.py` is still pending: the `DISPLAY_*` constants and the display bring-up
-remain in `launcher.py` because they are entangled with `lvgl_setup`.
 
 ## Rules
 
@@ -37,4 +35,5 @@ remain in `launcher.py` because they are entangled with `lvgl_setup`.
 
 ## Status
 
-Populated and final except `panel.py`.
+Populated. `panel.py` holds constants only; the bring-up that consumes them is
+still in `launcher.py` as `lvgl_setup`, which belongs to `shell/`.

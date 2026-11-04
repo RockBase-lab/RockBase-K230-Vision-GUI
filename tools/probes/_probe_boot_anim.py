@@ -11,7 +11,7 @@ import sys
 import time
 
 sys.path.insert(0, "/sdcard/factory/gui")
-for _name in ("core", "apps", "core.errors", "ui", "ui.beep", "ui.splash", "launcher",
+for _name in ("core", "apps", "core.errors", "ui", "ui.beep", "shell.splash", "launcher",
               "hardware.camera_fov", "core.model_pool", "core.font_pool", "core.ocr_dict",
               "net", "net.service"):
     if _name in sys.modules:

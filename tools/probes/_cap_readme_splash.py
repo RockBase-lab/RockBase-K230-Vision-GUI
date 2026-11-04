@@ -10,12 +10,12 @@ import ubinascii
 import uctypes
 
 sys.path.insert(0, "/sdcard/factory/gui")
-for _name in ("core", "ui.splash", "core.font_pool", "core.version"):
+for _name in ("core", "shell.splash", "core.font_pool", "core.version"):
     if _name in sys.modules:
         del sys.modules[_name]
 
 import lvgl as lv
-from ui import splash as splash_ui
+from shell import splash as splash_ui
 
 splash = splash_ui.Splash()
 # 14 of 16 models plus the dictionary and the fonts: roughly the state a user sees

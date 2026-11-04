@@ -8,10 +8,33 @@
 # dictionary is used as a whitelist of common characters.
 import io
 import os
+import sys
 
-PINYIN_SRC = r"D:\code\pony\IoT\k230\RockBase\examples\utils\pinyin.txt"
-PHRASE_SRC = r"D:\code\pony\IoT\k230\RockBase\examples\utils\small_pinyin.txt"
-DST = r"d:\code\pony\IoT\k230\RockBase-K230-Vision\factory\gui\audio\pinyin_map.py"
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+
+# The two inputs are the firmware's own TTS dictionaries, which ship inside the
+# image under /sdcard/examples/utils and are not part of this repository. Point
+# --src at a directory holding them, or drop copies next to this tool; the old
+# behaviour was a hard-coded absolute path, which silently wrote the output to
+# the wrong tree on any other checkout.
+DEFAULT_SRC = os.path.join(ROOT, "tools", "pinyin_src")
+
+_src = None
+for _i, _arg in enumerate(sys.argv):
+    if _arg == "--src" and _i + 1 < len(sys.argv):
+        _src = sys.argv[_i + 1]
+PINYIN_SRC = os.path.join(_src or DEFAULT_SRC, "pinyin.txt")
+PHRASE_SRC = os.path.join(_src or DEFAULT_SRC, "small_pinyin.txt")
+DST = os.path.join(ROOT, "factory", "gui", "audio", "pinyin_map.py")
+
+# The dictionaries are firmware resources, so they are not in this repository.
+# Fail with the invocation instead of a bare FileNotFoundError.
+for _p in (PINYIN_SRC, PHRASE_SRC):
+    if not os.path.exists(_p):
+        sys.exit("[FAIL] missing %s\n"
+                 "       Pass --src <dir holding pinyin.txt and small_pinyin.txt>,\n"
+                 "       or copy both files into %s" % (_p, DEFAULT_SRC))
 
 # Tone-marked vowels back to their plain form.
 TONE = {

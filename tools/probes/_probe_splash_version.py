@@ -6,7 +6,7 @@
 import sys
 
 sys.path.insert(0, "/sdcard/factory/gui")
-for _name in ("core", "ui", "ui.splash", "core.version"):
+for _name in ("core", "ui", "shell.splash", "core.version"):
     try:
         del sys.modules[_name]
     except KeyError:
@@ -16,7 +16,7 @@ import lvgl as lv
 import ubinascii
 import uctypes
 
-from ui import splash as splash_ui
+from shell import splash as splash_ui
 from core.version import GUI_VERSION
 
 splash = splash_ui.Splash()

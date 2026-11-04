@@ -12,6 +12,7 @@
 #   python tools/deploy_board.py --force                      # ignore "already identical", re-push all
 #   python tools/deploy_board.py --dry-run                    # print the plan only
 #   python tools/deploy_board.py --smoke                      # extra on-board import smoke test
+#   python tools/deploy_board.py --prune                      # also delete board files the repo no longer has
 #
 # Deployed content (MANIFEST):
 #   factory/gui  -> /sdcard/factory/gui   launcher.py / ui / audio / net / apps / assets
@@ -109,6 +110,9 @@ WITH_TEST_MEDIA = "--with-test-media" in FLAGS
 FORCE = "--force" in FLAGS
 DRY_RUN = "--dry-run" in FLAGS
 SMOKE = "--smoke" in FLAGS
+# Push-only deploy leaves superseded files on the card, which is how a package split
+# ends up with both layouts present. --prune makes the card match the repository.
+PRUNE = "--prune" in FLAGS
 
 # ---------------- deploy manifest ----------------
 # (local dir, board dir, push big media?)
@@ -288,6 +292,52 @@ def main():
             todo.append(it)
 
         print("[PLAN] %d to push, %d skipped (already identical)" % (len(todo), skipped))
+
+        # ---------- 2b) files the card has but the repository does not ----------
+        # Only the manifest roots are compared, so anything the product creates at
+        # runtime under /data is never touched. A deploy is additive by design; this
+        # is the opt-in way to make a card match a moved or deleted module.
+        # This MicroPython has no os.walk (confirmed on board: AttributeError), so the
+        # tree is walked by hand. A path that listdir rejects is a file.
+        stale = []
+        if PRUNE and not VERIFY_ONLY:
+            wanted = set(r for _, r in items)
+            remote_all = run(
+                "import os\n"
+                "stack = list(%r)\n"
+                "out = []\n"
+                "while stack:\n"
+                "    p = stack.pop()\n"
+                "    try:\n"
+                "        names = os.listdir(p)\n"
+                "    except OSError:\n"
+                "        continue\n"
+                "    for n in names:\n"
+                "        full = p + '/' + n\n"
+                "        try:\n"
+                "            os.listdir(full)\n"
+                "            stack.append(full)\n"
+                "        except OSError:\n"
+                "            out.append(full)\n"
+                "print(chr(10).join(out))\n" % [m[1] for m in MANIFEST]
+            ).strip().splitlines()
+            skip_ext = SKIP_EXT | set(SKIP_NAMES)
+            for path in remote_all:
+                path = path.strip()
+                if not path or path in wanted:
+                    continue
+                name = path.rsplit("/", 1)[-1]
+                if "__pycache__" in path or os.path.splitext(name)[1].lower() in skip_ext:
+                    continue
+                stale.append(path)
+            if stale:
+                print("[PRUNE] %d file(s) on the card no longer exist here:"
+                      % len(stale))
+                for path in stale:
+                    print("  - %s" % path)
+            else:
+                print("[PRUNE] nothing to remove")
+
         if DRY_RUN:
             for _, remote in todo:
                 print("  + %-58s %8d B" % (remote, size_map[remote]))
@@ -342,6 +392,24 @@ def main():
                 done += len(data)
             print("\r[%2d/%2d] %-46s 100.0%% (%.1fs)          "
                   % (len(todo), len(todo), "ALL PUSHED", time.time() - start))
+
+        # ---------- 4b) remove the stale files, after the push succeeded ----------
+        # Deliberately after: if the push fails halfway, the card still has the old
+        # layout to fall back to instead of missing files.
+        if stale:
+            removed = 0
+            for path in stale:
+                out = run("import os\n"
+                          "try:\n"
+                          "    os.remove('%s')\n"
+                          "    print('OK')\n"
+                          "except OSError as e:\n"
+                          "    print('ERR', e)\n" % path).strip()
+                if out.startswith("OK"):
+                    removed += 1
+                else:
+                    print("\n[PRUNE] could not remove %s: %s" % (path, out))
+            print("[PRUNE] removed %d/%d file(s)" % (removed, len(stale)))
 
         # ---------- 5) verification: byte counts ----------
         print("[VERIFY] checking byte counts of %d files ..." % len(items))

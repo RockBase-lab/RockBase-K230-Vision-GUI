@@ -12,6 +12,7 @@ Nothing below this layer knows it exists. `launcher.py` is the only importer.
 | --- | --- |
 | `theme.py` | `COL_*`, `TILE_*`, `ICON_SIZE`, `NAME_*`, `STATUS_*`, `CLOCK_*`, `GRID_*`, `ACCENT`, `ACCENTS`, `BAKE_VER` |
 | `registry.py` | `APPS`, `FOLDER_MEMBERS`, `APP_ACCENTS`, and the `_sym` helper its entries use |
+| `splash.py` | the boot progress screen (title, bar, percentage, two status lines) |
 | `tile_cache.py` | `TILE2` blob format, `_cache_load` / `_cache_save`, `_bake_tile`, `bake_all_tiles` |
 | `display_init.py` | `lvgl_setup`, `_flush_cb` |
 | `touchscreen.py` | `TouchScreen` |
@@ -49,8 +50,8 @@ Nothing below this layer knows it exists. `launcher.py` is the only importer.
 
 ## Status
 
-`theme.py` and `registry.py` are in place; the rest still lives inside
-`launcher.py` (about 2 300 lines). `theme.py` and `registry.py` must be imported
-after the launcher's `sys.path` bootstrap: under `exec(open(...).read())` the GUI
-root is not importable until that bootstrap runs, and an import placed above it
-fails with `no module named 'shell'`.
+`theme.py`, `registry.py` and `splash.py` are in place; the rest still lives
+inside `launcher.py` (about 2 550 lines). `theme.py` and `registry.py` must be
+imported after the launcher's `sys.path` bootstrap: under
+`exec(open(...).read())` the GUI root is not importable until that bootstrap
+runs, and an import placed above it fails with `no module named 'shell'`.

@@ -7,7 +7,7 @@ import sys
 
 sys.path.insert(0, "/sdcard/factory/gui")
 for _name in ("core", "launcher", "core.model_pool", "core.font_pool", "apps", "ui.beep",
-              "ui.paging", "ui.splash", "hardware.backlight", "net.service", "hardware.battery"):
+              "ui.paging", "shell.splash", "hardware.backlight", "net.service", "hardware.battery"):
     if _name in sys.modules:
         del sys.modules[_name]
 
