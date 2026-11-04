@@ -209,6 +209,21 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_hand_kp.py` | handkp_det contract: load cost, (1,42) output, crop/decode, angle-rule gesture |
 | `_probe_gesture_app.py` | Gesture app end to end through the launcher: fps, gestures seen, skeleton visibility |
 | `_probe_17_resident.py` | Gesture opened on top of the 16 preloaded boot models: handkp_det as a 17th resident kpu |
+| `_reset_hard.py` | `machine.reset()`, the only reset that releases a Sensor the GUI still owns |
+| `_probe_capture_caps.py` | Which transfer encodings the firmware supports for a screen capture (RLE, zlib, JPEG) |
+| `_probe_capture_jpeg.py` | Full-screen capture through the JPEG encoder instead of RLE |
+| `_cap_readme_ui.py` | README screenshots: desktop pages, both folder flyouts, Settings/Audio/IMU/Gallery/Network |
+| `_cap_readme_ui2.py` | README screenshots: Battery (after a real reading) and Touch |
+| `_cap_readme_splash.py` | README screenshot: boot progress bar at a realistic mid-boot state |
+| `_cap_readme_vision.py` | README screenshots: Faces, Detect, Pose, OCR, Plate in one run |
+| `_cap_readme_ocr.py` | OCR with a completed scan (freezes, runs detect plus recognise, snaps the result) |
+| `_cap_readme_detect.py` | Detect app after the pipeline settles, with the detected class printed |
+| `_cap_readme_plate.py` | Plate app after the streak vote produces a caption |
+| `_cap_readme_pose.py` | Pose app once the skeleton is drawn, with the person count printed |
+| `_cap_readme_face_points.py` | Points app once a face is locked, in the Mesh view |
+| `_cap_readme_gesture.py` | Gesture app snapped the moment the expected label is held (`EXPECT` at the top) |
+| `_cap_readme_imu.py` | IMU app, all three pages in one run, with the attitude printed per page |
+| `_cap_readme_swipe.py` | Desktop swipe: 14 stills at known pager offsets for the README GIF |
 
 Snapshot probes print a run-length encoded frame plus base64 blocks. Pipe that
 output through a file, then decode it with
