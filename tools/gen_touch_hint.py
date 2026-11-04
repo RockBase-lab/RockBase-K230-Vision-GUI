@@ -1,5 +1,5 @@
 # Generate the multi-touch hint bitmap shown when the Touch app opens:
-# factory/gui/assets/hint_multitouch.png.
+# factory/gui/assets/widgets/hint_multitouch.png.
 #
 # Why a bitmap instead of runtime tiny_ttf:
 # LVGL runs RENDER_MODE.FULL (every refresh paints the whole buffer), so tiny_ttf
@@ -18,7 +18,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FONT_PATH = os.path.join(ROOT, "tools", "fontsrc", "Nunito-Bold.ttf")
-OUT_PATH = os.path.join(ROOT, "factory", "gui", "assets", "hint_multitouch.png")
+OUT_PATH = os.path.join(ROOT, "factory", "gui", "assets", "widgets",
+                        "hint_multitouch.png")
 
 TEXT = "5-point multi-touch"
 SIZE = 40               # half of 80px; this text is ~368px wide at 40px, an easy fit in 800px

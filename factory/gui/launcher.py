@@ -142,7 +142,7 @@ def _font(*names):
     return None
 
 
-TILE_FONT = None  # tile label font: assets/Nunito-Bold-700.ttf (tiny_ttf at runtime, OFL)
+TILE_FONT = None  # tile label font: assets/fonts/Nunito-Bold-700.ttf (tiny_ttf at runtime, OFL)
 _tile_font_tried = False  # load lazily on the first bake; a failure is not retried
 
 
@@ -158,7 +158,7 @@ def _load_tile_font():
     """
     global TILE_FONT, _tile_font_tried
     _tile_font_tried = True
-    path = "A:" + _gui_dir + "/assets/Nunito-Bold-700.ttf"
+    path = "A:" + _gui_dir + "/assets/fonts/Nunito-Bold-700.ttf"
     try:
         font = lv.tiny_ttf_create_file(path, TILE_FONT_SIZE)
         if font is None:
@@ -538,7 +538,7 @@ def _battery_level():
 
 
 def _status_icon(name):
-    """Load and cache a status-bar icon on demand (assets/icon_status_<name>.png).
+    """Load and cache a status-bar icon on demand (assets/status/icon_status_<name>.png).
 
     LVGL built-in SYMBOLs are not used here: this firmware's built-in fonts are only
     14/16px, so the glyphs are too small inside a 56px status bar; repainting a PNG is
@@ -546,7 +546,7 @@ def _status_icon(name):
     """
     if name in STATUS_ICONS:
         return STATUS_ICONS[name]
-    dsc = _load_png(_gui_dir + "/assets/icon_status_{}.png".format(name))
+    dsc = _load_png(_gui_dir + "/assets/status/icon_status_{}.png".format(name))
     STATUS_ICONS[name] = dsc
     return dsc
 
@@ -558,8 +558,8 @@ def _clock_imgs():
     if CLOCK_IMGS:
         return CLOCK_IMGS
     for ch in "0123456789":
-        CLOCK_IMGS[ch] = _load_png(_gui_dir + "/assets/clock_{}.png".format(ch))
-    CLOCK_IMGS[":"] = _load_png(_gui_dir + "/assets/clock_colon.png")
+        CLOCK_IMGS[ch] = _load_png(_gui_dir + "/assets/glyphs/clock_{}.png".format(ch))
+    CLOCK_IMGS[":"] = _load_png(_gui_dir + "/assets/glyphs/clock_colon.png")
     return CLOCK_IMGS
 
 

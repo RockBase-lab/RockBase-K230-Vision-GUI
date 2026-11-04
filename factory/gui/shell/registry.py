@@ -73,31 +73,31 @@ ACCENTS = [0x2D98DA, 0x0FB9B1, 0xEB3B5A, 0x20BF6B, 0xF7B731, 0xFA8231]
 # apps.app_placeholder; swap in apps.app_xxx once the real app exists. Board facts
 # (firmware, heap, model count) live in the Settings app, not a System tile.
 APPS = [
-    {"id": "camera", "name": "Camera", "icon": "assets/icon_camera.png",
+    {"id": "camera", "name": "Camera", "icon": "assets/icons/icon_camera.png",
      "symbol": _sym("CAMERA", "VIDEO"), "module": "apps.app_camera",
      "immersive": True},
     # Gallery: 2x2 thumbnails plus full-screen view, reading /data/photos (written by
     # the Camera app when it captures)
-    {"id": "gallery", "name": "Gallery", "icon": "assets/icon_gallery.png",
+    {"id": "gallery", "name": "Gallery", "icon": "assets/icons/icon_gallery.png",
      "symbol": _sym("IMAGE", "IMAGE_S", "PHOTO"), "module": "apps.app_gallery"},
     # QR scan: full-screen viewfinder plus live find_qrcodes on chn1 greyscale frames;
     # a hit freezes the picture and opens a non-full-screen white panel with the
     # payload. The icon already exists (Lucide qr-code).
-    {"id": "scan", "name": "Scan", "icon": "assets/icon_scan.png",
+    {"id": "scan", "name": "Scan", "icon": "assets/icons/icon_scan.png",
      "symbol": _sym("QR_CODE", "BARCODE"), "module": "apps.app_scan",
      "immersive": True},
     # Face group: chained face pipeline (detect -> align -> embed). Its pipeline
     # differs from the single-model family in Vision and it has to maintain a local
     # face database, so it stands alone as a group.
-    {"id": "face", "name": "Face", "icon": "assets/icon_face.png",
+    {"id": "face", "name": "Face", "icon": "assets/icons/icon_face.png",
      "symbol": _sym("USER"), "folder": True},
     # Vision group: single entry point for every single-model detection app
     # (members in FOLDER_MEMBERS).
-    {"id": "vision", "name": "Vision", "icon": "assets/icon_vision.png",
+    {"id": "vision", "name": "Vision", "icon": "assets/icons/icon_vision.png",
      "symbol": _sym("CPU", "CHARGE"), "folder": True},
-    {"id": "audio", "name": "Audio", "icon": "assets/icon_audio.png",
+    {"id": "audio", "name": "Audio", "icon": "assets/icons/icon_audio.png",
      "symbol": _sym("MUSIC", "LOUD", "VOLUME_MID"), "module": "apps.app_audio"},
-    {"id": "touch", "name": "Touch", "icon": "assets/icon_touch.png",
+    {"id": "touch", "name": "Touch", "icon": "assets/icons/icon_touch.png",
      "symbol": _sym("TOUCHSCREEN", "TOUCH", "EYE_OPEN"), "module": "apps.app_touch"},
     # IMU: on-board QMI8658A six-axis inertial sensor (I2C3 / GPIO44-45).
     # Three pages: driving dashboard / raw data curves / attitude-angle curves,
@@ -107,21 +107,21 @@ APPS = [
     # pages follow suit so there is no seam where the dashboard covers the bar and the
     # curves expose it).
     # Exit goes through the physical CANCEL key, same as Camera / Scan.
-    {"id": "imu", "name": "IMU", "icon": "assets/icon_imu.png",
+    {"id": "imu", "name": "IMU", "icon": "assets/icons/icon_imu.png",
      "symbol": _sym("MOVE"), "module": "apps.app_imu",
      "immersive": True},
     # ---- Page 2 ----
     # Network and Settings are configured once and then left alone, so they sit
     # behind a swipe instead of taking a slot on the daily page.
-    {"id": "network", "name": "Network", "icon": "assets/icon_network.png",
+    {"id": "network", "name": "Network", "icon": "assets/icons/icon_network.png",
      "symbol": _sym("WIFI"), "module": "apps.app_network"},
-    {"id": "settings", "name": "Settings", "icon": "assets/icon_settings.png",
+    {"id": "settings", "name": "Settings", "icon": "assets/icons/icon_settings.png",
      "symbol": _sym("SETTINGS"), "module": "apps.app_settings"},
     # Battery: single-cell pack voltage through the ADC5 divider. Sampling runs
     # inside step() one reading at a time so the UI never blocks.
     # (A separate System tile used to sit after IMU; its board facts are now the
     # SYSTEM section of the Settings app.)
-    {"id": "battery", "name": "Battery", "icon": "assets/icon_battery.png",
+    {"id": "battery", "name": "Battery", "icon": "assets/icons/icon_battery.png",
      "symbol": _sym("BATTERY_FULL", "BATTERY_3", "BATTERY_2"),
      "module": "apps.app_battery"},
 ]
@@ -141,47 +141,47 @@ FOLDER_MEMBERS = {
         # block) always fails to malloc; with the home screen released the whole chain
         # is stable at ~3.9MB. Returning home rebuilds it from the SD tile cache
         # (measured ~0.7s).
-        {"id": "detect", "name": "Detect", "icon": "assets/icon_vision.png",
+        {"id": "detect", "name": "Detect", "icon": "assets/icons/icon_vision.png",
          "symbol": _sym("CPU"), "module": "apps.app_vision",
          "immersive": True, "release_home": True},
         # Live 17-keypoint skeleton (yolo11n-pose 320). Same immersive shell as
         # detect. release_home: the (1,56,2100) output tensor needs a ~470KB
         # contiguous block, measured to sit at 2.1MB free with the home screen
         # resident -- workable but tight enough that the cached tiles go first.
-        {"id": "pose", "name": "Pose", "icon": "assets/icon_pose.png",
+        {"id": "pose", "name": "Pose", "icon": "assets/icons/icon_pose.png",
          "symbol": _sym("USER"), "module": "apps.app_pose",
          "immersive": True, "release_home": True},
         # Segment: instance masks tinted over the preview from an ARGB buffer.
         # Runs at 640x384 preview: the display-sized masks buffer (W*H*4) is
         # 1.5MB at 800x480 and does not fit the heap after release_home.
-        {"id": "segment", "name": "Segment", "icon": "assets/icon_segment.png",
+        {"id": "segment", "name": "Segment", "icon": "assets/icons/icon_segment.png",
          "symbol": _sym("CROP"), "module": "apps.app_segment",
          "immersive": True, "release_home": True},
         # Orient: rotated boxes (yolo11n-obb), drawn as closed lv.line quads.
-        {"id": "orient", "name": "Orient", "icon": "assets/icon_orient.png",
+        {"id": "orient", "name": "Orient", "icon": "assets/icons/icon_orient.png",
          "symbol": _sym("ROTATE_RIGHT"), "module": "apps.app_orient",
          "immersive": True, "release_home": True},
         # Person / Fall / Gesture: the three yolov5 anchor-based detectors share
         # apps/anchor_det.py (3-output decode via aicube.anchorbasedet_post_process).
-        {"id": "person", "name": "Person", "icon": "assets/icon_person.png",
+        {"id": "person", "name": "Person", "icon": "assets/icons/icon_person.png",
          "symbol": _sym("USER"), "module": "apps.app_person",
          "immersive": True, "release_home": True},
-        {"id": "fall", "name": "Fall", "icon": "assets/icon_fall.png",
+        {"id": "fall", "name": "Fall", "icon": "assets/icons/icon_fall.png",
          "symbol": _sym("WARNING"), "module": "apps.app_fall",
          "immersive": True, "release_home": True},
         # Gesture: hand_det + handkp_det with an angle-rule classifier; the
         # second model loads on demand through the pool, not at boot.
-        {"id": "gesture", "name": "Gesture", "icon": "assets/icon_gesture.png",
+        {"id": "gesture", "name": "Gesture", "icon": "assets/icons/icon_gesture.png",
          "symbol": _sym("HAND"), "module": "apps.app_gesture",
          "immersive": True, "release_home": True},
         # Plate: detection -> crop -> recognition, so two models stay resident and
         # the heap has to be clean before they load. release_home frees the home
         # screen and the tile cache first, the same trade Detect and Pose make.
         # Measured per frame: detection 57-59 ms plus recognition 3-5 ms.
-        {"id": "plate", "name": "Plate", "icon": "assets/icon_plate.png",
+        {"id": "plate", "name": "Plate", "icon": "assets/icons/icon_plate.png",
          "symbol": _sym("CARD"), "module": "apps.app_plate",
          "immersive": True, "release_home": True},
-        {"id": "ocr", "name": "OCR", "icon": "assets/icon_ocr.png",
+        {"id": "ocr", "name": "OCR", "icon": "assets/icons/icon_ocr.png",
          # Snapshot text scan: preview runs live, OK/tap freezes and runs one
          # det+rec pass (det 230 ms + ~70 ms per box, measured). release_home:
          # both kpUs plus the 256 KB CJK font need the contiguous heap the tile
@@ -203,19 +203,19 @@ FOLDER_MEMBERS = {
         # first; measured inference itself is light at 8.5ms/frame, so this can become
         # False later once in-house testing confirms, saving the ~0.7s rebuild on the
         # way back to home.
-        {"id": "face_det", "name": "Faces", "icon": "assets/icon_face_det.png",
+        {"id": "face_det", "name": "Faces", "icon": "assets/icons/icon_face_det.png",
          "symbol": _sym("USER"), "module": "apps.app_face_det",
          "immersive": True, "release_home": True},
-        {"id": "landmark", "name": "Points", "icon": "assets/icon_landmark.png",
+        {"id": "landmark", "name": "Points", "icon": "assets/icons/icon_landmark.png",
          "symbol": _sym("DOTS"), "module": "apps.app_face_points",
          "immersive": True, "release_home": True},
-        {"id": "recognize", "name": "Recognize", "icon": "assets/icon_recognize.png",
+        {"id": "recognize", "name": "Recognize", "icon": "assets/icons/icon_recognize.png",
          "symbol": _sym("ID"), "module": "apps.app_face_recognize",
          "immersive": True, "release_home": True},
-        {"id": "liveness", "name": "Liveness", "icon": "assets/icon_liveness.png",
+        {"id": "liveness", "name": "Liveness", "icon": "assets/icons/icon_liveness.png",
          "symbol": _sym("EYE_OPEN"), "module": "apps.app_face_liveness",
          "immersive": True, "release_home": True},
-        {"id": "mask", "name": "Mask", "icon": "assets/icon_mask.png",
+        {"id": "mask", "name": "Mask", "icon": "assets/icons/icon_mask.png",
          "symbol": _sym("SHIELD"), "module": "apps.app_mask",
          "immersive": True, "release_home": True},
     ],

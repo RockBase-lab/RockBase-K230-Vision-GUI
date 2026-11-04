@@ -22,7 +22,7 @@ import _serial_guard as guard  # noqa: E402
 PORT = sys.argv[1] if len(sys.argv) > 1 else "COM56"
 BAUD = int(sys.argv[2]) if len(sys.argv) > 2 else 115200
 LOCAL = sys.argv[3] if len(sys.argv) > 3 else "tools/fontsrc/Nunito_Bold.ttf"
-REMOTE = sys.argv[4] if len(sys.argv) > 4 else "/sdcard/factory/gui/assets/Nunito_Bold.ttf"
+REMOTE = sys.argv[4] if len(sys.argv) > 4 else "/sdcard/factory/gui/assets/fonts/Nunito-Bold-700.ttf"
 
 CHUNK = 4096
 

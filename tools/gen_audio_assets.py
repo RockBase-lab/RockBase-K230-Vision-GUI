@@ -24,7 +24,10 @@ from PIL import Image, ImageDraw, ImageFont
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 ASSETS = os.path.join(ROOT, "factory", "gui", "assets")
-FONT_PATH = os.path.join(ASSETS, "Nunito-Bold-700.ttf")
+# Timer digits are status-bar-style glyphs; transport buttons are control faces.
+GLYPHS = os.path.join(ASSETS, "glyphs")
+WIDGETS = os.path.join(ASSETS, "widgets")
+FONT_PATH = os.path.join(ASSETS, "fonts", "Nunito-Bold-700.ttf")
 APP_PY = os.path.join(ROOT, "factory", "gui", "apps", "app_audio.py")
 
 SUPERSAMPLE = 4
@@ -127,16 +130,16 @@ def main():
             % (digit_need + 2, colon_need + 2, cell_w, colon_w))
 
     for ch in "0123456789":
-        p = os.path.join(ASSETS, "timer_%s.png" % ch)
+        p = os.path.join(GLYPHS, "timer_%s.png" % ch)
         render_cell(ch, cell_w, canvas_h, font_size, bg_rgb).save(p)
         print("  wrote", os.path.basename(p), os.path.getsize(p), "B")
 
-    p = os.path.join(ASSETS, "timer_colon.png")
+    p = os.path.join(GLYPHS, "timer_colon.png")
     render_cell(":", colon_w, canvas_h, font_size, bg_rgb).save(p)
     print("  wrote", os.path.basename(p), os.path.getsize(p), "B")
 
     for name, (color, text) in BUTTONS.items():
-        p = os.path.join(ASSETS, name + ".png")
+        p = os.path.join(WIDGETS, name + ".png")
         render_button(btn_w, btn_h, btn_radius, hex_to_rgb(int(color, 16)),
                       text, btn_font, bg_rgb).save(p)
         print("  wrote", os.path.basename(p), os.path.getsize(p), "B")

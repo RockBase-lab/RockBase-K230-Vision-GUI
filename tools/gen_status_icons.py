@@ -39,7 +39,7 @@ BASE_URL = "https://unpkg.com/lucide-static@latest/icons/{}.svg"
 
 
 def fetch_svg(name):
-    path = os.path.join(ASSETS, "src_status_{}.svg".format(name))
+    path = os.path.join(ASSETS, "src", "src_status_{}.svg".format(name))
     if not os.path.exists(path):
         url = BASE_URL.format(name)
         print("fetch", url)
@@ -131,7 +131,7 @@ def render(svg_path, w, h, out_path, color=(255, 255, 255), shared_box=None):
 def main():
     for name, (lucide, w, h) in ICONS.items():
         svg = fetch_svg(lucide)
-        out = os.path.join(ASSETS, "icon_status_{}.png".format(name))
+        out = os.path.join(ASSETS, "status", "icon_status_{}.png".format(name))
         render(svg, w, h, out)
     gen_wifi_status()
     gen_battery_status()
@@ -181,7 +181,7 @@ def gen_battery_status():
         _, lit_img = _render_svg(_bars_svg(src, cells), w, h,
                                  BATTERY_COL[level], box)
         _, track = _render_svg(_bars_svg(src, 4), w, h, BATTERY_TRACK, box)
-        out = os.path.join(ASSETS, "icon_status_battery_{}.png".format(level))
+        out = os.path.join(ASSETS, "status", "icon_status_battery_{}.png".format(level))
         _composite(track, lit_img).save(out)
         print("saved icon_status_battery_{}.png ({} cell(s))".format(level, cells))
 # Variants derive directly from the original Lucide wifi SVG: dropping the outer
@@ -268,7 +268,7 @@ def gen_wifi_status():
     src = open(svg_path, encoding="utf-8").read()
     # The white base image also goes through _wifi_tweak (thicker stroke, larger
     # bottom dot) before rendering, so it yields the shared crop box.
-    out_full = os.path.join(ASSETS, "icon_status_wifi.png")
+    out_full = os.path.join(ASSETS, "status", "icon_status_wifi.png")
     box, _full = _render_svg(_wifi_tweak(src), w, h, (255, 255, 255),
                              shared_box=None, save_path=out_full)
 
@@ -304,7 +304,7 @@ def gen_wifi_status():
     track_svg = build_svg(all_arcs)
     for key, keep in variants.items():
         _, lit = _render_svg(build_svg(keep), w, h, WIFI_COL[key], box)
-        out = os.path.join(ASSETS, "icon_status_wifi_{}.png".format(key))
+        out = os.path.join(ASSETS, "status", "icon_status_wifi_{}.png".format(key))
         if key == "off":
             # Disconnected state lights all three arcs plus the slash: no grey track
             # is needed, use lit as is (keeps the slash's bar-colour negative space).

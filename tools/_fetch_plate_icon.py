@@ -1,6 +1,6 @@
 """Re-fetch the IconOven licence-plate source, for provenance.
 
-The result is committed as assets/src_license-plate.svg, so this only needs to run
+The result is committed as assets/src/src_license-plate.svg, so this only needs to run
 if that file is lost or the upstream icon changes. gen_app_icons.py prefers the
 local file and never downloads it itself.
 
@@ -12,14 +12,16 @@ The stroke width is unified to 1.6 to match the other sources in this directory
 (Lucide is rewritten to the same value during rendering).
 
 Usage: python tools/_fetch_plate_icon.py
-Output: factory/gui/assets/src_license-plate.svg
+Output: factory/gui/assets/src/src_license-plate.svg
 """
 
+import os
 import urllib.request
 
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
 URL = "https://api.iconify.design/iconoven/license-plate.svg?height=24"
-OUT = "factory/gui/assets/src_license-plate.svg"
+OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                   "factory", "gui", "assets", "src", "src_license-plate.svg")
 
 HEADER = (
     "<!-- IconOven \"license-plate\" (MIT, Appic Marketing, "

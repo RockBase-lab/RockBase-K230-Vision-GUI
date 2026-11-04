@@ -26,4 +26,5 @@ accent change, needs these files.
 
 ## Status
 
-Scaffold. All 34 SVG files still live flat in `assets/`.
+Populated: 29 Lucide sources (`src_<name>.svg`) plus 5 generated
+`src_status_<name>.svg` written by `tools/gen_status_icons.py`.

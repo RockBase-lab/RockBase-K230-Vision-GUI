@@ -46,6 +46,10 @@ if HERE not in sys.path:
 import _gui_source as gui_source
 ROOT = os.path.dirname(HERE)
 ASSETS = os.path.join(ROOT, "factory", "gui", "assets")
+# Sources and products live in their own directories: the SVGs are inputs for both
+# icon families, the PNGs are only what the board loads.
+SRC_DIR = os.path.join(ASSETS, "src")
+ICONS_DIR = os.path.join(ASSETS, "icons")
 GUI_DIR = os.path.join(ROOT, "factory", "gui")
 
 
@@ -123,7 +127,7 @@ def fetch_svg(icon_name):
     with a different upstream (plate -> IconOven) is committed under assets/ and
     therefore resolves locally; only a missing Lucide name triggers a download.
     """
-    path = os.path.join(ASSETS, "src_{}.svg".format(icon_name))
+    path = os.path.join(SRC_DIR, "src_{}.svg".format(icon_name))
     if not os.path.exists(path):
         url = BASE_URL.format(icon_name)
         print("  fetch", url)
@@ -222,7 +226,7 @@ def main():
         print("[{}] source/{} ink=#{:06X}".format(app_name, icon_name,
                                                   ink[0] << 16 | ink[1] << 8 | ink[2]))
         svg = fetch_svg(icon_name)
-        out = os.path.join(ASSETS, "icon_{}.png".format(app_name))
+        out = os.path.join(ICONS_DIR, "icon_{}.png".format(app_name))
         render(svg, out, ink)
 
 

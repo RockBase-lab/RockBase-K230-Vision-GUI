@@ -21,7 +21,7 @@ if HERE not in sys.path:
 import _gui_source as gui_source
 ROOT = os.path.dirname(HERE)
 ASSETS = os.path.join(ROOT, "factory", "gui", "assets")
-FONT_PATH = os.path.join(ASSETS, "Nunito-Bold-700.ttf")
+FONT_PATH = os.path.join(ASSETS, "fonts", "Nunito-Bold-700.ttf")
 GUI_DIR = os.path.join(ROOT, "factory", "gui")
 
 
@@ -96,8 +96,8 @@ def main():
 
     for ch in "0123456789":
         render_glyph(ch, cell, canvas_h).save(
-            os.path.join(ASSETS, "clock_{}.png".format(ch)))
-    render_glyph(":", colon_w, canvas_h).save(os.path.join(ASSETS, "clock_colon.png"))
+            os.path.join(ASSETS, "glyphs", "clock_{}.png".format(ch)))
+    render_glyph(":", colon_w, canvas_h).save(os.path.join(ASSETS, "glyphs", "clock_colon.png"))
     print("cell_w={} colon_w={} h={} span={}px (ink digit={} colon={})".format(
         cell, colon_w, canvas_h, cell * 6 + colon_w * 2, need_digit, need_colon))
 

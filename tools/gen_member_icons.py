@@ -18,6 +18,7 @@ from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 ASSETS = os.path.join(ROOT, "factory", "gui", "assets")
+ICONS = os.path.join(ASSETS, "icons")
 CACHE = os.path.join(ASSETS, "cache")
 
 SIZE = 64
@@ -26,13 +27,13 @@ PREFIX = "member_"
 
 def main():
     made = 0
-    for name in sorted(os.listdir(ASSETS)):
+    for name in sorted(os.listdir(ICONS)):
         if not name.startswith("icon_") or not name.endswith(".png"):
             continue
         # Status bar icons and keyboard icons belong to other size families; skip them
         if "status" in name or name.startswith("icon_kb_"):
             continue
-        src = os.path.join(ASSETS, name)
+        src = os.path.join(ICONS, name)
         im = Image.open(src).convert("RGB")
         if im.size == (SIZE, SIZE):
             out_img = im

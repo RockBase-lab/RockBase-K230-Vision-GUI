@@ -25,7 +25,7 @@ ROOT = os.path.dirname(HERE)
 GUI = os.path.join(ROOT, "factory", "gui")
 ASSETS = os.path.join(GUI, "assets")
 CACHE = os.path.join(ASSETS, "cache")
-FONT_PATH = os.path.join(ASSETS, "Nunito-Bold-700.ttf")
+FONT_PATH = os.path.join(ASSETS, "fonts", "Nunito-Bold-700.ttf")
 # 28px CJK face for localized tile names: the same source and size as the
 # on-board ui_cjk_28.bin fallback bake, so both paths render identically.
 CJK_FONT_PATH = os.path.join(HERE, "fontsrc", "SourceHanSansCN-Regular.ttf")

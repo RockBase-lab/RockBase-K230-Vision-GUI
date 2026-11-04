@@ -96,7 +96,7 @@ at the GUI root to decide later: the root holds `launcher.py` and nothing else.
 | `net/`, `audio/` | populated, final | — |
 | `core/` | populated | — (`paths`, `errors`, `config`, `i18n`, `version`, `font_pool`, `model_pool`, `ocr_dict`) |
 | `hardware/` | populated, final | — (`panel` holds the constants; its bring-up is `shell/`'s) |
-| `assets/` | populated, flat | grouping into `icons/ status/ glyphs/ widgets/ fonts/ cache/ src/` |
+| `assets/` | populated, grouped | — (`icons/ status/ glyphs/ widgets/ fonts/ cache/ src/`) |
 
 Only `launcher.py` is left at the GUI root. `config.py` used to be the second root
 file; it now lives in `core/`.
@@ -123,12 +123,13 @@ These read this tree and must be updated in the same change as any move:
 | File | Reads |
 | --- | --- |
 | `tools/gen_tile_cache.py` | parses `launcher.py` (theme constants, `APPS`, `APP_ACCENTS`) and `core/i18n.py` (`NAMES`) as text; writes `assets/cache/tile_*.bin` |
-| `tools/gen_app_icons.py` | parses `launcher.py` for palette constants; writes `assets/icon_*.png` from `assets/src_*.svg` |
-| `tools/gen_status_icons.py` | parses `launcher.py` for `COL_BAR`; writes `assets/icon_status_*.png` and `assets/src_status_*.svg` |
-| `tools/gen_clock_digits.py` | parses `launcher.py`; reads `assets/Nunito-Bold-700.ttf`; writes `assets/clock_*.png`, `assets/timer_*.png` |
-| `tools/gen_tz_rows.py` | reads `assets/Nunito-Bold-700.ttf`; writes `assets/cache/tz_t*.bin` |
-| `tools/gen_member_icons.py` | writes `assets/cache/member_icon_*.png` |
-| `tools/gen_touch_hint.py` | writes `assets/hint_multitouch.png` |
+| `tools/gen_app_icons.py` | parses the theme source for palette constants; writes `assets/icons/icon_*.png` from `assets/src/src_*.svg` |
+| `tools/gen_status_icons.py` | parses the theme source for `COL_BAR`; writes `assets/status/icon_status_*.png` and `assets/src/src_status_*.svg` |
+| `tools/gen_clock_digits.py` | parses the theme source; reads `assets/fonts/Nunito-Bold-700.ttf`; writes `assets/glyphs/clock_*.png` |
+| `tools/gen_audio_assets.py` | parses `apps/app_audio.py`; reads `assets/fonts/Nunito-Bold-700.ttf`; writes `assets/glyphs/timer_*.png` and `assets/widgets/btn_*.png` |
+| `tools/gen_tz_rows.py` | reads `assets/fonts/Nunito-Bold-700.ttf`; writes `assets/cache/tz_t*.bin` |
+| `tools/gen_member_icons.py` | reads `assets/icons/icon_*.png`; writes `assets/cache/member_icon_*.png` |
+| `tools/gen_touch_hint.py` | writes `assets/widgets/hint_multitouch.png` |
 | `tools/gen_font.py` | writes `assets/fonts/*.bin` |
 | `tools/gen_ui_cjk_charset.py` | reads `core/i18n.py`; writes `tools/ui_cjk_charset.txt` |
 | `tools/gen_pinyin_map.py` | writes `audio/pinyin_map.py` (currently through a hard-coded absolute path) |

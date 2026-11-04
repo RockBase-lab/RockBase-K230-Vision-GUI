@@ -23,4 +23,6 @@ same PNGs at a smaller size.
 
 ## Status
 
-Scaffold. These files still live flat in `assets/`; only `../src/` is new.
+Populated: 25 app icons, written by `tools/gen_app_icons.py` from `../src/`.
+Members that reuse another entry's PNG are not duplicated here — the registry
+points two ids at one file.

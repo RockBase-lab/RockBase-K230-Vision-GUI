@@ -19,4 +19,5 @@ The small monochrome bitmaps drawn in the 56 px bar at the top of the screen.
 
 ## Status
 
-Scaffold. These files still live flat in `assets/`.
+Populated: 11 bitmaps (Home, 5 Wi-Fi states, battery frame plus 4 fill levels),
+written by `tools/gen_status_icons.py`.

@@ -22,4 +22,5 @@ Audio apps. Ten digits plus a colon per family.
 
 ## Status
 
-Scaffold. These files still live flat in `assets/`.
+Populated: 11 clock glyphs and 11 timer glyphs, written by
+`tools/gen_clock_digits.py` and `tools/gen_audio_assets.py`.

@@ -26,4 +26,5 @@ faces, the keyboard's password eye, the multi-touch hint.
 
 ## Status
 
-Scaffold. These files still live flat in `assets/`.
+Populated: 6 Audio transport buttons, 2 keyboard eye states and the multi-touch
+hint, written by `tools/gen_audio_assets.py` and `tools/gen_touch_hint.py`.

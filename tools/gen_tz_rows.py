@@ -24,7 +24,7 @@ ROOT = os.path.dirname(HERE)
 GUI = os.path.join(ROOT, "factory", "gui")
 ASSETS = os.path.join(GUI, "assets")
 CACHE = os.path.join(ASSETS, "cache")
-FONT_PATH = os.path.join(ASSETS, "Nunito-Bold-700.ttf")
+FONT_PATH = os.path.join(ASSETS, "fonts", "Nunito-Bold-700.ttf")
 
 CF_XRGB8888 = 17
 
