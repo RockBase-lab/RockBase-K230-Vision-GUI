@@ -4,15 +4,17 @@ The only layer allowed to touch a peripheral: PWM, ADC, I2C, GPIO, the DSI panel
 and the camera's frame geometry. Everything here is about the *device*; nothing
 here draws a widget or decides a user flow.
 
-## Planned contents
+## Contents
 
-| Module | Owns | Comes from |
-| --- | --- | --- |
-| `panel.py` | `DISPLAY_TYPE` / `DISPLAY_WIDTH` / `DISPLAY_HEIGHT` / `DISPLAY_FLAG`, panel bring-up | `launcher.py` display constants |
-| `backlight.py` | PWM channel on GPIO25, `MIN_PERCENT` / `MAX_PERCENT`, `attach` / `set_percent` | `ui/backlight.py` |
-| `battery.py` | ADC5 pack-voltage sampling | `batt.py` |
-| `battery_trace.py` | optional per-batch ADC trace to `/data/battery` | `apps/batt_trace.py` |
-| `camera_fov.py` | sensor geometry, preview crop, `set_preview` | `camera_fov.py` |
+| Module | Owns |
+| --- | --- |
+| `backlight.py` | PWM channel on GPIO25, `MIN_PERCENT` / `MAX_PERCENT`, `attach` / `set_percent` |
+| `battery.py` | ADC5 pack-voltage sampling, divider constants, OCV percentage |
+| `battery_trace.py` | optional per-batch ADC trace to `/data/battery` |
+| `camera_fov.py` | sensor geometry, preview crop, `set_preview` |
+
+`panel.py` is still pending: the `DISPLAY_*` constants and the display bring-up
+remain in `launcher.py` because they are entangled with `lvgl_setup`.
 
 ## Rules
 
@@ -35,8 +37,4 @@ here draws a widget or decides a user flow.
 
 ## Status
 
-Populated. `backlight.py` came from `ui/`, `battery.py` from the GUI root,
-`battery_trace.py` from `apps/` and `camera_fov.py` from the GUI root.
-
-`panel.py` is still pending: the `DISPLAY_*` constants and the display bring-up
-remain in `launcher.py` because they are entangled with `lvgl_setup`.
+Populated and final except `panel.py`.

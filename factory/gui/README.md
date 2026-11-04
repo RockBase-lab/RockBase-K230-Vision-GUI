@@ -41,8 +41,8 @@ Do not invert this by copying the number into `core/`.
 | The new code is | Goes in |
 | --- | --- |
 | A user-facing app with its own tile | `apps/app_<name>.py` |
-| The `APPS` / `FOLDER_MEMBERS` entry, an icon path, an accent | `shell/registry.py` |
-| A colour, size, margin or `BAKE_VER` worth | `shell/theme.py` |
+| The `APPS` / `FOLDER_MEMBERS` entry, an icon path, an accent | `shell/registry.py` (still `launcher.py` until the split lands) |
+| A colour, size, margin or `BAKE_VER` worth | `shell/theme.py` (still `launcher.py`) |
 | Home-screen navigation, folder flyout, paging, status bar | `shell/` |
 | A reusable LVGL widget used by more than one app | `ui/` |
 | Click/sound feedback bound to a widget event | `ui/beep.py` |
@@ -70,9 +70,10 @@ at the GUI root to decide later: the root holds `launcher.py` and nothing else.
    time and builds a second launcher.
 3. **One asset resolver, in `core/paths.py`.** It must live at L2, not in
    `shell/`: `ui/`, `apps/` and `core/font_pool.py` all need it and none of them
-   may import upward. Every `assets/` path goes through it. A module that joined
-   a path from its own directory once made the keyboard's eye icon vanish with no
-   log line (`docs/pitfalls.md`), and there are eight such resolvers today.
+   may import upward. Every `assets/` path goes through `asset_path()`, and every
+   PNG through `ui.image.load_asset()`. Joining a path from the calling module's
+   own directory is what once made the keyboard's eye icon vanish with no log
+   line (`docs/pitfalls.md`).
 4. **Package `__init__.py` files re-export nothing.** Importing a package must not
    pull in `lvgl` or claim a PWM channel. Import the submodule you need.
 5. **No re-export shims for old paths.** A moved module is imported from its new

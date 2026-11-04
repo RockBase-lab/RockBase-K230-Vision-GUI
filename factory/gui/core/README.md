@@ -4,18 +4,18 @@ Shared machinery that is not a widget, not an app and not a peripheral: settings
 localisation, version identity, the error type every layer catches, and the two
 resource pools (kmodel, font) plus the OCR dictionary.
 
-## Planned contents
+## Contents
 
-| Module | Owns | Comes from |
-| --- | --- | --- |
-| `paths.py` | `gui_root()`, `asset_path(name)` — the one place that knows the tree depth | new |
-| `errors.py` | `AppUnavailable` and its payloads (`CAMERA_UNAVAILABLE`, `NoSignalCounter`) | `apps/error.py` |
-| `config.py` | `DEFAULTS`, `get` / `set`, `/data/settings/gui.json` | `config.py` |
-| `i18n.py` | language selection, `NAMES`, `CJK_FONT`, the string table | `i18n.py` |
-| `version.py` | `GUI_VERSION` | `version.py` |
-| `font_pool.py` | lazy bitmap-font handles by name | `font_pool.py` |
-| `model_pool.py` | lazy `nn.kpu` handles, one instance per kmodel path | `model_pool.py` |
-| `ocr_dict.py` | the OCR word list loaded once at boot | `ocr_dict.py` |
+| Module | Owns |
+| --- | --- |
+| `paths.py` | `gui_root()`, `asset_path(name)` — the one place that knows the tree depth |
+| `errors.py` | `AppUnavailable` and its payloads (`CAMERA_UNAVAILABLE`, `NoSignalCounter`) |
+| `config.py` | `DEFAULTS`, `get` / `set`, `/data/settings/gui.json` |
+| `i18n.py` | language selection, `NAMES`, `CJK_FONT`, the string table |
+| `version.py` | `GUI_VERSION` |
+| `font_pool.py` | lazy bitmap-font handles by name |
+| `model_pool.py` | lazy `nn.kpu` handles, one instance per kmodel path |
+| `ocr_dict.py` | the OCR word list loaded once at boot |
 
 ## Rules
 

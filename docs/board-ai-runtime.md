@@ -1018,7 +1018,7 @@ the heap at 2.3 MB and fragmented.
 
 ### the shared kpu pool owns the model, the app owns its ai2d
 
-`factory/gui/model_pool.py` keeps one `nn.kpu` per kmodel path for the life of the
+`factory/gui/core/model_pool.py` keeps one `nn.kpu` per kmodel path for the life of the
 process; apps call `model_get(path)` and never `release()` it. The ownership split
 matters because releasing a pooled kpu takes the model away from every other app:
 

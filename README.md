@@ -218,10 +218,10 @@ python tools/deploy_board.py --gui-only --autostart
 
 `_doctor.py` checks, in the order that isolates the cause, every trap that has silently
 hidden a deployed change: whether `/sdcard/main.py` is a stale copy, whether `ui/`,
-`net/` and `audio/` are empty leftovers, whether the modules and icons that `APPS`
-references exist, whether `BAKE_VER` matches, whether the tile caches are stale, and
-whether the launcher imports resolve. It exits non-zero on failure, so it works as a
-gate in front of a deploy script.
+`net/`, `audio/`, `core/` and `hardware/` are empty leftovers, whether the modules and
+icons that `APPS` references exist, whether `BAKE_VER` matches, whether the tile caches
+are stale, and whether the launcher imports resolve. It exits non-zero on failure, so it
+works as a gate in front of a deploy script.
 
 **When another USB serial device is plugged in, pass the port explicitly.** Auto
 selection only excludes Bluetooth virtual ports and then takes the first candidate, so
@@ -265,17 +265,13 @@ then the desktop.
 .
 ├── factory/gui/                # all board-side code
 │   ├── launcher.py             # boot, desktop, tile baking, app registry
-│   ├── version.py              # GUI_VERSION
-│   ├── config.py               # reads and writes /data/settings/gui.json
-│   ├── model_pool.py           # resident kpu pool (apps must not release)
-│   ├── font_pool.py            # resident bitmap fonts
-│   ├── ocr_dict.py             # OCR dictionary
-│   ├── camera_fov.py           # aligns the two camera channels
-│   ├── batt.py                 # ADC5 battery sampling (shared by bar and app)
+│   ├── shell/                  # home-screen framework; scaffold until the split lands
 │   ├── apps/                   # one module per app (create_app/step/destroy)
-│   ├── ui/                     # paging / splash / backlight / beep / kb_layer
+│   ├── ui/                     # paging, keyboard, splash, click tone, PNG loader
 │   ├── net/                    # Wi-Fi, timezone, NTP
 │   ├── audio/                  # record and playback, TTS, tones, pinyin table
+│   ├── core/                   # config, i18n, version, errors, asset paths, pools
+│   ├── hardware/               # backlight, ADC5 battery, camera geometry
 │   └── assets/                 # icons, fonts, tile cache (cache/ is regenerable)
 ├── tools/
 │   ├── deploy_board.py         # incremental serial deploy with closed-loop checks
@@ -290,7 +286,8 @@ then the desktop.
 ```
 
 `factory/gui/assets/cache/` is generated output and can be deleted and re-baked.
-Nothing outside `apps/` should ever write runtime data.
+Runtime data never goes on `/sdcard`: every file the GUI creates lives under
+`/data/<owner>/`, where the owner is the app or subsystem that owns it.
 
 `factory/gui/README.md` is the layer map for that tree
 (`launcher.py -> shell/ -> apps/ -> ui/ net/ audio/ -> core/ -> hardware/`, imports
@@ -307,7 +304,7 @@ flowchart TD
     B --> C[Splash progress bar]
     C --> D[boot_load]
     D --> E[tile bitmap cache]
-    E --> F[bitmap fonts x5]
+    E --> F[bitmap fonts x6]
     F --> G[OCR dictionary]
     G --> H[model_pool resident x16]
     H --> I[Wi-Fi 15s budget]
@@ -354,15 +351,15 @@ apply to members as well.
 
 ### Resource ownership
 
-- **`model_pool`** owns every kpu it hands out. Applications **must not** call
+- **`core.model_pool`** owns every kpu it hands out. Applications **must not** call
   `release()`, which would take the model away from the next application. An app's
   `destroy()` frees only its own `Ai2d`, because the input geometry differs per app and
   cannot be shared.
-- **`font_pool`** keeps a bitmap font resident after its first load, so the per-frame
+- **`core.font_pool`** keeps a bitmap font resident after its first load, so the per-frame
   path never pays for `font_load` again.
-- **`batt`, `backlight`, `net.service`, `beep`** are singletons: the launcher
-  initialises them and hands the handle to the application, which must not open a
-  second one.
+- **`hardware.battery`, `hardware.backlight`, `net.service` and `ui.beep`** are
+  singletons: the launcher initialises them and hands the handle to the application,
+  which must not open a second one.
 
 ### Settings flow
 

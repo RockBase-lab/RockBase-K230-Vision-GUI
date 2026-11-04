@@ -49,4 +49,4 @@ Nothing below this layer knows it exists. `launcher.py` is the only importer.
 
 ## Status
 
-Scaffold. Everything above still lives inside `launcher.py` (2 615 lines).
+Scaffold. Everything above still lives inside `launcher.py` (about 2 600 lines).

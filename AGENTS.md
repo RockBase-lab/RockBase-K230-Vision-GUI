@@ -139,10 +139,10 @@ all of it in one change:
 2. Add its entry to `APPS` in `launcher.py`, or to `FOLDER_MEMBERS` when it
    belongs to an existing folder tile.
 3. If the app gets its own icon, add the `id` to `ICONS` in
-   `tools/gen_app_icons.py` **and** to `APP_ACCENTS`. The accent is the
-   icon's ink colour, and an id missing from `APP_ACCENTS` renders white.
-   Members that reuse another entry's PNG (`detect` -> `icon_vision.png`)
-   skip this step.
+   `tools/gen_app_icons.py` **and** to `APP_ACCENTS` in `launcher.py`. The
+   accent is the icon's ink colour, and an id missing from `APP_ACCENTS`
+   renders white. Members that reuse another entry's PNG (`detect` ->
+   `icon_vision.png`) skip this step.
 4. Generate the icons: `python tools/gen_app_icons.py`. It needs
    `pip install svglib reportlab`.
 5. Increment `BAKE_VER` in `launcher.py`, then re-bake:
@@ -224,7 +224,7 @@ Check, in this order:
 | A `tools/` command-line flag | The usage line in the script and the skill that documents it |
 | `tools/deploy_board.py` `MANIFEST` | The directory layout on the board |
 | A string in `factory/gui/core/i18n.py` `NAMES` | `python tools/gen_ui_cjk_charset.py` (regenerates the glyph list and checks `ocr_charset.txt` coverage), then `python tools/gen_tile_cache.py`. Every zh character must be inside `tools/ui_cjk_charset.txt`, or it renders as a box |
-| A desktop visual constant, or `i18n.NAMES` | `BAKE_VER` + 1 in `launcher.py`; `gen_tile_cache.py` bakes both languages (`tile_<id>.bin` / `tile_<id>_zh.bin`) |
+| A desktop visual constant, or `core/i18n.py` `NAMES` | `BAKE_VER` + 1 in `launcher.py`; `gen_tile_cache.py` bakes both languages (`tile_<id>.bin` / `tile_<id>_zh.bin`) |
 | A constant parsed by a generator | The generator's own default and any `docs/` value |
 | Any rule, path, or command name | The four places rules live: `AGENTS.md`, `.github/copilot-instructions.md`, `.github/skills/**`, `docs/*.md` |
 | A new file anywhere under `factory/gui/` | The layer map in `factory/gui/README.md`, plus that directory's own README |
@@ -252,8 +252,8 @@ python tools/_doctor.py              # or: python tools/_doctor.py COM56
 
 It checks, in the order that isolates the cause, every trap that has silently
 hidden a deployed change on this card: `/sdcard/main.py` being a stale launcher
-copy, empty `ui/` / `net/` / `audio/` package directories left from the
-pre-split layout, missing APPS modules or icons, a `BAKE_VER` mismatch, stale
+copy, missing or empty package directories (`ui/`, `net/`, `audio/`, `core/`,
+`hardware/`), missing APPS modules or icons, a `BAKE_VER` mismatch, stale
 tile caches, and unresolvable imports. One line per check, non-zero exit on
 failure.
 

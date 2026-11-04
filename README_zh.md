@@ -196,7 +196,7 @@ python tools/deploy_board.py --gui-only --autostart
 ```
 
 `_doctor.py` 按“最容易掩盖问题”的顺序逐项检查：`/sdcard/main.py` 是否是旧拷贝、
-`ui/`/`net/`/`audio/` 是否是空目录、`APPS` 引用的模块与图标是否缺失、
+`ui/`/`net/`/`audio/`/`core/`/`hardware/` 是否是空目录、`APPS` 引用的模块与图标是否缺失、
 `BAKE_VER` 是否一致、tile 缓存是否过期、launcher 的 import 能否解析。
 失败返回非零，适合放在部署脚本前面当闸门。
 
@@ -238,17 +238,13 @@ python tools/deploy_board.py COM9 --gui-only --autostart
 .
 ├── factory/gui/                # 全部板端代码
 │   ├── launcher.py             # 启动、桌面、tile 烘焙、应用注册表
-│   ├── version.py              # GUI_VERSION
-│   ├── config.py               # /data/settings/gui.json 读写与默认值
-│   ├── model_pool.py           # 常驻 kpu 池（应用不得 release）
-│   ├── font_pool.py            # 常驻位图字体
-│   ├── ocr_dict.py             # OCR 字典
-│   ├── camera_fov.py           # 双通道取景窗对齐
-│   ├── batt.py                 # ADC5 电池采样（状态栏与应用共用）
+│   ├── shell/                  # 主屏框架；拆分完成前只有占位
 │   ├── apps/                   # 每个应用一个模块（create_app/step/destroy）
-│   ├── ui/                     # paging / splash / backlight / beep / kb_layer
+│   ├── ui/                     # 分页、键盘、splash、点击音、PNG 读取
 │   ├── net/                    # Wi-Fi 连接、时区、NTP
 │   ├── audio/                  # 录音回放、TTS、提示音、拼音表
+│   ├── core/                   # 配置、多语言、版本、异常、资源路径、两个资源池
+│   ├── hardware/               # 背光、ADC5 电池、取景几何
 │   └── assets/                 # 图标、字体、tile 缓存（cache/ 可重新生成）
 ├── tools/
 │   ├── deploy_board.py         # 串口增量部署 + 闭环校验
@@ -263,7 +259,8 @@ python tools/deploy_board.py COM9 --gui-only --autostart
 ```
 
 `factory/gui/assets/cache/` 是生成产物，可以删除后重新烘焙；
-`apps/` 之外的任何文件都不应该写运行时数据。
+运行时数据从不写 `/sdcard`：GUI 产生的每个文件都在 `/data/<属主>/` 下，
+属主是负责它的应用或子系统。
 
 `factory/gui/README.md` 是该目录的分层表
 （`launcher.py -> shell/ -> apps/ -> ui/ net/ audio/ -> core/ -> hardware/`，
@@ -279,7 +276,7 @@ flowchart TD
     B --> C[Splash 进度条]
     C --> D[boot_load]
     D --> E[tile 位图缓存]
-    E --> F[位图字体 x5]
+    E --> F[位图字体 x6]
     F --> G[OCR 字典]
     G --> H[model_pool 常驻 x16]
     H --> I[Wi-Fi 15s 预算]
@@ -324,12 +321,12 @@ def create_app(content, ctx):
 
 ### 资源所有权
 
-- **`model_pool`**：拥有它发出的每一个 kpu。应用**不得**调用 `release()`，
+- **`core.model_pool`**：拥有它发出的每一个 kpu。应用**不得**调用 `release()`，
   否则会把模型从下一个应用手里拿走。应用的 `destroy()` 只释放自己的 `Ai2d`
   （输入几何随应用不同，不能共享）。
-- **`font_pool`**：位图字体按需加载后常驻，避免每帧重复 `font_load`。
-- **`batt` / `backlight` / `net.service` / `beep`**：都是单例，launcher 初始化后
-  把句柄交给应用，应用不要自己再开一份。
+- **`core.font_pool`**：位图字体按需加载后常驻，避免每帧重复 `font_load`。
+- **`hardware.battery` / `hardware.backlight` / `net.service` / `ui.beep`**：都是单例，
+  launcher 初始化后把句柄交给应用，应用不要自己再开一份。
 
 ### 配置流
 
