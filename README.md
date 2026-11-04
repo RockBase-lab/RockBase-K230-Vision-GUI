@@ -418,14 +418,14 @@ been measured and therefore is not part of the boot sequence.
 
 1. Create `factory/gui/apps/app_<name>.py` exporting `create_app(content, ctx)` and
    returning an object with `step()` and `destroy()`.
-2. Add an entry to `APPS` in `launcher.py`, or to `FOLDER_MEMBERS` when it belongs to an
-   existing folder.
+2. Add an entry to `APPS` in `shell/registry.py`, or to `FOLDER_MEMBERS` when it
+   belongs to an existing folder.
 3. If it needs its own icon, add the `id` to `ICONS` in `tools/gen_app_icons.py`
    **and** to `APP_ACCENTS` in `launcher.py` (a missing accent renders white). Members
    that reuse an existing PNG skip this step.
 4. Generate the icons: `python tools/gen_app_icons.py` (needs
    `pip install svglib reportlab`).
-5. Increment `BAKE_VER` in `launcher.py`, then re-bake:
+5. Increment `BAKE_VER` in `shell/theme.py`, then re-bake:
    `python tools/gen_tile_cache.py` (top-level tiles only; folder members are not
    baked).
 6. Deploy and verify: `python tools/deploy_board.py --gui-only`, soft reset, open the
@@ -446,7 +446,7 @@ Launcher. When shared hardware needs a new entry point, write a small module for
 
 ### Changing a colour or size constant
 
-The `COL_*`, `TILE_*`, `ICON_SIZE` and `NAME_COLOR` constants in `launcher.py` are
+The `COL_*`, `TILE_*`, `ICON_SIZE` and `NAME_COLOR` constants in `shell/theme.py` are
 parsed by the `tools/gen_*.py` generators. After changing one you must:
 
 1. Re-run the matching generator;

@@ -136,7 +136,7 @@ all of it in one change:
 
 1. Create `apps/app_<name>.py` exporting `create_app(content, ctx)` and
    returning an object with `step()` and `destroy()`.
-2. Add its entry to `APPS` in `launcher.py`, or to `FOLDER_MEMBERS` when it
+2. Add its entry to `APPS` in `shell/registry.py`, or to `FOLDER_MEMBERS` when it
    belongs to an existing folder tile.
 3. If the app gets its own icon, add the `id` to `ICONS` in
    `tools/gen_app_icons.py` **and** to `APP_ACCENTS` in `launcher.py`. The
@@ -145,7 +145,7 @@ all of it in one change:
    `icon_vision.png`) skip this step.
 4. Generate the icons: `python tools/gen_app_icons.py`. It needs
    `pip install svglib reportlab`.
-5. Increment `BAKE_VER` in `launcher.py`, then re-bake:
+5. Increment `BAKE_VER` in `shell/theme.py`, then re-bake:
    `python tools/gen_tile_cache.py`. Top-level tiles only; folder members
    are drawn at runtime.
 6. Deploy and verify on the board:
@@ -215,8 +215,8 @@ Check, in this order:
 
 | Changed | Must also verify |
 | --- | --- |
-| `launcher.py` colour/size constants (`COL_*`, `TILE_*`, `ICON_SIZE`, `NAME_COLOR`, `*_W`, `*_H`) | Re-run the matching `tools/gen_*.py`, increment `BAKE_VER`, refresh `assets/cache/*.bin` |
-| `launcher.py` `APPS` / `FOLDER_MEMBERS` | Each `module` exists in `apps/`, each `icon` exists in `assets/`, each `id` has an `APP_ACCENTS` entry |
+| `shell/theme.py` colour/size constants (`COL_*`, `TILE_*`, `ICON_SIZE`, `NAME_COLOR`, `*_W`, `*_H`) | Re-run the matching `tools/gen_*.py`, increment `BAKE_VER`, refresh `assets/cache/*.bin` |
+| `shell/registry.py` `APPS` / `FOLDER_MEMBERS` | Each `module` exists in `apps/`, each `icon` exists in `assets/`, each `id` has an `APP_ACCENTS` entry |
 | App contract (`create_app` / `step` / `destroy`) | Every `apps/app_*.py` still matches it |
 | A board API call | `stubs/*.pyi` covers the symbol |
 | `README.md` | `README_zh.md` carries the same content, with the same headings, table rows, and numbers. The full README sync walkthrough is in `.github/skills/readme-sync/SKILL.md` when that local skill is present |

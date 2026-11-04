@@ -15,10 +15,14 @@ import re
 from PIL import Image, ImageDraw, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+import sys
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+import _gui_source as gui_source
 ROOT = os.path.dirname(HERE)
 ASSETS = os.path.join(ROOT, "factory", "gui", "assets")
 FONT_PATH = os.path.join(ASSETS, "Nunito-Bold-700.ttf")
-GUI_PY = os.path.join(ROOT, "factory", "gui", "launcher.py")
+GUI_DIR = os.path.join(ROOT, "factory", "gui")
 
 
 def _hex(name, txt):
@@ -26,7 +30,7 @@ def _hex(name, txt):
     return ((v >> 16) & 255, (v >> 8) & 255, v & 255)
 
 
-_gui_txt = open(GUI_PY, encoding="utf-8").read()
+_gui_txt = gui_source.all_text(GUI_DIR)
 BAR = _hex("COL_BAR", _gui_txt)      # COL_BAR: status bar background (never hard-code it)
 WHITE = _hex("COL_TEXT", _gui_txt)   # clock digits use the primary text colour (settled: white)
 FONT_SIZE = 32             # visually comparable to the status icons (ink ~20-30px)
@@ -35,9 +39,10 @@ SUPERSAMPLE = 4
 
 
 def parse_sizes():
-    """Parse the clock cell sizes from launcher.py so generator and display agree exactly."""
+    """Parse the clock cell sizes from the theme source so generator and display agree
+    exactly."""
     import re
-    txt = open(GUI_PY, encoding="utf-8").read()
+    txt = gui_source.all_text(GUI_DIR)
     cell = int(re.search(r"CLOCK_CELL_W\s*=\s*(\d+)", txt).group(1))
     colon = int(re.search(r"CLOCK_COLON_W\s*=\s*(\d+)", txt).group(1))
     high = int(re.search(r"CLOCK_H\s*=\s*(\d+)", txt).group(1))

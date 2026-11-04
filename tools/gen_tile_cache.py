@@ -17,6 +17,10 @@ import re
 from PIL import Image, ImageDraw, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+import sys
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+import _gui_source as gui_source
 ROOT = os.path.dirname(HERE)
 GUI = os.path.join(ROOT, "factory", "gui")
 ASSETS = os.path.join(GUI, "assets")
@@ -40,7 +44,7 @@ def _hex(txt, name):
 
 
 def parse_gui():
-    txt = open(os.path.join(GUI, "launcher.py"), encoding="utf-8").read()
+    txt = gui_source.all_text(GUI)
     ver = int(re.search(r"BAKE_VER\s*=\s*(\d+)", txt).group(1))
     CFG["tile"] = int(re.search(r"\bTILE_SIZE\s*=\s*(\d+)", txt).group(1))
     CFG["icon"] = int(re.search(r"\bICON_SIZE\s*=\s*(\d+)", txt).group(1))
@@ -73,7 +77,7 @@ def parse_gui():
                          "folder": '"folder": True' in e})
     # Localized names from i18n.NAMES: id -> (en, zh). The baker must emit the
     # same per-language tiles the board's _cache_load validates.
-    itxt = open(os.path.join(GUI, "core", "i18n.py"), encoding="utf-8").read()
+    itxt = gui_source.i18n_text(GUI)
     names = dict(
         (m.group(1), (m.group(2), m.group(3)))
         for m in re.finditer(

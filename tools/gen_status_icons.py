@@ -16,11 +16,14 @@ from reportlab.graphics import renderPM
 from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+import sys
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+import _gui_source as gui_source
 ROOT = os.path.dirname(HERE)
 ASSETS = os.path.join(ROOT, "factory", "gui", "assets")
 
-_gui_txt = open(os.path.join(ROOT, "factory", "gui", "launcher.py"),
-                encoding="utf-8").read()
+_gui_txt = gui_source.all_text(os.path.join(ROOT, "factory", "gui"))
 _v = int(re.search(r"\bCOL_BAR\s*=\s*0x([0-9A-Fa-f]{6})", _gui_txt).group(1), 16)
 BAR = ((_v >> 16) & 255, (_v >> 8) & 255, _v & 255)  # COL_BAR (never hard-code this)
 SUPERSAMPLE = 4

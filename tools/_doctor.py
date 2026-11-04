@@ -19,6 +19,7 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 
 import _serial_guard as guard  # noqa: E402
+import _gui_source as gui_source  # noqa: E402
 
 GUI = "/sdcard/factory/gui"
 LOCAL_GUI = os.path.join(ROOT, "factory", "gui")
@@ -28,12 +29,13 @@ STUB_MAX_BYTES = 400
 
 # Package directories created by the module split. An empty one means the card still
 # has the flat pre-split layout and the current launcher cannot import them.
-PACKAGES = ("ui", "net", "audio", "core", "hardware")
+PACKAGES = ("ui", "net", "audio", "core", "hardware", "shell")
 
 
 def local_state():
-    """Parse the local launcher.py: bake version and the module/icon it references."""
-    txt = io.open(os.path.join(LOCAL_GUI, "launcher.py"), encoding="utf-8").read()
+    """Parse the theme and registry sources: bake version and the module/icon each
+    entry references."""
+    txt = gui_source.all_text(LOCAL_GUI)
     ver = int(re.search(r"BAKE_VER\s*=\s*(\d+)", txt).group(1))
     mods, icons = [], []
     for block in (r"APPS\s*=\s*\[(.*?)\n\]", r"FOLDER_MEMBERS\s*=\s*\{(.*?)\n\}"):
@@ -134,9 +136,10 @@ def main():
 
         # 5) The deployed launcher must be the same bake version, otherwise the board
         #    loads stale bitmaps and ignores freshly written caches.
-        line = run("import re\n"
-                   "print(re.search(r'BAKE_VER\\s*=\\s*(\\d+)',"
-                   "open('%s/launcher.py').read()).group(1))" % GUI).strip()
+        line = run(gui_source.board_source_code(GUI) +
+                   "import re\n"
+                   "print(re.search(r'BAKE_VER\\s*=\\s*(\\d+)', GUI_SRC)"
+                   ".group(1))\n").strip()
         check("board launcher BAKE_VER", line.isdigit() and int(line) == ver,
               "board={} local={}".format(line, ver))
 
@@ -145,9 +148,10 @@ def main():
         #    only a warning: nothing loads them, they just waste card space.
         # No re on board: this MicroPython's re module has no re.S alias, and a line
         # scan is clearer anyway.
-        out = run("import os\n"
+        out = run(gui_source.board_source_code(GUI) +
+                  "import os\n"
                   "live = set()\n"
-                  "lines = open('%s/launcher.py').read().split(chr(10))\n"
+                  "lines = GUI_SRC.split(chr(10))\n"
                   "inside = False\n"
                   "for ln in lines:\n"
                   "    if ln.startswith('APPS = ['):\n"
@@ -174,7 +178,7 @@ def main():
                   "    else:\n"
                   "        orphan.append(app)\n"
                   "print(sorted(bad))\n"
-                  "print(sorted(orphan))" % (GUI, GUI, ver))
+                  "print(sorted(orphan))" % (GUI, ver))
         lines = [ln for ln in out.splitlines() if ln.strip()]
         bad_tiles = lines[0] if lines else "[]"
         orphans = lines[1] if len(lines) > 1 else "[]"
@@ -188,7 +192,8 @@ def main():
         out = run("import sys\n"
                   "sys.path.insert(0, '%s')\n"
                   "for m in ['ui.paging', 'ui.beep', 'net.service', 'hardware.battery',\n"
-                  "          'core.paths', 'core.config', 'hardware.camera_fov']:\n"
+                  "          'core.paths', 'core.config', 'core.model_pool',\n"
+                  "          'hardware.camera_fov', 'shell.theme', 'shell.registry']:\n"
                   "    try:\n"
                   "        __import__(m)\n"
                   "        print('OK', m)\n"

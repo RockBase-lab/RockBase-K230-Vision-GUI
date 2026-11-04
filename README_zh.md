@@ -381,11 +381,12 @@ home 屏并读取该语言对应的 tile 缓存。应用内部文案目前仍是
 
 1. 新建 `factory/gui/apps/app_<name>.py`，导出 `create_app(content, ctx)`，
    返回带 `step()` 与 `destroy()` 的对象。
-2. 在 `launcher.py` 的 `APPS` 里加条目；属于现有文件夹时改 `FOLDER_MEMBERS`。
+2. 在 `shell/registry.py` 的 `APPS` 里加条目；属于现有文件夹时改 `FOLDER_MEMBERS`。
 3. 若使用独立图标：把 `id` 加进 `tools/gen_app_icons.py` 的 `ICONS` **和**
-   `launcher.py` 的 `APP_ACCENTS`（缺 accent 会渲染成白色）。复用已有 PNG 的成员跳过这步。
+   `shell/registry.py` 的 `APP_ACCENTS`（缺 accent 会渲染成白色）。
+   复用已有 PNG 的成员跳过这步。
 4. 生成图标：`python tools/gen_app_icons.py`（需要 `pip install svglib reportlab`）。
-5. 递增 `launcher.py` 的 `BAKE_VER`，再重烘 tile：`python tools/gen_tile_cache.py`
+5. 递增 `shell/theme.py` 的 `BAKE_VER`，再重烘 tile：`python tools/gen_tile_cache.py`
    （只处理顶层 tile，文件夹成员不烘焙）。
 6. 部署验证：`python tools/deploy_board.py --gui-only`，软复位，打开应用。
 
@@ -401,7 +402,7 @@ home 屏并读取该语言对应的 tile 缓存。应用内部文案目前仍是
 
 ### 改动了颜色或尺寸常量
 
-`launcher.py` 里的 `COL_*`、`TILE_*`、`ICON_SIZE`、`NAME_COLOR` 等常量会被
+`shell/theme.py` 里的 `COL_*`、`TILE_*`、`ICON_SIZE`、`NAME_COLOR` 等常量会被
 `tools/gen_*.py` 解析。改动后必须：
 
 1. 重跑对应的生成脚本；

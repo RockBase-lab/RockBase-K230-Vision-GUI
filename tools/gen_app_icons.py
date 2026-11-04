@@ -41,15 +41,18 @@ from reportlab.graphics import renderPM
 from svglib.svglib import svg2rlg
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+import _gui_source as gui_source
 ROOT = os.path.dirname(HERE)
 ASSETS = os.path.join(ROOT, "factory", "gui", "assets")
-GUI_PY = os.path.join(ROOT, "factory", "gui", "launcher.py")
+GUI_DIR = os.path.join(ROOT, "factory", "gui")
 
 
 def _parse_gui():
-    """Parse colour constants out of launcher.py so the generator and the display side
-    cannot drift apart."""
-    txt = open(GUI_PY, encoding="utf-8").read()
+    """Parse colour constants out of the theme source so the generator and the
+    display side cannot drift apart."""
+    txt = gui_source.all_text(GUI_DIR)
     bg = int(re.search(r"\bTILE_BG\s*=\s*0x([0-9A-Fa-f]{6})", txt).group(1), 16)
     accents = dict(
         (k, int(v, 16)) for k, v in re.findall(
