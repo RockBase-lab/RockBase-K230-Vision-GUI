@@ -510,7 +510,7 @@ import font_pool
 import ocr_dict
 
 SWIPE_THRESHOLD_PX = paging.SWIPE_THRESHOLD_PX   # 120px, shared with every app
-SNAP_ANIM_MS = paging.SNAP_ANIM_MS               # 200ms
+SNAP_ANIM_MS = paging.SNAP_ANIM_MS               # 180ms
 
 disp_imgs = None
 disp_drv = None
@@ -1293,7 +1293,7 @@ class HardwareButtons:
         return False
 
 
-def _backlight_on(target_pct=100):
+def _backlight_on(target_pct=backlight.MIN_PERCENT):
     """Drive the panel backlight to the stored brightness.
 
     PWM first for a short fade, then a plain GPIO high, then give up loudly: a silent
@@ -1303,10 +1303,10 @@ def _backlight_on(target_pct=100):
     """
     global _BACKLIGHT
     target = int(target_pct)
-    if target < 1:
-        target = 1
-    elif target > 100:
-        target = 100
+    if target < backlight.MIN_PERCENT:
+        target = backlight.MIN_PERCENT
+    elif target > backlight.MAX_PERCENT:
+        target = backlight.MAX_PERCENT
     try:
         pwm = PWM(BACKLIGHT_PIN, freq=BACKLIGHT_PWM_HZ, duty=0)
         for step in range(1, BACKLIGHT_FADE_STEPS + 1):
@@ -2701,7 +2701,7 @@ def main():
                  flag=DISPLAY_FLAG, to_ide=True)
     # Light the panel as early as possible: everything below can take a second (tile
     # bake) and the user must see that the board booted.
-    _backlight_on(config.get_int("display.brightness", 100))
+    _backlight_on(config.get_int("display.brightness", backlight.MIN_PERCENT))
     try:
         lvgl_setup()
         # Buzzer before the UI so the very first tap after boot has sound

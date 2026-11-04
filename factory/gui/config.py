@@ -15,6 +15,8 @@
 import json
 import os
 
+from ui import backlight
+
 PATH = "/data/settings/gui.json"
 
 DEFAULTS = {
@@ -22,8 +24,9 @@ DEFAULTS = {
     "ui.click_sound": True,
     # Synthesised shutter sound in the Camera app.
     "camera.shutter_sound": True,
-    # Panel backlight, percent. 20 is the floor that still reads comfortably.
-    "display.brightness": 100,
+    # Panel backlight, percent. Ships at the minimum readable level: the panel is
+    # the largest fixed load on the pack, and the Settings stepper shares the floor.
+    "display.brightness": backlight.MIN_PERCENT,
 }
 
 _values = None

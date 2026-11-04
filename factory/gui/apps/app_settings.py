@@ -76,8 +76,11 @@ GROUPS = (
     )),
     ("DISPLAY", (
         {"type": "stepper", "key": "display.brightness",
-         "label": "Brightness", "hint": "panel backlight, 20-100%",
-         "min": 20, "max": 100, "step": 10, "unit": "%"},
+         "label": "Brightness",
+         "hint": "panel backlight, {}-{}%".format(
+             backlight.MIN_PERCENT, backlight.MAX_PERCENT),
+         "min": backlight.MIN_PERCENT, "max": backlight.MAX_PERCENT,
+         "step": 10, "unit": "%"},
     )),
     ("NETWORK", (
         {"type": "info", "label": "Wi-Fi and timezone",
@@ -435,7 +438,8 @@ class SettingsApp:
         if name == "reset":
             config.reset()
             beep.set_enabled(config.get_bool("ui.click_sound", True))
-            backlight.set_percent(config.get_int("display.brightness", 100))
+            backlight.set_percent(
+                config.get_int("display.brightness", backlight.MIN_PERCENT))
             self._refresh_controls()
             self._refresh_live(force=True)
             label = self._actions.get(name)

@@ -9,20 +9,26 @@
 # set_percent() is a no-op; the Settings row still shows a value, but a
 # non-dimmable panel is a degraded boot, not an error.
 
+# Lowest duty that still reads comfortably in a lit room. The PWM itself accepts
+# down to 1%, but below this the 1 kHz pulses turn the 800x480 panel into something
+# the user has to squint at, so it is the product floor rather than a hardware one.
+MIN_PERCENT = 20
+MAX_PERCENT = 100
+
 _pwm = None
-_level = 100
+_level = MIN_PERCENT
 
 
 def _clamp(pct):
     pct = int(pct)
-    if pct < 1:
-        return 1
-    if pct > 100:
-        return 100
+    if pct < MIN_PERCENT:
+        return MIN_PERCENT
+    if pct > MAX_PERCENT:
+        return MAX_PERCENT
     return pct
 
 
-def attach(pwm, pct=100):
+def attach(pwm, pct=MIN_PERCENT):
     """Take ownership of the PWM already driving the backlight pin."""
     global _pwm, _level
     _pwm = pwm
