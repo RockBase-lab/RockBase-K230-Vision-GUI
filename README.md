@@ -447,12 +447,6 @@ parsed by the `tools/gen_*.py` generators. After changing one you must:
 Otherwise the board keeps loading the old bitmaps, and the symptom is "I changed the
 code but the UI looks the same".
 
-### Language rules for comments and docs
-
-Files tracked by git are written in **English** (code comments, docstrings, commit
-messages, `AGENTS.md`, `README.md`); `README_zh.md` is the single Chinese file, so this
-page is not a precedent. The full rule is in [AGENTS.md](AGENTS.md).
-
 ## Tool reference
 
 | Script | Input to output |
@@ -609,16 +603,12 @@ Issues and pull requests are welcome. Before committing, walk through the
 - Changing a baking constant means re-running the generator and incrementing
   `BAKE_VER`;
 - `README.md` and `README_zh.md` stay in sync;
-- Commit messages are **English** and contain no non-ASCII characters.
+- Commit messages are **English** and contain no non-ASCII characters; files tracked
+  by git are written in English, and Chinese only appears in the matching `*_zh.md`
+  counterpart (see [AGENTS.md](AGENTS.md)).
 
 ## About the images
 
-Every still in this document was exported from the board as an LVGL snapshot and was
-not retouched: desktop and system screens are the raw pixels, and the camera previews
-are real frames. The swipe animation at the top is also composed of real rendered
-frames, but a single board-side capture costs 1-2 seconds, so the 180 ms animation
-cannot be recorded live; the frames were captured one by one and re-timed on the PC to
-the animation's own cadence (`img/README.md` records the full procedure).
-
-See [`img/README.md`](img/README.md) for capture status and the scene list for the
-remaining AI screenshots.
+Every image was exported from the board as an LVGL snapshot and was not retouched.
+Capture status, the shooting procedure and the scene list for the remaining
+screenshots are in [`img/README.md`](img/README.md).

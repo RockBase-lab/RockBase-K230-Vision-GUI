@@ -1,7 +1,9 @@
 # Images
 
 Screenshots referenced by `README.md` and `README_zh.md`, plus the shooting plan
-for the ones that still need a real scene.
+for the ones that still need a real scene. Every finished image is an unretouched
+export from the board: flat screens are the raw LVGL buffer pixels, camera frames
+are real captured previews, and only the GIF timing is reconstructed (see below).
 
 ## Status
 

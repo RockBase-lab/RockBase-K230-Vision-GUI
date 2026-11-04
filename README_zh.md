@@ -404,11 +404,6 @@ config.DEFAULTS  ──►  /data/settings/gui.json  ◄──  app_settings.GRO
 
 否则板子会继续加载旧位图，且症状是“代码改了但界面没变”。
 
-### 注释与文档的语言规则
-
-仓库跟踪的文件一律用**英文**（代码注释、docstring、commit message、`AGENTS.md`、`README.md`）；
-只有 `README_zh.md` 是中文，本文件即该例外。完整规则见 [AGENTS.md](AGENTS.md)。
-
 ## 工具链速查
 
 | 脚本 | 输入 → 输出 |
@@ -548,13 +543,10 @@ Nunito 与 Font Awesome 字体（SIL OFL / CC BY 4.0）、DejaVu Sans Mono（Bit
 - 改了 `APPS` 就必须确认模块、图标、`APP_ACCENTS` 三者齐全；
 - 改了烘焙常量就必须重跑生成脚本并递增 `BAKE_VER`；
 - `README.md` 与 `README_zh.md` 内容保持同步；
-- commit message 一律用**英文**，不含非 ASCII 字符。
+- commit message 一律用**英文**，不含非 ASCII 字符；仓库跟踪的文件一律用英文书写，
+  中文只出现在与之配对的 `*_zh.md` 里（完整规则见 [AGENTS.md](AGENTS.md)）。
 
 ## 图片说明
 
-本文静态截图全部由板上 LVGL 快照导出，未经过修图：桌面与系统类应用为逐像素原始输出，
-相机类应用的预览画面是真实取景帧。首页的滑页动图也是真实渲染帧，只是板端抓一帧需要
-1–2 秒，无法实时录制 180 ms 的动画，所以帧是逐个抓取后在 PC 端按动画节奏重新计时合成的
-（`img/README.md` 记录了完整步骤）。
-
-补齐进度与 AI 类截图的取景清单见 [`img/README.md`](img/README.md)。
+本文图片全部由板上 LVGL 快照导出，未经修图。补齐进度、拍摄步骤与待补截图的取景清单见
+[`img/README.md`](img/README.md)。
