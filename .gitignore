@@ -78,7 +78,6 @@ train/05_compile/*.kmodel
 *.kmodel
 
 # Flashed firmware images (hundreds of MB, machine-specific)
-img/
 *.img
 
 # Keep the kmodels that ship with the repo:

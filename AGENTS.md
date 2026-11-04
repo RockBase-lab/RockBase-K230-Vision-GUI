@@ -167,7 +167,7 @@ Check, in this order:
 | `launcher.py` `APPS` / `FOLDER_MEMBERS` | Each `module` exists in `apps/`, each `icon` exists in `assets/`, each `id` has an `APP_ACCENTS` entry |
 | App contract (`create_app` / `step` / `destroy`) | Every `apps/app_*.py` still matches it |
 | A board API call | `stubs/*.pyi` covers the symbol |
-| `README.md` | `README_zh.md` carries the same content |
+| `README.md` | `README_zh.md` carries the same content, with the same headings, table rows, and numbers. The full README sync walkthrough is in `.github/skills/readme-sync/SKILL.md` when that local skill is present |
 | A `tools/` command-line flag | The usage line in the script and the skill that documents it |
 | `tools/deploy_board.py` `MANIFEST` | The directory layout on the board |
 | A constant parsed by a generator | The generator's own default and any `docs/` value |

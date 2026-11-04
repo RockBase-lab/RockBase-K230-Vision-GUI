@@ -35,6 +35,7 @@ Recovery for every entry here is a power cycle. Programmatic resets do not help.
 | `kd_mpi_ai_set_pdm_clk failed:-1` | PDM input handle leaked | Close streams in `finally`; only a power cycle clears it |
 | `kd_mpi_ao_enable_chn failed:-1` | Audio output handle leaked, or the Vision app left mpp resources | Same; power cycle |
 | `kd_mpi_vdec_attach_vb_pool failed`, pool id reaching -1 | Decoder destroy raised before the VB pool was released | Repair the pool manually when channel destruction fails |
+| `OSError: sensor(N) is already inited` while no probe of yours is running, and the serial log still shows the app's own output (for example `[Vision] mouse 0.70`) before the REPL prompt | The GUI is sitting on a camera app and owns the singleton; nothing in your session created it | `python tools/probes/_reset_hard.py` (`machine.reset()`), then run the probe. Ctrl-D and `stop()/deinit()` do not release it. Deploying also leaves the GUI on a camera app when the last thing you did was open one |
 | `OSError: sensor(N) is already inited` | A second `Sensor()` in the same VM, or an earlier probe died before `destroy()` and left the first one claimed | `machine.reset()`, not Ctrl-D; and wrap probe bodies in `try/finally` so the camera is always released |
 | Touch completely dead | Deleted the LVGL active screen | Load another screen first |
 | Serial drops with `ClearCommError` / `OSError 995` | A KPU runtime tensor was never released | Release every tensor after `to_numpy()` |
