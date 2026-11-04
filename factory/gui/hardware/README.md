@@ -36,4 +36,4 @@ here draws a widget or decides a user flow.
 ## Status
 
 Populated. `panel.py` holds constants only; the bring-up that consumes them is
-still in `launcher.py` as `lvgl_setup`, which belongs to `shell/`.
+`shell/display_init.py`.

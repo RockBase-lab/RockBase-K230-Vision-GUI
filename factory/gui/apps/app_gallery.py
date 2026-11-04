@@ -22,8 +22,8 @@
 # through as_lvgl_img_src, this firmware occasionally shifts the hue of the whole image
 # (yellow turns blue) and the next attempt looks normal again - the color-format handling
 # inside that function is unreliable. An explicit dsc sets cf=lv.COLOR_FORMAT.RGB888
-# ourselves, taking exactly the same path as the desktop tiles in launcher.py (those tiles never
-# shifted color).
+# ourselves, taking exactly the same path as the desktop tiles in
+# shell/tile_cache.py (those tiles never shifted color).
 # See the notes on paging.RawImageCache.get() and tools/_probe_dsc.py.
 #
 # Reference lifetime: dsc.data points straight at the bytearray we own (zero copy,

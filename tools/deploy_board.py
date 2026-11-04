@@ -15,7 +15,8 @@
 #   python tools/deploy_board.py --prune                      # also delete board files the repo no longer has
 #
 # Deployed content (MANIFEST):
-#   factory/gui  -> /sdcard/factory/gui   launcher.py / ui / audio / net / apps / assets
+#   factory/gui  -> /sdcard/factory/gui   launcher.py / shell / apps / ui / net /
+#                                         audio / core / hardware / assets
 #                                         (README.md files are skipped: the layer map is
 #                                         local documentation and costs device space)
 #   factory/test -> /sdcard/factory/test  production test scripts (**without** media >1MB

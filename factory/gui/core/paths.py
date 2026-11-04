@@ -35,9 +35,9 @@ def _is_dir(path):
 def gui_root():
     """Absolute path of the deployed GUI root (the directory holding assets/).
 
-    Under exec(open('launcher.py').read()) there is no __file__; every imported
-    module has one, so this is only reached from launcher.py itself (which keeps
-    its own fallback for sys.path setup).
+    Resolution starts from this module's own __file__, which always exists: the
+    entry point runs through exec(open(...).read()) and has no __file__, but it
+    keeps its own fallback for the sys.path bootstrap and never calls this.
     """
     global _root
     if _root is not None:

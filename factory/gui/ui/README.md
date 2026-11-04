@@ -24,8 +24,7 @@ not own a device or a user flow.
 3. **Resolve assets through `core/paths.py`**, never by joining from this
    module's own directory. That mistake once made the keyboard's eye icon
    disappear while `_load_png` silently returned `None` (`docs/pitfalls.md`). The
-   PNG reader itself belongs in `ui/image.py`, not in either of the two modules
-   that currently define their own copy.
+   PNG reader itself lives in `image.py`, and no other module opens a PNG.
 4. **A new widget takes user-visible strings from `core/i18n`**, not a hard-coded
    literal. Today none of these modules imports `i18n`: localisation covers the
    home screen only, and widget strings are still literals. Do not extend that

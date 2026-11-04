@@ -132,7 +132,7 @@ These read this tree and must be updated in the same change as any move:
 | `tools/gen_touch_hint.py` | writes `assets/widgets/hint_multitouch.png` |
 | `tools/gen_font.py` | writes `assets/fonts/*.bin` |
 | `tools/gen_ui_cjk_charset.py` | reads `core/i18n.py`; writes `tools/ui_cjk_charset.txt` |
-| `tools/gen_pinyin_map.py` | writes `audio/pinyin_map.py` (currently through a hard-coded absolute path) |
+| `tools/gen_pinyin_map.py` | reads `tools/pinyin_src/` (or `--src`); writes `audio/pinyin_map.py` |
 | `tools/_doctor.py` | reads the theme and registry text through `tools/_gui_source.py`; `PACKAGES` now includes `core`, `hardware` and `shell`, and the import probe names every shell module, so a broken deploy cannot pass |
 | `tools/deploy_board.py` | walks this whole tree |
 | `tools/probes/*.py` | import `hardware.camera_fov`, `core.model_pool`, `core.config` by module name, and clear them from `sys.modules` (parent `core` included) before re-importing |

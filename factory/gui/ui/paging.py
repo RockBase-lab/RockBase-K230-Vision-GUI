@@ -1,10 +1,10 @@
 # Shared paging/scroll module: reused by the desktop launcher and every app that
 # pages horizontally.
 #
-# Why a separate module: the desktop (launcher.py) and the gallery used to carry their
-# own copies of the scroll-container setup and snap logic, with thresholds and
-# styles kept in sync by comments, which drifted easily. They are collapsed into
-# one copy here.
+# Why a separate module: the desktop (shell/home.py) and the gallery each carried their
+# own copy of the scroll-container setup and snap logic, with thresholds and styles
+# kept in sync by comments, which drifted easily. They are collapsed into one copy
+# here.
 #
 # This module **depends on lvgl only** and never imports launcher.py (launcher.py runs via
 # exec(open().read()), so a reverse import would execute it again and create a

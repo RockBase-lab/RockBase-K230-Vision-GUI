@@ -1,7 +1,7 @@
 # Network app: WiFi connection flow plus timezone/NTP settings.
 #
 # Service and UI are separate: connecting, retrying and NTP all live in net_mgr
-# (a long-running singleton started by launcher.py). This app is only the
+# (a long-running singleton started during boot). This app is only the
 # configuration front end -- destroy() deletes widgets and never disconnects, so
 # WiFi stays up after leaving (required, to leave room for background web
 # services later).
@@ -750,8 +750,8 @@ class NetworkApp:
         self.st_err.set_text(net_mgr.last_error if st == net_mgr.GAVE_UP else "")
 
     def step(self):
-        # net_mgr.poll() is driven by the launcher.py main loop (inside and outside
-        # apps), so it is not called again here.
+        # net_mgr.poll() is driven by the GUI main loop (inside and outside apps),
+        # so it is not called again here.
         self._refresh_status()
         # Timezone roller: consume touch points and advance the drag/snap animation
         # (poll driven, like paging).

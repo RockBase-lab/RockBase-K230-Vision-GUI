@@ -7,8 +7,8 @@
 #
 # Language changes are hot: set_lang() persists to config and raises a flag the
 # launcher main loop consumes to rebuild the home screen (tile bitmaps are baked
-# per language, see _cache_path in launcher.py). Apps keep running; their own
-# strings are not localized yet.
+# per language, see cache_path in shell/tile_cache.py). Apps keep running; their
+# own strings are not localized yet.
 
 from core import config
 
