@@ -181,6 +181,13 @@ muscle memory.
    `sys.modules` is only half the job: a package submodule must also be cleared
    off its parent (`delattr(apps, "app_<name>")`), otherwise `from apps import
    app_<name>` returns the stale object with its own module bindings.
+   Purge **every** submodule of the package rather than listing them by hand
+   (`for n in list(sys.modules): if n.split(".")[0] in ("core", "apps", "ui",
+   "shell", "launcher"): del sys.modules[n]`). A hand-written list misses the
+   submodule added last week, and the stale copy keeps the bindings it was
+   imported against: a probe that switched the language to `zh` still rendered
+   the English tiles because the surviving `shell.tile_cache` held the previous
+   `core.i18n` object.
 2. **Measure repaint cost with invalidate plus refresh now.** Measuring through
    `task_handler()` under-reports because the 30 ms refresh period often means
    no repaint happens at all.
