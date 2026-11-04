@@ -196,7 +196,10 @@ python tools/bake_factory_image.py      # 在仓库根目录执行
 3. 检查暂存树是否仍能放进 500 MiB 的 `SDCARD` 分区；
 4. 用 SDK 自带的 `gen_image.sh` 重新打包。
 
-`--check` 只报告暂存状态，不修改任何东西。
+`--check` 只报告暂存状态，不修改任何东西。`--publish DIR` 还会把产出的 `.img`
+复制成 `<镜像名>-<后缀>.img`（默认后缀 `with-gui`），并与源文件 MD5 核对。
+**只复制 `.img`**：那才是 `dd` 要写的文件，不含 `.kdimg` 也就不会在一个目录里
+堆出多个候选而刷错。
 
 有两个构建系统的细节让这一步必须小心。下一次 `make` 会清空 `images/`，所以
 烘焙必须在最后一次构建之后跑。另外 `gen_image_rtapp.py` 读的是暂存的

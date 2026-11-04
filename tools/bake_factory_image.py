@@ -14,12 +14,19 @@ Usage (from the repository root, on Windows or inside WSL):
     python tools/bake_factory_image.py
     python tools/bake_factory_image.py --sdk ~/rockbase-rtos
     python tools/bake_factory_image.py --check          # verify only, change nothing
+    python tools/bake_factory_image.py --publish D:/share/k230
+    python tools/bake_factory_image.py --publish D:/share/k230 --suffix with-gui
+
+--publish copies only the .img (the file dd writes), under <image>-<suffix>.img,
+and checks it against the source MD5. The .kdimg for Canaan's Windows tool is not
+copied, so a directory of candidates cannot lead to flashing the wrong one.
 
 The SDK lives inside WSL because the cross toolchain and the build host are
 there. On Windows this tool routes through `wsl`; inside WSL it runs directly.
 """
 
 import argparse
+import hashlib
 import os
 import shutil
 import subprocess
@@ -212,6 +219,10 @@ def main():
                     help="build output to use (default %s)" % DEFAULT_DEFCONFIG)
     ap.add_argument("--check", action="store_true",
                     help="report the staged state and exit without changing it")
+    ap.add_argument("--publish", metavar="DIR", default=None,
+                    help="also copy the .img into DIR, named <image>-<suffix>.img")
+    ap.add_argument("--suffix", default="with-gui",
+                    help="name suffix used by --publish (default with-gui)")
     args = ap.parse_args()
 
     if not os.path.isdir(GUI_SRC):
@@ -272,9 +283,87 @@ def main():
         input=list_script.encode(CHILD_ENCODING), capture_output=True)
     print()
     print("[DONE] flashable artefacts:")
-    for line in (listing.stdout or b"").decode(CHILD_ENCODING, "replace").split("\n"):
+    output = (listing.stdout or b"").decode(CHILD_ENCODING, "replace")
+    for line in output.split("\n"):
         if line.strip():
             print("  " + line)
+
+    if args.publish:
+        publish(args.publish, args.suffix, args.sdk, args.defconfig)
+
+
+def _wsl_cmd():
+    return (["bash", "-s"] if in_wsl()
+            else ["wsl", "-d", "Ubuntu-22.04", "--", "bash", "-s"])
+
+
+def _wsl_script(sdk, body):
+    """Prepend the SDK path, with ~ expansion, to a shell snippet."""
+    return ('S=%s\n'
+            'case "$S" in "~"|"~/"*) S="$HOME${S#\\~}" ;; esac\n'
+            % sdk) + body
+
+
+def publish(dest, suffix, sdk, defconfig):
+    """Copy the .img into `dest` under a suffixed name and verify it arrived.
+
+    The .img is the artefact to flash with dd; the .kdimg is for Canaan's Windows
+    tool and is deliberately not copied, so a directory full of candidates cannot
+    lead to flashing the wrong one.
+    """
+    dest = os.path.expanduser(dest)
+    if not os.path.isdir(dest):
+        sys.exit("[FAIL] publish directory does not exist: %s" % dest)
+
+    # Take the newest .img rather than guessing the name: it carries the board name
+    # and the nncase version, which the SDK chooses.
+    lister = _wsl_script(sdk, 'ls -t "$S/output/%s"/*.img 2>/dev/null | head -1\n'
+                              % defconfig)
+    newest = subprocess.run(_wsl_cmd(), input=lister.encode(CHILD_ENCODING),
+                            capture_output=True)
+    src = (newest.stdout or b"").decode(CHILD_ENCODING, "replace").strip()
+    if not src:
+        sys.exit("[FAIL] no .img found in the SDK output")
+
+    name = "%s-%s.img" % (os.path.basename(src)[:-len(".img")], suffix)
+    target = os.path.join(dest, name)
+    print()
+    print("[PUBLISH] %s -> %s" % (os.path.basename(src), target))
+
+    # Stream straight to the file: the image is 640 MB, and reading it through a
+    # pipe into memory only to write it out again doubles the peak footprint for
+    # no gain. The filename is inlined, not passed as $1: `bash -s` has no
+    # positional parameters, so "$1" would expand to nothing and cat would fail.
+    reader = _wsl_script(sdk, 'cat "$S/output/%s/%s"\n'
+                              % (defconfig, os.path.basename(src)))
+    digest = hashlib.md5()
+    written = 0
+    with open(target, "wb") as out:
+        proc = subprocess.run(_wsl_cmd(), input=reader.encode(CHILD_ENCODING),
+                              stdout=subprocess.PIPE)
+        if proc.returncode != 0:
+            sys.exit("[FAIL] cannot read %s from the SDK output" % src)
+        chunk = proc.stdout
+        out.write(chunk)
+        digest.update(chunk)
+        written = len(chunk)
+
+    if written == 0:
+        sys.exit("[FAIL] the image read back empty")
+
+    # Compare against the source, not against the bytes we happened to hash on the
+    # way through: that would only prove the pipe was self-consistent.
+    sum_script = _wsl_script(sdk, 'md5sum \"$S/output/%s/%s\" | cut -d\" \" -f1\n'
+                                  % (defconfig, os.path.basename(src)))
+    want = (subprocess.run(_wsl_cmd(), input=sum_script.encode(CHILD_ENCODING),
+                           capture_output=True).stdout or b"")
+    want = want.decode(CHILD_ENCODING, "replace").strip()
+    got = digest.hexdigest()
+    if want and want != got:
+        sys.exit("[FAIL] copy differs from the source: %s != %s" % (got, want))
+    print("[OK]     %.1f MB, md5 %s (%s)" % (
+        written / (1024.0 * 1024.0), got,
+        "matches the source" if want else "source hash unavailable"))
 
 
 if __name__ == "__main__":

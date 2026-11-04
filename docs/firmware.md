@@ -206,7 +206,11 @@ It runs inside WSL (the toolchain lives there) and does four things:
 3. checks the staged tree still fits the 500 MiB `SDCARD` partition;
 4. re-packs with the SDK's own `gen_image.sh`.
 
-`--check` reports the staged state and changes nothing.
+`--check` reports the staged state and changes nothing. `--publish DIR` also
+copies the resulting `.img`, as `<image>-<suffix>.img` (default suffix
+`with-gui`), and checks it against the source MD5. Only the `.img` is copied:
+that is the file `dd` writes, and leaving the `.kdimg` out keeps a directory of
+candidates from leading to a wrong flash.
 
 Two build-system details make this safe. `images/` is wiped by the next `make`,
 so the bake has to run after the last build. And `gen_image_rtapp.py` reads the
