@@ -221,6 +221,10 @@ Check, in this order:
 4. **Scripts and generated assets.** See the coupling table below.
 5. **Skills and `AGENTS.md`.** If a command line, file path, or rule
    changed, update the text that documents it.
+6. **`python tools/_check_i18n.py`** after touching `core/i18n.py`, adding a
+   label, or changing a font. It verifies charset coverage, that every key
+   reference resolves, that no label keeps a Latin face while being given
+   Chinese text, and that dialog text never uses the `NAMES`-only 28 px face.
 
 ### Coupling table
 

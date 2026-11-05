@@ -217,6 +217,7 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_i18n_apps.py` | Load cost of the two UI CJK faces and captures of Settings/Battery/Audio/Network/Gallery/Touch in zh (needs `--lvgl`) |
 | `_probe_i18n_cjk_box.py` | The 22 px dialog face: IMU calibration prompt and the Face Recognize status bar in zh, both previously boxed (needs `--lvgl`) |
 | `_probe_i18n_gesture_bar.py` | Gesture status field: a label built from `--` that later gets a Chinese token, through the real `_update_stat` (needs `--lvgl`) |
+| `_probe_i18n_charset.py` | Renders every zh character in `NAMES` + `STRINGS` with the 16 px face in one grid, so a missing glyph shows as a box (needs `--lvgl`) |
 | `_cap_readme_ui.py` | README screenshots: desktop pages, both folder flyouts, Settings/Audio/IMU/Gallery/Network |
 | `_cap_readme_ui2.py` | README screenshots: Battery (after a real reading) and Touch |
 | `_cap_readme_splash.py` | README screenshot: boot progress bar at a realistic mid-boot state |

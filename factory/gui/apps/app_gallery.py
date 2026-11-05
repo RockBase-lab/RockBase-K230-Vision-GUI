@@ -498,6 +498,9 @@ class GalleryApp:
         except BaseException:
             text = name
         self.filename.set_text(text)
+        # A photo dropped into /data/photos by hand can carry a Chinese name, and
+        # this label was created empty (so it holds the default Latin face).
+        i18n.fit_font(self.filename, text)
         # Cap the width for long paths (longer text wraps automatically), so it never runs
         # off the screen
         try:
