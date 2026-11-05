@@ -220,6 +220,7 @@ See `docs/pitfalls.md` for the full trap index.
 | `_probe_i18n_charset.py` | Renders every zh character in `NAMES` + `STRINGS` with the 16 px face in one grid, so a missing glyph shows as a box (needs `--lvgl`) |
 | `_cap_readme_ui.py` | README screenshots: desktop pages, both folder flyouts, Settings/Audio/IMU/Gallery/Network |
 | `_cap_readme_ui2.py` | README screenshots: Battery (after a real reading) and Touch |
+| `_cap_readme_i18n.py` | README screenshots: desktop and Settings in both languages, language set in memory only (needs `--lvgl`) |
 | `_cap_readme_splash.py` | README screenshot: boot progress bar at a realistic mid-boot state |
 | `_cap_readme_vision.py` | README screenshots: Faces, Detect, Pose, OCR, Plate in one run |
 | `_cap_readme_ocr.py` | OCR with a completed scan (freezes, runs detect plus recognise, snaps the result) |

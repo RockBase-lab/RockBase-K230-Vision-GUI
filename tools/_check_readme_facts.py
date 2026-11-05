@@ -29,12 +29,18 @@ def check(name, expected, actual):
         failures.append(name)
 
 
+# The launcher framework moved into shell/ (theme, registry, boot, display), so the
+# tables and constants are read from their owning modules, not from launcher.py.
 launcher = read(os.path.join(GUI, "launcher.py"))
+registry = read(os.path.join(GUI, "shell", "registry.py"))
+theme = read(os.path.join(GUI, "shell", "theme.py"))
+boot = read(os.path.join(GUI, "shell", "boot.py"))
+display_init = read(os.path.join(GUI, "shell", "display_init.py"))
 paging = read(os.path.join(GUI, "ui", "paging.py"))
 
 # Registry counts
-apps_block = re.search(r"\nAPPS = \[(.*?)\n\]", launcher, re.S).group(1)
-members_block = re.search(r"\nFOLDER_MEMBERS = \{(.*?)\n\}", launcher, re.S).group(1)
+apps_block = re.search(r"\nAPPS = \[(.*?)\n]", registry, re.S).group(1)
+members_block = re.search(r"\nFOLDER_MEMBERS = \{(.*?)\n\}", registry, re.S).group(1)
 top = len(re.findall(r'^\s*\{"id"', apps_block, re.M))
 members = len(re.findall(r'^\s*\{"id"', members_block, re.M))
 folders = len(re.findall(r'"folder": True', apps_block))
@@ -45,21 +51,22 @@ check("registered app modules", 23, top - folders + members)
 
 # Preload tables
 check("boot kmodels", 16, len(re.findall(r'^\s*\(".*\.kmodel", \d+\),',
-                                        launcher, re.M)))
-check("boot fonts", 5, len(re.findall(r'^\s*\(".*\.bin", \d+\),', launcher, re.M)))
+                                        boot, re.M)))
+check("boot fonts", 8, len(re.findall(r'^\s*\(".*\.bin", \d+\),',
+                                     boot, re.M)))
 
 # Layout / feel constants
 def const(path, name):
     return int(re.search(r"^%s = (\d+)" % name, path, re.M).group(1))
 
 
-check("status bar height", 56, const(launcher, "STATUS_H"))
-check("tile size", 164, const(launcher, "TILE_SIZE"))
-check("icon size", 112, const(launcher, "ICON_SIZE"))
+check("status bar height", 56, const(theme, "STATUS_H"))
+check("tile size", 164, const(theme, "TILE_SIZE"))
+check("icon size", 112, const(theme, "ICON_SIZE"))
 check("swipe threshold", 120, const(paging, "SWIPE_THRESHOLD_PX"))
 check("snap animation ms", 180, const(paging, "SNAP_ANIM_MS"))
-check("wifi boot budget ms", 15000, const(launcher, "BOOT_WIFI_TIMEOUT_MS"))
-check("backlight pin", 25, const(launcher, "BACKLIGHT_PIN"))
+check("wifi boot budget ms", 15000, const(boot, "BOOT_WIFI_TIMEOUT_MS"))
+check("backlight pin", 25, const(display_init, "BACKLIGHT_PIN"))
 
 # App-specific constants
 vision = read(os.path.join(GUI, "apps", "app_vision.py"))

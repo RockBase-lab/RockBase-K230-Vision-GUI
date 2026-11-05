@@ -12,6 +12,8 @@ are real captured previews, and only the GIF timing is reconstructed (see below)
 | `swipe.gif` | done | The desktop showcase: 14 real pager frames stitched; 560x336, 48 colours, 385 KB |
 | `folder-vision.png` | done | `Vision` folder flyout, 9 members |
 | `folder-face.png` | done | `Face` folder flyout, 5 members |
+| `desktop-zh.png` | done | Chinese desktop: all eight page-one tile names localized |
+| `app-settings-zh.png` | done | Chinese Settings: SOUND / DISPLAY sections plus the Language row |
 | `boot-splash.png` | done | Progress bar mid model-load (`Loading models 14/16`) |
 | `app-settings.png` | done | Toggles, brightness stepper, SYSTEM section |
 | `app-audio.png` | done | Idle record screen |
@@ -42,6 +44,13 @@ Two routes, both already scripted:
   ```powershell
   python tools/probes/_cap_run.py tools/probes/_cap_readme_ui.py tmp/ui.txt COM56
   python tools/decode_lv_snapshot.py tmp/ui.txt "tmp/readme_%s.png"
+  ```
+  The Chinese shots come from a dedicated script that captures both languages in
+  one run (`desktop_en`, `desktop_zh`, `settings_en`, `settings_zh`); it sets the
+  language in memory with `save=False`, so the board's stored setting is untouched:
+  ```powershell
+  python tools/probes/_cap_run.py tools/probes/_cap_readme_i18n.py tmp/i18n.txt COM56
+  python tools/decode_lv_snapshot.py tmp/i18n.txt "tmp/rd_%s.png"
   ```
   RLE is right for these: a flat 800x480 frame is about 46 KB.
 - **Camera preview frames** — RLE expands a live frame past 1 MB and raises

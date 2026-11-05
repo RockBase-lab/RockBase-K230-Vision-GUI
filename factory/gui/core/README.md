@@ -11,7 +11,7 @@ resource pools (kmodel, font) plus the OCR dictionary.
 | `paths.py` | `gui_root()`, `asset_path(name)` — the one place that knows the tree depth |
 | `errors.py` | `AppUnavailable` and its payloads (`CAMERA_UNAVAILABLE`, `NoSignalCounter`) |
 | `config.py` | `DEFAULTS`, `get` / `set`, `/data/settings/gui.json` |
-| `i18n.py` | language selection, `NAMES`, `CJK_FONT`, the string table |
+| `i18n.py` | `NAMES` / `STRINGS`, `ui.language`, the three CJK face names, `font_for` / `fit_font` |
 | `version.py` | `GUI_VERSION` |
 | `font_pool.py` | lazy bitmap-font handles by name |
 | `model_pool.py` | lazy `nn.kpu` handles, one instance per kmodel path |
@@ -32,16 +32,21 @@ resource pools (kmodel, font) plus the OCR dictionary.
    where `__file__` is missing under `exec()`.
 4. **`config` and `i18n` are peers.** `i18n` calls `config.get` / `config.set`, so
    they must stay in the same layer; neither may move up.
-5. **`errors.py` is here because every layer catches it.** It used to sit in
+5. **A face must cover every string drawn with it.** `CJK_FONT` (28 px) is baked
+   from `NAMES` only and exists for tile names; dialog text uses
+   `CJK_FONT_DIALOG` (22 px) and body text `CJK_FONT_16`. A label whose text
+   changes at runtime must go through `i18n.fit_font()` after `set_text`, because
+   LVGL draws a box for a missing glyph with no error.
+6. **`errors.py` is here because every layer catches it.** It used to sit in
    `apps/`, which made `model_pool` (infrastructure) import `apps/` (business) —
    a cycle in intent even without a Python cycle. Keep the definition below both
    users.
-6. **A pool returns a borrowed handle, never an owned one.** `model_pool` owns
+7. **A pool returns a borrowed handle, never an owned one.** `model_pool` owns
    every `kpu` it hands out; a caller must not `release()` it, or the next app
    loses the model. Only the app's own `Ai2d` is freed in `destroy()`.
-7. **One source per constant.** `config.DEFAULTS["display.brightness"]` reads
+8. **One source per constant.** `config.DEFAULTS["display.brightness"]` reads
    `hardware.backlight.MIN_PERCENT`; do not restate the number.
-8. **Settings writes are immediate and idempotent.** A corrupt or missing file
+9. **Settings writes are immediate and idempotent.** A corrupt or missing file
    must never stop the GUI: `load()` keeps `DEFAULTS` and logs one line.
 
 ## Status

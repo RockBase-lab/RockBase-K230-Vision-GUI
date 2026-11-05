@@ -62,6 +62,7 @@
 | 物理按键 | `GPIO0` = CANCEL（低有效，逐级返回），`GPIO53` = OK（高有效） |
 | 滑动手感 | 阈值 120px、吸附动画 180ms；`lv.refr_now()` 帧率提升覆盖触摸与吸附过程 |
 | 背光控制 | 独立 GPIO25 PWM 调光，设置项即时生效并持久化 |
+| 多语言 | 英文与简体中文；`ui.language` 切换桌面与应用文案，无需重启 |
 
 第二页只放“配置一次就不再动”的入口（Network / Settings / Battery），
 日常使用的应用留在第一页。滑动时只有图标网格在滚动，状态栏与页码点保持不动；
@@ -72,6 +73,29 @@
 | Vision 组（9 个成员） | Face 组（5 个成员） |
 | --- | --- |
 | ![Vision 文件夹](img/folder-vision.png) | ![Face 文件夹](img/folder-face.png) |
+
+### 多语言
+
+所有用户可见文案都来自同一张表 `factory/gui/core/i18n.py`：`NAMES` 存放 25 个
+桌面与文件夹名称，`STRINGS` 存放 288 条应用文案。在 Settings 里选择语言会写入
+`ui.language` 并置一个标志位，因此：
+
+- **桌面**在下次显示 home 屏时重建，并读取该语言的 tile 缓存
+  （英文 `tile_<id>.bin`，中文 `tile_<id>_zh.bin`）；
+- **Settings** 立即重建自身页面，切换当场可见；
+- **其它应用**在打开时读取文案，已打开的应用保持原语言直到重新进入。
+
+整个过程不需要重启，也不会因为切换语言丢掉应用状态。
+
+| 中文桌面 | 中文设置页 |
+| --- | --- |
+| ![中文桌面](img/desktop-zh.png) | ![中文设置页](img/app-settings-zh.png) |
+
+中文由三套预烘焙位图字体绘制（16px 正文、22px 对话框、28px tile 名），只包含
+界面真正用到的字——374 个字形，而不是整套 CJK 字体。实测代价为
+569 / 584 / 193 ms 与 54 / 96 / 30 KB；完整的 3755 字方案实测 4688 ms、约 860 KB，
+会挤占 AI 应用所需的堆。每套字体与文案表的一致性由
+`python tools/_check_i18n.py` 校验。
 
 ### 启动
 
@@ -276,7 +300,7 @@ flowchart TD
     B --> C[Splash 进度条]
     C --> D[boot_load]
     D --> E[tile 位图缓存]
-    E --> F[位图字体 x6]
+    E --> F[位图字体 x8]
     F --> G[OCR 字典]
     G --> H[model_pool 常驻 x16]
     H --> I[Wi-Fi 15s 预算]
@@ -339,10 +363,7 @@ config.DEFAULTS  ──►  /data/settings/gui.json  ◄──  app_settings.GRO
 设置项没有“保存”按钮，改一次写一次盘。缺失或损坏的配置文件不会阻止 GUI 启动，
 会用默认值继续并打印一行日志。
 
-`ui.language`（`en` / `zh`）负责桌面与应用文案本地化：tile 名、文件夹标题、成员标签
-以及所有用户可见的应用字符串都来自 `factory/gui/core/i18n.py`。桌面切换在下次显示
-home 屏时生效，不需要复位：launcher 会重建 home 屏并读取该语言对应的 tile 缓存。
-Settings 会立即重建自身页面；其它应用在打开时读取文案，已打开的应用保持原语言。
+`ui.language`（`en` / `zh`）就是其中一个键；切换语义与字体代价见[多语言](#多语言)。
 
 ## 应用清单
 
@@ -424,6 +445,7 @@ Settings 会立即重建自身页面；其它应用在打开时读取文案，�
 | `tools/gen_status_icons.py` | Lucide SVG → 状态栏 home / wifi / battery 位图 |
 | `tools/gen_clock_digits.py` | Nunito Bold → 状态栏数字位图 |
 | `tools/gen_font.py` | 字符集 + TTF → 位图字体 `.bin` |
+| `tools/gen_ui_cjk_charset.py` | `core/i18n.py` 文案表 → 两套 CJK 字集文件 |
 | `tools/gen_pinyin_map.py` | → `audio/pinyin_map.py` |
 | `tools/gen_audio_assets.py` | → 音频应用的数字与按钮位图 |
 | `tools/gen_face_mesh.py` | → 人脸网格表 |
@@ -432,6 +454,7 @@ Settings 会立即重建自身页面；其它应用在打开时读取文案，�
 | `tools/decode_lv_snapshot.py` | 板上导出的 LVGL 快照 → PNG |
 | `tools/make_swipe_gif.py` | 滑页定格帧 → README 用的 GIF（重新计时并固定状态栏） |
 | `tools/_check_readme_facts.py` | 只读：核对 README 里的数量与常量是否与源码一致 |
+| `tools/_check_i18n.py` | 只读：字集覆盖、键引用、运行期字体重绑、对话框字体 |
 | `tools/_run_remote.py` | 在板上跑一个本地脚本并回收输出 |
 | `tools/probes/*.py` | 一次性测量脚本，用于复现 `docs/` 里的数值 |
 

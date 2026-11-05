@@ -67,6 +67,7 @@ board-only imports; they are not firmware source.
 | Physical keys | `GPIO0` = CANCEL (active low, steps back one level), `GPIO53` = OK (active high) |
 | Swipe feel | 120 px threshold, 180 ms snap; `lv.refr_now()` boosting covers the touch and snap window |
 | Backlight | Standalone GPIO25 PWM dimming; a settings change applies immediately and persists |
+| Languages | English and Simplified Chinese; `ui.language` relabels the desktop and every app string with no reboot |
 
 Page two holds only the entries you configure once (Network, Settings, Battery); the
 daily set stays on page one. During a swipe only the tile grid scrolls: the status bar
@@ -79,6 +80,31 @@ directly.
 | Vision group (9 members) | Face group (5 members) |
 | --- | --- |
 | ![Vision folder](img/folder-vision.png) | ![Face folder](img/folder-face.png) |
+
+### Languages
+
+Every user-visible string comes from one table, `factory/gui/core/i18n.py`:
+`NAMES` holds the 25 tile and folder names, `STRINGS` the 288 application strings.
+Choosing a language in Settings writes `ui.language` and raises a flag, so:
+
+- the **desktop** rebuilds on the next home screen with that language's tile cache
+  (`tile_<id>.bin` for English, `tile_<id>_zh.bin` for Chinese);
+- **Settings** rebuilds its own page immediately, so the switch is visible at once;
+- **every other application** reads its strings when it opens, so one that is already
+  running keeps its language until it is reopened.
+
+No reboot is needed, and an app's state is never lost to a language change.
+
+| Chinese desktop | Chinese Settings |
+| --- | --- |
+| ![Chinese desktop](img/desktop-zh.png) | ![Chinese Settings](img/app-settings-zh.png) |
+
+Chinese text is drawn by three pre-baked bitmap faces (16 px body, 22 px dialog,
+28 px tile names) built from the characters the UI actually uses — 374 glyphs, not a
+whole CJK font. That keeps the cost at 569 / 584 / 193 ms and 54 / 96 / 30 KB;
+the full 3755-glyph set was measured at 4688 ms and ~860 KB, which would crowd out the
+AI applications' heap. Each face is checked against the table by
+`python tools/_check_i18n.py`.
 
 ### Boot
 
@@ -304,7 +330,7 @@ flowchart TD
     B --> C[Splash progress bar]
     C --> D[boot_load]
     D --> E[tile bitmap cache]
-    E --> F[bitmap fonts x6]
+    E --> F[bitmap fonts x8]
     F --> G[OCR dictionary]
     G --> H[model_pool resident x16]
     H --> I[Wi-Fi 15s budget]
@@ -373,12 +399,8 @@ There is no Save button: every change is written immediately. A missing or corru
 settings file never blocks the GUI from starting; it falls back to the defaults and
 prints one log line.
 
-`ui.language` (`en` / `zh`) localizes the desktop and app text: tile names,
-folder titles, member labels and every user-visible app string come from
-`factory/gui/core/i18n.py`. A desktop change applies when the home screen is next
-shown, with no reset needed: the launcher rebuilds it and reads the new language's
-tile cache. Settings rebuilds its own page immediately; other apps read their
-strings when they are opened, so an already-running app keeps its language.
+`ui.language` (`en` / `zh`) is one of those keys; see [Languages](#languages) for the
+switch semantics and the font cost.
 
 ## Application list
 
@@ -469,6 +491,7 @@ code but the UI looks the same".
 | `tools/gen_status_icons.py` | Lucide SVG to status-bar home, wifi and battery bitmaps |
 | `tools/gen_clock_digits.py` | Nunito Bold to status-bar clock digit bitmaps |
 | `tools/gen_font.py` | A charset plus a TTF to a bitmap font `.bin` |
+| `tools/gen_ui_cjk_charset.py` | `core/i18n.py` tables to the two CJK charset files the fonts bake from |
 | `tools/gen_pinyin_map.py` | The pinyin table at `audio/pinyin_map.py` |
 | `tools/gen_audio_assets.py` | Digit and button bitmaps for the Audio app |
 | `tools/gen_face_mesh.py` | The face-mesh tables |
@@ -477,6 +500,7 @@ code but the UI looks the same".
 | `tools/decode_lv_snapshot.py` | An LVGL snapshot exported from the board to PNG |
 | `tools/make_swipe_gif.py` | Swipe stills to the README GIF (re-timed, status bar frozen) |
 | `tools/_check_readme_facts.py` | Read-only: verify the counts and constants the README claims |
+| `tools/_check_i18n.py` | Read-only: charset coverage, key references, runtime font re-fits, dialog face |
 | `tools/_run_remote.py` | Run a local script on the board and collect its output |
 | `tools/probes/*.py` | One-shot measurement scripts that reproduce the values in `docs/` |
 

@@ -1,7 +1,7 @@
 # Regenerate the two CJK charset files the UI fonts bake from:
 #
-#   tools/ui_cjk_charset.txt          NAMES + STRINGS (the 16px app face)
-#   tools/ui_cjk_desktop_charset.txt  NAMES only       (the 28px tile-name face)
+#   tools/ui_cjk_charset.txt          NAMES + STRINGS (16px app and 22px dialog)
+#   tools/ui_cjk_desktop_charset.txt  NAMES only      (28px tile names)
 #
 # Coverage is guaranteed by construction: gen_font.py takes the characters from
 # these exact files, and refresh() below is the only writer. Keeping the 28px
