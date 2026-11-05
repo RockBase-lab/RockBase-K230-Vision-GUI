@@ -181,14 +181,19 @@ their English `name` as the fallback the launcher uses when an id has no row.
    for `STRINGS`. Templates keep their `{}` placeholders in both halves.
 2. Resolve it at build time with `i18n.t(key)` / `i18n.name(id)`, and pass the
    result through `i18n.font_for(text, latin_font)` before setting it on a
-   label: the Latin faces carry no CJK glyphs.
-3. Run `python tools/gen_ui_cjk_charset.py`. It rewrites both charset files from
+   label: the Latin faces carry no CJK glyphs. A label whose text changes at
+   runtime must call `i18n.fit_font(label, text)` after `set_text`, otherwise it
+   keeps the Latin face it was built with (ASCII placeholders like `-` and `--`)
+   and boxes the first Chinese string.
+3. Dialog-size text uses `i18n.CJK_FONT_DIALOG` (22 px, the whole `STRINGS`
+   table), never `i18n.CJK_FONT`: that 28 px face is baked from `NAMES` only.
+4. Run `python tools/gen_ui_cjk_charset.py`. It rewrites both charset files from
    the tables: `tools/ui_cjk_charset.txt` (16 px app face) and
    `tools/ui_cjk_desktop_charset.txt` (28 px tile-name face, `NAMES` only).
-4. Bake both faces: `python tools/gen_font.py ui16cjk ui28cjk`.
-5. Re-bake the tile bitmaps when `NAMES` changed: `python tools/gen_tile_cache.py`.
+5. Bake the three faces: `python tools/gen_font.py ui16cjk ui22cjk ui28cjk`.
+6. Re-bake the tile bitmaps when `NAMES` changed: `python tools/gen_tile_cache.py`.
    It writes both languages, so a switch needs no slow on-board bake.
-6. Deploy and check both languages on board. A missing glyph renders as a box
+7. Deploy and check both languages on board. A missing glyph renders as a box
    with no error, so read the screenshot rather than trusting exit status.
 
 The language is hot for the desktop: `i18n.set_lang()` persists `ui.language`
@@ -230,7 +235,7 @@ Check, in this order:
 | A `tools/` command-line flag | The usage line in the script and the skill that documents it |
 | `tools/deploy_board.py` `MANIFEST` | The directory layout on the board |
 | `tools/bake_factory_image.py` `EXCLUDES` | The same skip set as `deploy_board.py`, so a baked image and an incremental deploy carry identical Python |
-| A string in `factory/gui/core/i18n.py` (either table) | `python tools/gen_ui_cjk_charset.py`, then `python tools/gen_font.py ui16cjk ui28cjk`. Every zh character must be in the matching charset file, or it renders as a box |
+| A string in `factory/gui/core/i18n.py` (either table) | `python tools/gen_ui_cjk_charset.py`, then `python tools/gen_font.py ui16cjk ui22cjk ui28cjk`. Every zh character must be in the matching charset file, or it renders as a box |
 | A `NAMES` row, or a desktop visual constant | `BAKE_VER` + 1 in `shell/theme.py`; `gen_tile_cache.py` bakes both languages (`tile_<id>.bin` / `tile_<id>_zh.bin`) |
 | A constant parsed by a generator | The generator's own default and any `docs/` value |
 | Any rule, path, or command name | The four places rules live: `AGENTS.md`, `.github/copilot-instructions.md`, `.github/skills/**`, `docs/*.md` |

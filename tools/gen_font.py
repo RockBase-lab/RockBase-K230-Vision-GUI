@@ -160,6 +160,20 @@ SPECS = {
             ("SourceHanSansCN-Regular.ttf", None),
         ],
     },
+    # Dialog face: titles and buttons render at 22-28px, and the 28px desktop face
+    # only carries the tile names. This one covers the whole STRINGS table, so any
+    # dialog wording renders instead of boxing. 22px matches DIALOG_BODY_FONT, and a
+    # title at 22px still reads as a heading inside a 600px card.
+    "ui22cjk": {
+        "out": "ui_cjk_22.bin",
+        "size": 22,
+        "bpp": 4,
+        "charset": "ui_cjk_charset.txt",
+        "parts": [
+            ("SourceHanSansCN-Regular.ttf", [(0x20, 0x7E)]),
+            ("SourceHanSansCN-Regular.ttf", None),
+        ],
+    },
     # Desktop language labels: the zh tile names bake into the tile bitmaps at
     # TILE_FONT_SIZE (28px), so the on-board fallback bake and the folder flyout
     # title need a 28px CJK face. The charset is only the characters i18n.NAMES

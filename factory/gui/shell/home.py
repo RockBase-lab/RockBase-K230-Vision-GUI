@@ -878,7 +878,7 @@ class Launcher:
         if bold is None:
             bold = widgets.font("font_montserrat_20", "font_montserrat_16")
         # A CJK label takes the 28px UI face: same size class as the kb font.
-        bold = i18n.font_for(btn_text, bold, i18n.CJK_FONT)
+        bold = i18n.font_for(btn_text, bold, i18n.CJK_FONT_DIALOG)
         if bold:
             lab.set_style_text_font(bold, 0)
         lab.center()

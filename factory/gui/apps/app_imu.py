@@ -1928,7 +1928,7 @@ class ImuApp(object):
         title = lv.label(panel)
         title.set_text(i18n.t("imu.gyro_title"))
         title.set_style_text_color(lv.color_hex(0xFFFFFF), 0)
-        tf = i18n.font_for(i18n.t("imu.gyro_title"), title_font, i18n.CJK_FONT)
+        tf = i18n.font_for(i18n.t("imu.gyro_title"), title_font, i18n.CJK_FONT_DIALOG)
         if tf is not None:
             title.set_style_text_font(tf, 0)
         title.align(lv.ALIGN.TOP_MID, 0, 24)
@@ -1970,7 +1970,7 @@ class ImuApp(object):
             lb = lv.label(btn)
             lb.set_text(text)
             lb.set_style_text_color(lv.color_hex(0xFFFFFF), 0)
-            bf = i18n.font_for(text, title_font, i18n.CJK_FONT)
+            bf = i18n.font_for(text, title_font, i18n.CJK_FONT_DIALOG)
             if bf is not None:
                 lb.set_style_text_font(bf, 0)
             lb.center()
@@ -2016,7 +2016,7 @@ class ImuApp(object):
         if self._overlay is None:
             self._build_overlay()
         self._ov_title.set_text(title)
-        tf = i18n.font_for(title, self._ov_title_font, i18n.CJK_FONT)
+        tf = i18n.font_for(title, self._ov_title_font, i18n.CJK_FONT_DIALOG)
         if tf is not None:
             self._ov_title.set_style_text_font(tf, 0)
         self._ov_body.set_text(body)
@@ -2027,7 +2027,7 @@ class ImuApp(object):
             if buttons and idx < len(buttons):
                 text, bg, act = buttons[idx]
                 self._btn_labels[idx].set_text(text)
-                bf = i18n.font_for(text, self._ov_title_font, i18n.CJK_FONT)
+                bf = i18n.font_for(text, self._ov_title_font, i18n.CJK_FONT_DIALOG)
                 if bf is not None:
                     self._btn_labels[idx].set_style_text_font(bf, 0)
                 self._btn_acts[idx] = act

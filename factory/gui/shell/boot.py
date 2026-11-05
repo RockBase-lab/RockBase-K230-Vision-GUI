@@ -72,6 +72,7 @@ BOOT_FONTS = [
     ("ui_nunito_bold_22.bin", 110),
     ("kb_nunito_bold_28.bin", 119),
     ("ui_cjk_16.bin", 569),
+    ("ui_cjk_22.bin", 584),
     ("ui_cjk_28.bin", 193),
     ("plate_cjk_30.bin", 164),
     ("ocr_cjk_16.bin", 7469),

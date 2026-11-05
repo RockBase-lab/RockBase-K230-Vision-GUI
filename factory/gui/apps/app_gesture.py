@@ -438,10 +438,14 @@ class GestureApp:
     def _update_stat(self):
         self.stat_fps.set_text("FPS {}".format(self.fps_text))
         if self.last_gesture:
-            # classify() emits English tokens, so the display name is looked up per
-            # token; an unknown token falls back to itself.
-            self.stat_gesture.set_text(
-                i18n.t("gesture." + self.last_gesture, self.last_gesture))
+            # classify() emits camelCase tokens ("thumbUp"), while the table keys are
+            # lower case; normalising here keeps the two vocabularies in sync.
+            token = self.last_gesture
+            text = i18n.t("gesture." + token.lower(), token)
+            self.stat_gesture.set_text(text)
+            # This label was built from "--", so it carries a Latin face: re-fit it
+            # or every Chinese gesture name draws boxes.
+            i18n.fit_font(self.stat_gesture, text)
             self.stat_gesture.set_style_text_color(lv.color_hex(COL_GESTURE), 0)
         else:
             self.stat_gesture.set_text("--")

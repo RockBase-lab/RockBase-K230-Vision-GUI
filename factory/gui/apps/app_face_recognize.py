@@ -519,17 +519,21 @@ class FaceRecognizeApp:
             note = self._enroll_note
         if note:
             self.seg_name.set_text(note)
+            i18n.fit_font(self.seg_name, note)
             self.seg_name.set_style_text_color(lv.color_hex(COL_FPS), 0)
         elif not self.has_face:
-            self.seg_name.set_text(i18n.t("ai.no_face"))
+            text = i18n.t("ai.no_face")
+            self.seg_name.set_text(text)
+            i18n.fit_font(self.seg_name, text)
             self.seg_name.set_style_text_color(lv.color_hex(COL_UNKNOWN), 0)
         elif self._name:
             self.seg_name.set_text("{} {:.2f}".format(self._name, self._score))
             self.seg_name.set_style_text_color(lv.color_hex(COL_KNOWN), 0)
         else:
-            self.seg_name.set_text(
-                i18n.t("rec.unknown_score").format(self._score)
-                if self._score else i18n.t("rec.unknown"))
+            text = (i18n.t("rec.unknown_score").format(self._score)
+                    if self._score else i18n.t("rec.unknown"))
+            self.seg_name.set_text(text)
+            i18n.fit_font(self.seg_name, text)
             self.seg_name.set_style_text_color(lv.color_hex(COL_UNKNOWN), 0)
 
         self.seg_fps.set_text("FPS {}".format(self.fps_text))

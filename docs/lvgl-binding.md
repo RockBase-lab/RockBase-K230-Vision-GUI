@@ -70,25 +70,32 @@ table defines size and glyph set. The assets land in
 ### localized UI text uses a glyph subset, not a whole CJK font
 
 All user-visible strings come from `core/i18n.py`, and the Latin faces
-(`Nunito`, `montserrat`, `mono_dejavu`) have no CJK glyphs. Two faces cover the
-Chinese half, both baked from Source Han Sans with bpp 4 and only the characters
+(`Nunito`, `montserrat`, `mono_dejavu`) have no CJK glyphs. Three faces cover the
+Chinese half, all baked from Source Han Sans with bpp 4 and only the characters
 the tables actually use:
 
-| Face | Charset | Glyphs | File | Load |
-| --- | --- | --- | --- | --- |
-| `ui_cjk_16.bin` | `NAMES` + `STRINGS` | 374 | 54 KB | 569 ms |
-| `ui_cjk_28.bin` | `NAMES` only | 47 | 30 KB | 193 ms |
+| Face | Charset | Glyphs | File | Load | Used for |
+| --- | --- | --- | --- | --- | --- |
+| `ui_cjk_16.bin` | `NAMES` + `STRINGS` | 374 | 54 KB | 569 ms | app body text, status bars |
+| `ui_cjk_22.bin` | `NAMES` + `STRINGS` | 374 | 96 KB | 584 ms | dialog titles and buttons |
+| `ui_cjk_28.bin` | `NAMES` only | 47 | 30 KB | 193 ms | baked tile names, flyout titles |
+
+One face per rendered size, and **each face must cover every string drawn with
+it**. The 28 px face is deliberately `NAMES`-only because it exists for tile
+names; pointing dialog wording at it boxes every glyph (measured: the IMU
+calibration prompt). Dialogs use `i18n.CJK_FONT_DIALOG` instead. Folding the
+app strings into the 28 px face would grow it from 30 KB to 138 KB and add
+~1.5 s of boot for glyphs it never renders.
 
 `tools/gen_ui_cjk_charset.py` regenerates both charset files from `i18n.py`, so
 coverage is guaranteed by construction: a character that is not in the table
-cannot be displayed. Keep the 28 px face on `NAMES` alone — folding the app
-strings in grew it from 30 KB to 138 KB for glyphs it never renders.
+cannot be displayed.
 
-`i18n.font_for(text, latin)` returns the CJK face when the string has a
-non-ASCII code point, so a label that may be localized must pass its text
-through it. A label created before the language is known keeps whichever font it
-was built with: apps read strings at construction, Settings rebuilds itself on a
-language change.
+`i18n.font_for(text, latin, cjk)` picks a face at build time, and
+`i18n.fit_font(label, text, cjk)` re-points a label that already exists. The
+second one is mandatory for any label whose text changes at runtime, because a
+label created from an ASCII placeholder (`-`, `--`, `FPS -`) keeps the Latin
+face it was given and boxes the first Chinese string set on it.
 
 A full-screen repaint with four mixed ASCII/CJK labels costs under 1 ms
 (`refr_now` x10).

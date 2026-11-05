@@ -130,7 +130,7 @@ These read this tree and must be updated in the same change as any move:
 | `tools/gen_tz_rows.py` | reads `assets/fonts/Nunito-Bold-700.ttf`; writes `assets/cache/tz_t*.bin` |
 | `tools/gen_member_icons.py` | reads `assets/icons/icon_*.png`; writes `assets/cache/member_icon_*.png` |
 | `tools/gen_touch_hint.py` | writes `assets/widgets/hint_multitouch.png` |
-| `tools/gen_font.py` | writes `assets/fonts/*.bin` |
+| `tools/gen_font.py` | writes `assets/fonts/*.bin`, including the three CJK faces (`ui16cjk`, `ui22cjk` for dialogs, `ui28cjk` for tile names) |
 | `tools/gen_ui_cjk_charset.py` | reads `core/i18n.py`; writes `tools/ui_cjk_charset.txt` (16 px face) and `tools/ui_cjk_desktop_charset.txt` (28 px face, `NAMES` only) |
 | `tools/gen_pinyin_map.py` | reads `tools/pinyin_src/` (or `--src`); writes `audio/pinyin_map.py` |
 | `tools/_doctor.py` | reads the theme and registry text through `tools/_gui_source.py`; `PACKAGES` now includes `core`, `hardware` and `shell`, and the import probe names every shell module, so a broken deploy cannot pass |

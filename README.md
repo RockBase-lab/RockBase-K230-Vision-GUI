@@ -86,8 +86,8 @@ The boot sequence drives a real progress bar weighted by **measured milliseconds
 rather than by item count:
 
 1. Read the tile bitmap cache (on a miss, bake on the board and write it to disk)
-2. Load 7 bitmap fonts (the OCR CJK font alone costs about 7.5 s and dominates the bar;
-   the two UI CJK faces cost 569 ms and 193 ms)
+2. Load 8 bitmap fonts (the OCR CJK font alone costs about 7.5 s and dominates the bar;
+   the three UI CJK faces cost 569 ms, 584 ms and 193 ms)
 3. Read the OCR dictionary
 4. Load the 16 resident kmodels
 5. Attempt a Wi-Fi connection (hard 15 s budget; on timeout the desktop still appears

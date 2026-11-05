@@ -16,6 +16,10 @@ from core import config
 LANGS = ("en", "zh")
 CJK_FONT = "ui_cjk_28.bin"
 CJK_FONT_16 = "ui_cjk_16.bin"
+# Dialog titles and buttons render at 22-28px. The 28px face is baked from NAMES
+# only (tile names), so it has no glyphs for dialog wording; the 22px face carries
+# the whole STRINGS table and is the CJK fallback above body text size.
+CJK_FONT_DIALOG = "ui_cjk_22.bin"
 
 NAMES = {
     # Top-level tiles
@@ -45,7 +49,9 @@ NAMES = {
     "landmark": ("Points", "关键点"),
     "recognize": ("Recognize", "识别"),
     "liveness": ("Liveness", "活体"),
-    "mask": ("Mask", "口罩"),
+    # Mask is the face-parse overlay (a 19-class per-pixel map painted in colour),
+    # not a surgical mask: 遮罩, never 口罩.
+    "mask": ("Mask", "遮罩"),
 }
 
 # App strings. Templates keep their {} placeholders in both halves and are
@@ -458,6 +464,30 @@ def font_for(text, latin, cjk=CJK_FONT_16):
         return font_pool.get(cjk) or latin
     except BaseException:
         return latin
+
+
+def fit_font(label, text, cjk=CJK_FONT_16):
+    """Re-point a live label at a face that can render `text`.
+
+    Required whenever a label's text changes at runtime: a label built from an
+    ASCII initial value ("-", "--", "FPS -") keeps the Latin face it was given, so
+    set_text() with a Chinese string draws boxes. Returns True when a CJK face was
+    applied.
+    """
+    if not needs_cjk(text):
+        return False
+    try:
+        from core import font_pool
+        font = font_pool.get(cjk)
+    except BaseException:
+        font = None
+    if font is None:
+        return False
+    try:
+        label.set_style_text_font(font, 0)
+        return True
+    except BaseException:
+        return False
 
 
 # AppUnavailable payloads are English constants in the raising module (they are
