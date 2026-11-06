@@ -203,7 +203,7 @@ IMU 应用有三页，左右滑动切换：仪表盘、原始数据曲线、姿�
 
 ```powershell
 git clone <本仓库地址>
-cd RockBase-K230-Vision
+cd RockBase-K230-Vision-GUI
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt

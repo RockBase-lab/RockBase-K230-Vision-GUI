@@ -225,7 +225,7 @@ procedure.
 
 ```powershell
 git clone <this repository>
-cd RockBase-K230-Vision
+cd RockBase-K230-Vision-GUI
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
